@@ -111,6 +111,16 @@ Use the left panel (on a phone, the tabs along the bottom).
 
 Hold your mouse over any leave-type label to see its full name and how it works. Click the leave-type buttons above a calendar to hide or show that type, or **Pending requests** to hide leave that isn't approved yet. You see when colleagues are away, but not their notes or balances.
 
+## Printing a leave report
+
+You can print a professional report of your leave, or save it as a PDF.
+
+1. Click **Reports** in the left panel (on a phone, the Reports tab).
+2. Use **‹ 2026 ›** at the top to choose the leave year.
+3. Click **Print / Save as PDF**. In the print window, choose your printer, or choose **Save as PDF** as the destination.
+
+The report shows your details, a table of each leave type (allowance, taken, pending, remaining), every request with its status and who approved it, and lines for your and the Administrator's signatures.
+
 ## Common questions
 
 | Problem | What to do |

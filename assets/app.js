@@ -82,6 +82,7 @@
     month: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
     year: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
     approvals: '<path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/>',
+    reports: '<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M10 13h6M10 17h6"/><path d="M4 7v14h3"/>',
     employees: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2.2"/><path d="M5.5 16c.6-1.9 2-3 3.5-3s2.9 1.1 3.5 3"/><path d="M14.5 9h4M14.5 13h4"/>',
     team: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3 3 0 0 1 0 6M18 14c2 .7 3 2.6 3 6"/>',
     plus: '<path d="M12 5v14M5 12h14"/>'
@@ -90,7 +91,7 @@
   function markHTML() { var on = [1, 4, 5]; var s = ''; for (var i = 0; i < 9; i++) s += '<i' + (on.indexOf(i) >= 0 ? ' class="on"' : '') + '></i>'; return '<span class="mark" aria-hidden="true">' + s + '</span>'; }
 
   /* ------------------------------ state ------------------------------ */
-  var VIEWS = ['home', 'wall', 'month', 'year', 'approvals', 'team', 'employees'];
+  var VIEWS = ['home', 'wall', 'month', 'year', 'approvals', 'team', 'employees', 'reports'];
   var hashView = (location.hash || '').replace('#', '');
   var S = {
     token: store.get(LIVE ? 'token' : 'demo_token'),
@@ -99,6 +100,7 @@
     cursor: monthStart(new Date()),
     yearOffset: 0,
     emp: null, empYear: 0, empType: 'all', empStatus: 'Approved',
+    repKind: null, repPerson: null, repYear: 0,
     person: null,
     showPending: store.get('showPending') !== false,
     hidden: store.get('hidden') || {}
@@ -235,6 +237,7 @@
     var items = [['home', 'Overview'], ['wall', 'Wallchart'], ['month', 'Calendar'], ['year', 'Year planner']];
     if (isMgr()) items.push(['approvals', 'Approvals'], ['team', 'Team balances']);
     if (isMgr()) items.push(['employees', 'Employees']);
+    items.push(['reports', 'Reports']);
     return items;
   }
   function render() {
@@ -544,6 +547,139 @@
     return rows.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
   }
 
+  /* ---------- Reports: printable leave reports ---------- */
+  function datesOf(r) {
+    var t = typeOf(r.type);
+    if (C.isCalendarUnit(t)) {
+      var out = [], d = C.parse(r.start), e = C.parse(r.end), g = 0;
+      while (d <= e && g++ < 800) { out.push({ date: C.iso(d), amt: 1 }); d = C.addDays(d, 1); }
+      return out;
+    }
+    return DL[r.id] || C.dayList(r, CTX);
+  }
+  function inYear(list, y) {
+    var rng = C.lyRange(y, CTX.S);
+    return list.filter(function (x) { return x.date >= rng.start && x.date <= rng.end; });
+  }
+  function reqUseText(r, y) {
+    var t = typeOf(r.type), n = inYear(datesOf(r), y).reduce(function (s, x) { return s + x.amt; }, 0);
+    if (!C.isDayUnit(t) && !C.isCalendarUnit(t)) return C.fmtAmount(t, 1) + ' (' + days(n) + ')';
+    return C.fmtAmount(t, n);
+  }
+  function personRequests(st, y) {
+    var rng = C.lyRange(y, CTX.S);
+    return S.data.requests.filter(function (r) { return r.staffId === st.id && r.end >= rng.start && r.start <= rng.end; })
+      .sort(function (a, b) { return a.start < b.start ? -1 : 1; });
+  }
+  function rpHead(title, sub, y) {
+    var rng = C.lyRange(y, CTX.S);
+    return '<header class="rp-head"><div><div class="rp-org">' + esc(settings().CompanyName || 'Leave Planner') + '</div>' +
+      '<h1 class="rp-title">' + esc(title) + '</h1>' + (sub ? '<div class="rp-sub">' + sub + '</div>' : '') + '</div>' +
+      '<div class="rp-meta"><span>Leave year</span><b>' + esc(lyName(y)) + '</b><span>' + esc(fmt(rng.start, true) + ' – ' + fmt(rng.end, true)) + '</span></div></header>';
+  }
+  function rpFoot(note) {
+    return '<footer class="rp-foot"><span>' + esc(note || 'Only working days are counted, except Sabbatical (calendar days). Days a person doesn’t normally work, days the church is closed and public holidays are not deducted.') + '</span>' +
+      '<span>Prepared ' + esc(fmtLong(todayISO())) + ' by ' + esc(me().name) + '</span></footer>';
+  }
+  function personReport(st, y) {
+    var bal = C.balances(S.data, st.id, y), rng = C.lyRange(y, CTX.S);
+    var reqs = personRequests(st, y);
+    var used = {};
+    reqs.forEach(function (r) { used[r.type] = 1; });
+    var sumRows = S.data.types.filter(function (t) { return bal[t.code].offered && (t.deducts || used[t.code]); }).map(function (t) {
+      var b = bal[t.code];
+      var allow = b.entitled == null ? '—' : C.fmtAmount(t, b.entitled) + (t.accumulates && b.broughtForward ? '<small>incl. ' + C.fmtDays(b.broughtForward) + ' saved</small>' : '');
+      var note = [];
+      if (b.lastYear && todayISO() <= b.lastYear.until) note.push('+ ' + C.fmtDays(b.lastYear.left) + ' from ' + lyName(b.lastYear.fromYear) + ', use by ' + fmt(b.lastYear.until, true));
+      if (Number(t.perTerm) > 0) { var tn = C.termOf(S.data, todayISO()); if (tn) note.push(tn.name + ': ' + (C.termBookings(S.data, st.id, t.code, tn).length >= Number(t.perTerm) ? 'booked' : 'not yet booked')); }
+      return '<tr><td><span class="rp-dot" style="background:' + esc(t.colour) + '"></span>' + esc(t.name) + (note.length ? '<small>' + esc(note.join(' · ')) + '</small>' : '') + '</td>' +
+        '<td class="n">' + allow + '</td><td class="n">' + C.fmtDays(b.approved) + '</td><td class="n">' + (b.pending ? C.fmtDays(b.pending) : '–') + '</td>' +
+        '<td class="n"><b>' + (b.remaining == null ? '—' : C.fmtDays(b.remaining)) + '</b></td></tr>';
+    }).join('');
+    var reqRows = reqs.map(function (r) {
+      var t = typeOf(r.type);
+      var dec = r.status === 'Pending' ? 'Awaiting decision' : (r.decidedBy ? esc(r.decidedBy) + (r.decidedOn ? '<small>' + esc(fmt(String(r.decidedOn).slice(0, 10), true)) + '</small>' : '') : '');
+      return '<tr class="st-' + esc(r.status) + '"><td>' + esc(fmtRange(r)) + '</td><td><span class="rp-dot" style="background:' + esc(t.colour) + '"></span>' + esc(t.name) + '</td>' +
+        '<td class="n">' + reqUseText(r, y) + '</td><td><span class="rp-status">' + esc(r.status) + '</span></td><td>' + dec + '</td><td class="rp-note">' + esc(r.reason || '') + (r.note ? '<small>Administrator: ' + esc(r.note) + '</small>' : '') + '</td></tr>';
+    }).join('');
+    var totalOff = 0;
+    reqs.forEach(function (r) { if (r.status === 'Approved') totalOff += inYear(datesOf(r), y).reduce(function (s, x) { return s + x.amt; }, 0); });
+    return '<section class="rp-page">' + rpHead('Leave report', esc(st.name), y) +
+      '<dl class="rp-who"><div><dt>Employee</dt><dd>' + esc(st.name) + '</dd></div><div><dt>Category</dt><dd>' + esc(catName(st)) + '</dd></div>' +
+      '<div><dt>Working days</dt><dd>' + esc(workLabel(st)) + '</dd></div><div><dt>Start date</dt><dd>' + (st.start ? esc(fmt(st.start, true)) : '—') + '</dd></div>' +
+      '<div><dt>Days off approved</dt><dd>' + days(totalOff) + '</dd></div><div><dt>Requests</dt><dd>' + reqs.length + '</dd></div></dl>' +
+      '<h2 class="rp-h">Leave balances</h2><table class="rp-tbl"><thead><tr><th>Leave type</th><th class="n">Allowance</th><th class="n">Taken</th><th class="n">Pending</th><th class="n">Remaining</th></tr></thead><tbody>' +
+      (sumRows || '<tr><td colspan="5">No leave types are set up for this category.</td></tr>') + '</tbody></table>' +
+      '<h2 class="rp-h">Leave requests</h2>' + (reqRows ? '<table class="rp-tbl rp-req"><thead><tr><th>Dates</th><th>Leave type</th><th class="n">Days</th><th>Status</th><th>Decided by</th><th>Note</th></tr></thead><tbody>' + reqRows + '</tbody></table>'
+        : '<p class="rp-empty">No leave requested in ' + esc(lyName(y)) + '.</p>') +
+      '<div class="rp-sign"><div><span></span>Employee signature &amp; date</div><div><span></span>Administrator signature &amp; date</div></div>' +
+      rpFoot() + '</section>';
+  }
+  function summaryReport(y) {
+    var staff = sortedStaff().slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
+    var mains = {}, rows = [];
+    staff.forEach(function (st) { var m = mainType(st, y); if (m) mains[m.t.code] = 1; });
+    var others = S.data.types.filter(function (t) { return !mains[t.code]; });
+    var tot = { main: 0, pend: 0, off: 0 };
+    staff.forEach(function (st) {
+      var bal = C.balances(S.data, st.id, y), m = mainType(st, y), pend = 0, off = 0;
+      personRequests(st, y).forEach(function (r) {
+        var n = inYear(datesOf(r), y).reduce(function (s, x) { return s + x.amt; }, 0);
+        if (r.status === 'Approved') off += n; else if (r.status === 'Pending') pend += n;
+      });
+      tot.pend += pend; tot.off += off; if (m) tot.main += m.b.approved;
+      rows.push('<tr><td><b>' + esc(st.name) + '</b><small>' + esc(catName(st)) + '</small></td>' +
+        '<td class="n">' + (m ? '<b>' + C.fmtDays(m.b.approved) + '</b> / ' + C.fmtDays(m.b.entitled) + '<small>' + C.fmtDays(m.b.remaining) + ' left</small>' : '–') + '</td>' +
+        others.map(function (t) {
+          var b = bal[t.code];
+          if (!b.offered) return '<td class="n rp-na">–</td>';
+          if (b.entitled == null) return '<td class="n">' + (b.approved ? C.fmtDays(b.approved) : '0') + '</td>';
+          return '<td class="n"><b>' + C.fmtDays(b.approved) + '</b> / ' + C.fmtDays(b.entitled) + '</td>';
+        }).join('') +
+        '<td class="n">' + (pend ? C.fmtDays(pend) : '–') + '</td><td class="n"><b>' + C.fmtDays(off) + '</b></td></tr>');
+    });
+    var heads = '<th>Employee</th><th class="n">Staff leave<small>taken / allowed</small></th>' + others.map(function (t) {
+      return '<th class="n">' + esc(t.name.replace(' (Fri–Sun)', '')) + '<small>' + (t.deducts ? 'taken / allowed' : 'days taken') + '</small></th>';
+    }).join('') + '<th class="n">Pending<small>days</small></th><th class="n">Total off<small>days</small></th>';
+    var away = S.data.requests.filter(function (r) { return r.status === 'Approved' && r.end >= todayISO() && C.tracksLeave(staffById(r.staffId)); })
+      .sort(function (a, b) { return a.start < b.start ? -1 : 1; }).slice(0, 12);
+    return '<section class="rp-page rp-wide">' + rpHead('Staff leave summary', staff.length + ' staff members', y) +
+      '<table class="rp-tbl rp-sum"><thead><tr>' + heads + '</tr></thead><tbody>' + rows.join('') + '</tbody>' +
+      '<tfoot><tr><td>Total</td><td class="n">' + C.fmtDays(tot.main) + '</td>' + others.map(function () { return '<td></td>'; }).join('') +
+      '<td class="n">' + C.fmtDays(tot.pend) + '</td><td class="n">' + C.fmtDays(tot.off) + '</td></tr></tfoot></table>' +
+      '<p class="rp-key">“Staff leave” is each person’s main allowance: Pastoral, Support or Cleaning Staff Leave. Weekend Off is counted in weekends; Sabbatical in calendar days, including days saved from earlier years.</p>' +
+      (away.length ? '<h2 class="rp-h">Upcoming approved leave</h2><table class="rp-tbl"><thead><tr><th>Employee</th><th>Dates</th><th>Leave type</th><th class="n">Days</th></tr></thead><tbody>' +
+        away.map(function (r) { var t = typeOf(r.type); return '<tr><td>' + esc((staffById(r.staffId) || {}).name || '') + '</td><td>' + esc(fmtRange(r)) + '</td><td><span class="rp-dot" style="background:' + esc(t.colour) + '"></span>' + esc(t.name) + '</td><td class="n">' + reqAmount(r) + '</td></tr>'; }).join('') +
+        '</tbody></table>' : '') +
+      rpFoot() + '</section>';
+  }
+
+  VIEW_FN.reports = function () {
+    var admin = isMgr(), y = curLY() + S.repYear;
+    var kinds = [];
+    if (takesLeave(me())) kinds.push(['mine', 'My leave report']);
+    if (admin) kinds.push(['person', 'One employee'], ['summary', 'All staff — summary'], ['full', 'All staff — full detail']);
+    if (!kinds.some(function (k) { return k[0] === S.repKind; })) S.repKind = kinds[0][0];
+    var staff = sortedStaff().slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
+    if (!S.repPerson || !staffById(S.repPerson)) S.repPerson = staff[0] && staff[0].id;
+    var body;
+    if (S.repKind === 'mine') body = personReport(me(), y);
+    else if (S.repKind === 'person') body = staffById(S.repPerson) ? personReport(staffById(S.repPerson), y) : '<p>No staff yet.</p>';
+    else if (S.repKind === 'summary') body = summaryReport(y);
+    else body = summaryReport(y) + staff.map(function (st) { return personReport(st, y); }).join('');
+    var controls = '<div class="rp-controls">' +
+      (kinds.length > 1 ? '<label class="field">Report<select id="rep-kind">' + kinds.map(function (k) { return '<option value="' + k[0] + '"' + (k[0] === S.repKind ? ' selected' : '') + '>' + k[1] + '</option>'; }).join('') + '</select></label>' : '') +
+      (S.repKind === 'person' ? '<label class="field">Employee<select id="rep-person">' + staff.map(function (p) { return '<option value="' + esc(p.id) + '"' + (p.id === S.repPerson ? ' selected' : '') + '>' + esc(p.name) + '</option>'; }).join('') + '</select></label>' : '') +
+      '</div>';
+    return {
+      title: 'Reports',
+      sub: 'Choose a report, then print it or save it as a PDF from the print window.',
+      controls: '<div class="seg"><button data-act="rprev" aria-label="Previous leave year">‹</button><button data-act="rthis">' + esc(lyName(y)) + '</button><button data-act="rnext" aria-label="Next leave year">›</button></div>' +
+        '<button class="btn primary" data-act="print">Print / Save as PDF</button>',
+      body: controls + '<div class="report">' + body + '</div>'
+    };
+  };
+
   /** A person's main leave type for the year: their staff leave (e.g. Pastoral Staff Leave), not sick or special leave. */
   function mainType(st, y) {
     var bal = C.balances(S.data, st.id, y), best = null;
@@ -832,6 +968,12 @@
       case 'eprev': S.empYear--; render(); break;
       case 'enext': S.empYear++; render(); break;
       case 'ethis': S.empYear = 0; render(); break;
+      case 'rprev': S.repYear--; render(); break;
+      case 'rnext': S.repYear++; render(); break;
+      case 'rthis': S.repYear = 0; render(); break;
+      case 'print':
+        try { window.print(); } catch (e) { toast('Printing isn’t available here. Open the planner in your browser to print.', true); }
+        break;
       case 'toggle-type': S.hidden[el.dataset.code] = !S.hidden[el.dataset.code]; store.set('hidden', S.hidden); render(); break;
       case 'toggle-pending': S.showPending = !S.showPending; store.set('showPending', S.showPending); render(); break;
       case 'new': requestModal(); break;
@@ -880,6 +1022,8 @@
     else if (ev.target.id === 'emp-person') { S.emp = ev.target.value; render(); }
     else if (ev.target.id === 'emp-type') { S.empType = ev.target.value; render(); }
     else if (ev.target.id === 'emp-status') { S.empStatus = ev.target.value; render(); }
+    else if (ev.target.id === 'rep-kind') { S.repKind = ev.target.value; render(); }
+    else if (ev.target.id === 'rep-person') { S.repPerson = ev.target.value; render(); }
     else if (ev.target.id === 'f-staff') {
       var sel = document.getElementById('f-type');
       sel.innerHTML = typeOptions(staffById(ev.target.value), sel.value);
