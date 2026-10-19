@@ -227,7 +227,8 @@
         (n[0] === 'approvals' && pend ? '<span class="badge">' + pend + '</span>' : '') + '</button>';
     }).join('');
     var formUrl = CFG.FORM_URL || settings().FormURL;
-    var links = (formUrl ? '<a href="' + esc(formUrl) + '" target="_blank" rel="noopener">Prefer a form? Request via Google Forms ↗</a>' : '') +
+    var guideUrl = CFG.GUIDE_URL || 'https://github.com/pian1966/leave-planner/blob/main/STAFF-GUIDE.md';
+    var links = '<a href="' + esc(guideUrl) + '" target="_blank" rel="noopener">Staff guide: how to use the planner ↗</a>' + (formUrl ? '<a href="' + esc(formUrl) + '" target="_blank" rel="noopener">Prefer a form? Request via Google Forms ↗</a>' : '') +
       (isMgr() && CFG.SHEET_URL ? '<a href="' + esc(CFG.SHEET_URL) + '" target="_blank" rel="noopener">Open the Google Sheet ↗</a>' : '');
     var brand = '<div class="brand">' + markHTML() + '<div><b>Leave Planner</b><small>' + esc(settings().CompanyName || 'My Team') + '</small></div></div>';
     var tabs = navItems().filter(function (n) { return n[0] !== 'year' || !isMgr(); });
