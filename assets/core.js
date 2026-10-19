@@ -188,16 +188,17 @@ var LeaveCore = (function () {
     });
   }
 
+  /** Administrators approve all leave and see everyone's details. ("Admin" is accepted for older sheets.) */
+  function isAdmin(user) { return !!user && /^admin(istrator)?$/i.test(String(user.role || '').trim()); }
   function canManage(user, st) {
-    if (!user || !st) return false;
-    if (user.role === 'Admin') return true;
-    if (user.role === 'Manager' && st.id !== user.id && st.manager && st.manager === user.email) return true;
-    return false;
+    return !!user && !!st && isAdmin(user);
   }
+  /** People in the "Administrator" category manage leave but don't take leave in the planner. */
+  function tracksLeave(st) { return !!st && !/^administrators?$/i.test(String(st.level || '').trim()); }
 
   /** Is this leave type open to this person's category? Types that use an allowance need a number on the Categories tab. */
   function offered(data, st, t) {
-    if (!t || !st) return false;
+    if (!t || !st || !tracksLeave(st)) return false;
     if (!t.deducts) return true;
     var lv = level(data, st);
     return !!lv && lv.ent[t.code] != null && !isNaN(lv.ent[t.code]);
@@ -313,6 +314,7 @@ var LeaveCore = (function () {
     var t = type(data, r.type);
     if (!t) return 'Choose a leave type.';
     if (!st) return 'Choose who the leave is for.';
+    if (!tracksLeave(st)) return st.name + ' is in the Administrator category, so their leave isn’t tracked in the planner.';
     if (!offered(data, st, t)) return t.name + ' isn’t available to ' + (st.level ? st.level : 'this person') + '.';
     if (!isISO(r.start) || !isISO(r.end)) return 'Pick a first and last day.';
     if (r.end < r.start) return 'The last day is before the first day.';
@@ -411,7 +413,7 @@ var LeaveCore = (function () {
     if (!r) throw new Error('That request no longer exists.');
     if (r.status !== 'Pending') throw new Error('This request has already been ' + String(r.status).toLowerCase() + '.');
     var st = staffById(data, r.staffId);
-    if (!canManage(actor, st)) throw new Error('Only ' + (st ? st.name.split(' ')[0] + '’s' : 'the') + ' manager or an admin can decide this request.');
+    if (!canManage(actor, st)) throw new Error('Only an Administrator can approve or decline leave.');
     if (decision !== 'Approved' && decision !== 'Declined') throw new Error('Choose approve or decline.');
     if (decision === 'Approved') { var err = validate(data, st, r, r.id, true); if (err) throw new Error(err); }
     return { req: r, staff: st, type: type(data, r.type) };
@@ -423,7 +425,7 @@ var LeaveCore = (function () {
     if (r.status !== 'Pending' && r.status !== 'Approved') throw new Error('Only pending or approved leave can be cancelled.');
     var st = staffById(data, r.staffId), mine = r.staffId === actor.id;
     var ok = canManage(actor, st) || (mine && (r.status === 'Pending' || r.start > todayStr));
-    if (!ok) throw new Error(mine ? 'Leave that has already started can only be cancelled by your manager.' : 'You can only cancel your own leave.');
+    if (!ok) throw new Error(mine ? 'Leave that has already started can only be cancelled by an Administrator.' : 'You can only cancel your own leave.');
     return { req: r, staff: st, type: type(data, r.type) };
   }
 
@@ -452,7 +454,7 @@ var LeaveCore = (function () {
     dayList: dayList, countDays: countDays, isDayUnit: isDayUnit, isCalendarUnit: isCalendarUnit, unitName: unitName, fmtAmount: fmtAmount, amount: amount,
     easter: easter, saPublicHolidays: saPublicHolidays,
     lyOf: lyOf, lyLabel: lyLabel, lyRange: lyRange, graceEnd: graceEnd, parseMonthDay: parseMonthDay, terms: terms, termOf: termOf, termBookings: termBookings,
-    type: type, staffById: staffById, level: level, canManage: canManage, offered: offered, yearAllowance: yearAllowance,
+    type: type, staffById: staffById, level: level, canManage: canManage, isAdmin: isAdmin, tracksLeave: tracksLeave, offered: offered, yearAllowance: yearAllowance,
     balances: balances, validate: validate, fmtDays: fmtDays, findReq: findReq,
     prepareRequest: prepareRequest, prepareDecision: prepareDecision, prepareCancel: prepareCancel,
     publicView: publicView

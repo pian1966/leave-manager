@@ -91,7 +91,8 @@
   var CTX = null, IX = {}, DL = {};
 
   function me() { return S.data.user; }
-  function isMgr() { var r = me().role; return r === 'Admin' || r === 'Manager'; }
+  function isMgr() { return C.isAdmin(me()); }
+  function takesLeave(st) { return C.tracksLeave(st || me()); }
   function canManage(st) { return C.canManage(me(), st); }
   function staffById(id) { return C.staffById(S.data, id); }
   function typeOf(code) { return C.type(S.data, code) || { code: code, name: code, colour: '#64748B' }; }
@@ -100,7 +101,8 @@
   function settings() { return S.data.settings || {}; }
   function sortedStaff() {
     var mine = me().id;
-    return S.data.staff.slice().sort(function (a, b) { return a.id === mine ? -1 : b.id === mine ? 1 : a.name.localeCompare(b.name); });
+    return S.data.staff.filter(function (s) { return C.tracksLeave(s); })
+      .sort(function (a, b) { return a.id === mine ? -1 : b.id === mine ? 1 : a.name.localeCompare(b.name); });
   }
   function pendingForMe() {
     return S.data.requests.filter(function (r) { return r.status === 'Pending' && canManage(staffById(r.staffId)); })
@@ -120,7 +122,9 @@
         (a[x.date] || (a[x.date] = [])).push({ r: r, amt: x.amt });
       });
     });
-    if (!S.person || !staffById(S.person)) S.person = d.user.id;
+    if (!S.person || !staffById(S.person) || !C.tracksLeave(staffById(S.person))) {
+      S.person = C.tracksLeave(d.user) ? d.user.id : ((sortedStaff()[0] || {}).id || d.user.id);
+    }
     render();
   }
   function entries(sid, date, all) {
@@ -194,10 +198,10 @@
         '<div id="l-err"></div><button class="btn primary" style="width:100%;padding:11px" type="submit" id="l-go">Sign in</button></form>';
     } else {
       right = '<div class="pick"><p class="eyebrow">Demo mode</p><h2 style="margin:4px 0 6px">Sign in as a team member</h2>' +
-        '<p class="muted small" style="margin:0">Sample data for a 10-person church team. Try Thandi (admin) or Pieter (manager) to approve requests. Changes stay in this browser.</p>' +
+        '<p class="muted small" style="margin:0">Sample data for a 10-person church team. Sign in as Linda (the Administrator) to approve requests and see employee summaries. Changes stay in this browser.</p>' +
         '<div class="people">' + Demo.people().map(function (s) {
           return '<button type="button" data-act="demo-login" data-id="' + esc(s.id) + '"><span class="av" style="--c:' + esc(s.colour) + '">' + esc(initials(s.name)) + '</span>' +
-            '<span class="grow"><b>' + esc(s.name) + '</b><br><span>' + esc(s.level) + ' · ' + esc(s.role) + ' · works ' + esc(C.daysLabel(C.parseDays(s.workDays, C.parseDays((Demo.cat(s.level) || {}).workDays, [1, 3, 4, 5])))) + '</span></span></button>';
+            '<span class="grow"><b>' + esc(s.name) + '</b><br><span>' + (C.tracksLeave(s) ? '' : 'Approves all leave · ') + esc(s.level) + ' · works ' + esc(C.daysLabel(C.parseDays(s.workDays, C.parseDays((Demo.cat(s.level) || {}).workDays, [1, 3, 4, 5])))) + '</span></span></button>';
         }).join('') + '</div></div>';
     }
     app.innerHTML = '<div class="login"><section class="art"><div class="brand">' + markHTML() + '<div><b>Leave Planner</b><small>Team leave, at a glance</small></div></div>' +
@@ -209,13 +213,13 @@
   function navItems() {
     var items = [['home', 'Overview'], ['wall', 'Wallchart'], ['month', 'Calendar'], ['year', 'Year planner']];
     if (isMgr()) items.push(['approvals', 'Approvals'], ['team', 'Team balances']);
-    if (me().role === 'Admin') items.push(['employees', 'Employees']);
+    if (isMgr()) items.push(['employees', 'Employees']);
     return items;
   }
   function render() {
     if (!S.data) return renderLogin();
     if (!isMgr() && (S.view === 'approvals' || S.view === 'team')) S.view = 'home';
-    if (S.view === 'employees' && me().role !== 'Admin') S.view = 'home';
+    if (S.view === 'employees' && !isMgr()) S.view = 'home';
     var v = VIEW_FN[S.view]();
     var u = me(), pend = isMgr() ? pendingForMe().length : 0;
     var nav = navItems().map(function (n) {
@@ -224,15 +228,15 @@
     }).join('');
     var formUrl = CFG.FORM_URL || settings().FormURL;
     var links = (formUrl ? '<a href="' + esc(formUrl) + '" target="_blank" rel="noopener">Prefer a form? Request via Google Forms ↗</a>' : '') +
-      (u.role === 'Admin' && CFG.SHEET_URL ? '<a href="' + esc(CFG.SHEET_URL) + '" target="_blank" rel="noopener">Open the Google Sheet ↗</a>' : '');
+      (isMgr() && CFG.SHEET_URL ? '<a href="' + esc(CFG.SHEET_URL) + '" target="_blank" rel="noopener">Open the Google Sheet ↗</a>' : '');
     var brand = '<div class="brand">' + markHTML() + '<div><b>Leave Planner</b><small>' + esc(settings().CompanyName || 'My Team') + '</small></div></div>';
     var tabs = navItems().filter(function (n) { return n[0] !== 'year' || !isMgr(); });
     app.innerHTML =
       '<div class="shell"><aside class="side">' + brand +
-      '<button class="btn primary" data-act="new">' + icon('plus').replace('<svg', '<svg width="16" height="16"') + 'Request leave</button>' +
+      '<button class="btn primary" data-act="new">' + icon('plus').replace('<svg', '<svg width="16" height="16"') + (takesLeave(u) ? 'Request leave' : 'Book leave') + '</button>' +
       '<nav class="nav" aria-label="Main">' + nav + '</nav>' + (links ? '<div class="side-links">' + links + '</div>' : '') +
-      '<div class="me">' + av(u) + '<div class="who"><b>' + esc(u.name) + '</b><span>' + esc(catName(u)) + ' · ' + esc(u.role) + '</span></div><button data-act="logout">Sign out</button></div></aside>' +
-      '<main class="main"><div class="mhead">' + brand + '<div class="controls"><button class="btn primary small" data-act="new">+ Request</button><button class="btn small" data-act="logout" aria-label="Sign out">' + esc(initials(u.name)) + ' · Out</button></div></div>' +
+      '<div class="me">' + av(u) + '<div class="who"><b>' + esc(u.name) + '</b><span>' + (takesLeave(u) ? esc(catName(u)) + ' · ' + esc(u.role) : 'Administrator') + '</span></div><button data-act="logout">Sign out</button></div></aside>' +
+      '<main class="main"><div class="mhead">' + brand + '<div class="controls"><button class="btn primary small" data-act="new">+ ' + (takesLeave(u) ? 'Request' : 'Book') + '</button><button class="btn small" data-act="logout" aria-label="Sign out">' + esc(initials(u.name)) + ' · Out</button></div></div>' +
       (!LIVE ? '<div class="demo-note"><span><b>Demo mode.</b> You’re signed in as ' + esc(u.name) + ' (' + esc(u.role) + '). Connect your Google Sheet in config.js to go live.</span><span class="controls"><button class="btn small" data-act="logout">Switch person</button><button class="btn small ghost" data-act="demo-reset">Reset sample data</button></span></div>' : '') +
       '<header class="top"><div class="t"><h1>' + v.title + '</h1>' + (v.sub ? '<p>' + v.sub + '</p>' : '') + '</div><div class="controls">' + (v.controls || '') + '</div></header>' +
       '<div class="view">' + v.body + '</div></main></div>' +
@@ -297,15 +301,25 @@
     }
     var hols = d.holidays.filter(function (h) { return h.date >= today; }).sort(function (a, b) { return a.date < b.date ? -1 : 1; }).slice(0, 4);
     var pend = isMgr() ? pendingForMe() : [];
+    if (!takesLeave(u)) {
+      var recent = d.requests.filter(function (r) { return r.status === 'Approved' && r.end >= today; })
+        .sort(function (a, b) { return a.start < b.start ? -1 : 1; }).slice(0, 6);
+      cards = '';
+      upcoming = recent; past = [];
+      reqRow = function (r) {
+        var t = typeOf(r.type), st = staffById(r.staffId) || { name: '?' };
+        return '<div class="li click" data-act="open-req" data-id="' + esc(r.id) + '">' + av(st) + '<div class="grow"><b>' + esc(st.name) + '</b><span>' + esc(t.name) + ' · ' + esc(fmtRange(r)) + '</span></div>' + pill(r.status) + '</div>';
+      };
+    }
 
     return {
       title: greet + ', ' + esc(firstName(u.name)),
-      sub: esc(fmtLong(today)) + ' · ' + esc(lyName(y)) + ' leave year · ' + esc(catName(u)) + ', working ' + esc(workLabel(u)),
-      controls: '<button class="btn primary" data-act="new">' + icon('plus').replace('<svg', '<svg width="16" height="16"') + 'Request leave</button>',
+      sub: esc(fmtLong(today)) + ' · ' + esc(lyName(y)) + ' leave year · ' + (takesLeave(u) ? esc(catName(u)) + ', working ' + esc(workLabel(u)) : 'Administrator: all leave requests come to you'),
+      controls: '<button class="btn primary" data-act="new">' + icon('plus').replace('<svg', '<svg width="16" height="16"') + (takesLeave(u) ? 'Request leave' : 'Book leave for someone') + '</button>',
       body: (pend.length ? '<div class="demo-note" style="background:var(--warn-soft)"><span><b>' + pend.length + ' request' + (pend.length > 1 ? 's' : '') + ' waiting for you.</b> ' + esc(pend.slice(0, 3).map(function (r) { return firstName(staffById(r.staffId).name); }).join(', ')) + (pend.length > 3 ? ' and others' : '') + '</span><button class="btn small" data-act="nav" data-view="approvals">Review now</button></div>' : '') +
-        '<div class="bals">' + (cards || '<div class="panel muted">No leave allowances are set for your level yet.</div>') + '</div>' +
+        (takesLeave(u) ? '<div class="bals">' + (cards || '<div class="panel muted">No leave allowances are set for your category yet.</div>') + '</div>' : '') +
         '<div class="grid home-grid"><section class="panel"><h2>Who’s away <small>next 7 days the church is open</small></h2><div class="week">' + wk + '</div></section>' +
-        '<div class="grid"><section class="panel"><h2>My leave <small>' + upcoming.length + ' upcoming</small></h2><div class="list">' +
+        '<div class="grid"><section class="panel"><h2>' + (takesLeave(u) ? 'My leave' : 'Coming up') + ' <small>' + upcoming.length + ' upcoming</small></h2><div class="list">' +
         (upcoming.length ? upcoming.map(reqRow).join('') : '<p class="empty">Nothing booked yet.</p>') + '</div>' +
         (past.length ? '<p class="eyebrow" style="margin:16px 0 6px">Earlier</p><div class="list">' + past.map(reqRow).join('') + '</div>' : '') + '</section>' +
         '<section class="panel"><h2>Public holidays</h2><div class="list">' + (hols.length ? hols.map(function (h) {
@@ -319,7 +333,7 @@
     var dates = [];
     for (var i = 1; i <= n; i++) dates.push(new Date(y, m, i, 12));
     var maxOff = Number(settings().MaxOffPerDay) || 0;
-    var head = '<tr><th class="p" scope="col">Team · ' + S.data.staff.length + '</th>' + dates.map(function (d) {
+    var head = '<tr><th class="p" scope="col">Team · ' + sortedStaff().length + '</th>' + dates.map(function (d) {
       var ds = C.iso(d), closed = !C.isOpen(d, CTX);
       return '<th scope="col" class="' + (ds === today ? 'today' : '') + (closed ? ' closed' : '') + '" title="' + esc(CTX.hol[ds] || (closed ? 'Church closed' : '')) + '">' + DOW[d.getDay()][0] + '<b>' + d.getDate() + '</b>' +
         (CTX.hol[ds] ? '<span class="holname">PH</span>' : (closed ? '<span class="holname closedname">Closed</span>' : '')) + '</th>';
@@ -563,7 +577,7 @@
       controls: '<div class="seg"><button data-act="eprev" aria-label="Previous leave year">‹</button><button data-act="ethis">' + esc(lyName(y)) + '</button><button data-act="enext" aria-label="Next leave year">›</button></div>',
       body: '<div class="emp-layout"><nav class="emp-list panel" aria-label="Employees">' + list + '</nav>' +
         '<section class="emp-detail">' + personSel + (st ? '<div class="panel emp-head"><div class="who">' + av(st, true) + '<div><h2>' + esc(st.name) + '</h2>' +
-          '<p class="muted">' + esc(catName(st)) + ' · works ' + esc(workLabel(st)) + ' · ' + esc(st.role) + (st.start ? ' · started ' + esc(fmt(st.start, true)) : '') + (mgr ? ' · manager ' + esc(mgr.name) : '') + '</p>' +
+          '<p class="muted">' + esc(catName(st)) + ' · works ' + esc(workLabel(st)) + ' · ' + esc(st.role) + (st.start ? ' · started ' + esc(fmt(st.start, true)) : '') + '' + '</p>' +
           '<p class="small">' + esc(st.email) + '</p></div></div><div class="emp-bal small">' + balLine + '</div></div>' +
           '<div class="emp-filters"><label class="field">Leave type<select id="emp-type">' + typeOpts + '</select></label>' +
           '<label class="field">Show<select id="emp-status">' + statusOpts + '</select></label></div>' +
@@ -649,18 +663,19 @@
   function requestModal(pre) {
     pre = pre || {};
     var u = me();
-    var who = pre.staffId || u.id;
     var targets = sortedStaff().filter(function (s) { return s.id === u.id || canManage(s); });
-    var html = '<header><div><p class="eyebrow">New request</p><h2>Request leave</h2></div><button class="x" data-act="close" aria-label="Close">×</button></header><form id="reqForm" novalidate>' +
-      (targets.length > 1 ? '<label class="field">For<select id="f-staff">' + targets.map(function (s) { return '<option value="' + esc(s.id) + '"' + (s.id === who ? ' selected' : '') + '>' + esc(s.name) + (s.id === u.id ? ' (you)' : '') + '</option>'; }).join('') + '</select></label>' : '') +
+    if (!targets.length) { toast('There’s nobody whose leave you can book.', true); return; }
+    var who = pre.staffId || (takesLeave(u) ? u.id : targets[0].id);
+    var html = '<header><div><p class="eyebrow">New request</p><h2>' + (takesLeave(u) ? 'Request leave' : 'Book leave') + '</h2></div><button class="x" data-act="close" aria-label="Close">×</button></header><form id="reqForm" novalidate>' +
+      (targets.length > 1 || !takesLeave(u) ? '<label class="field">For<select id="f-staff">' + targets.map(function (s) { return '<option value="' + esc(s.id) + '"' + (s.id === who ? ' selected' : '') + '>' + esc(s.name) + (s.id === u.id ? ' (you)' : '') + '</option>'; }).join('') + '</select></label>' : '') +
       '<label class="field">Leave type<select id="f-type">' + typeOptions(staffById(who)) + '</select></label>' +
       '<div class="two"><label class="field">First day<input type="date" id="f-start" required value="' + esc(pre.date || '') + '"></label>' +
       '<label class="field">Last day<input type="date" id="f-end" required value="' + esc(pre.date || '') + '"></label></div>' +
       '<div class="field" id="f-half-wrap" hidden><span>Length</span><div class="radios">' +
       '<label><input type="radio" name="half" value="None" checked>Full day</label><label><input type="radio" name="half" value="AM">Morning</label><label><input type="radio" name="half" value="PM">Afternoon</label></div></div>' +
-      '<label class="field">Note for your manager <span class="muted" style="font-weight:400">(optional)</span><textarea id="f-reason" rows="2" maxlength="500"></textarea></label>' +
+      '<label class="field">' + (takesLeave(u) ? 'Note for the Administrator' : 'Note') + ' <span class="muted" style="font-weight:400">(optional)</span><textarea id="f-reason" rows="2" maxlength="500"></textarea></label>' +
       '<div class="summary" id="f-sum"></div><div id="f-err"></div>' +
-      '<div class="actions"><button type="button" class="btn" data-act="close">Cancel</button><button type="submit" class="btn primary" id="f-go">Send request</button></div></form>';
+      '<div class="actions"><button type="button" class="btn" data-act="close">Cancel</button><button type="submit" class="btn primary" id="f-go">' + (takesLeave(u) ? 'Send request' : 'Book leave') + '</button></div></form>';
     openModal(html, 'Request leave');
     updateRequestSummary();
   }
@@ -702,7 +717,7 @@
       ((we || skipped.length) ? '<span class="muted small">Not counted: ' + [we ? we + ' day' + (we > 1 ? 's' : '') + ' ' + (st && st.id === me().id ? 'you don’t' : firstName(st ? st.name : '') + ' doesn’t') + ' work' : '', skipped.length ? skipped.join(', ') : ''].filter(Boolean).join(' · ') + '</span>' : '') +
       (t && t.allowedDays ? '<span class="muted small">' + esc(t.name) + ' can only be booked on ' + esc(C.daysLabel(C.parseDays(t.allowedDays, []))) + (Number(t.perTerm) > 0 ? ', ' + (Number(t.perTerm) === 1 ? 'once' : t.perTerm + ' times') + ' per school term' : '') + '.</span>' : '') +
       (t && st && Number(t.perTerm) > 0 && C.termOf(S.data, r.start) ? '<span class="muted small">Counts as ' + esc(C.termOf(S.data, r.start).name) + '’s ' + esc(t.name) + '.</span>' : '') + line2 +
-      (t && t.needsApproval && st && st.id === me().id ? '<span class="muted small">Goes to your manager for approval.</span>' : '');
+      (t && t.needsApproval && st && st.id === me().id ? '<span class="muted small">Goes to the Administrator for approval.</span>' : '');
     var err = st && t ? C.validate(S.data, st, r) : null;
     setErr(err || '');
   }
@@ -844,7 +859,7 @@
       if (err) { setErr(err); return; }
       busy(btn2, true);
       var forOther = r.staffId !== me().id, t = C.type(S.data, r.type);
-      call('request', r, forOther ? 'Booked for ' + firstName(st.name) : (t.needsApproval ? 'Request sent to your manager' : 'Booked'))
+      call('request', r, forOther ? 'Booked for ' + firstName(st.name) : (t.needsApproval ? 'Request sent to the Administrator' : 'Booked'))
         .then(closeModal).catch(function () { busy(btn2, false); });
     }
   });
@@ -855,13 +870,13 @@
 
   /* ------------------------------ demo backend ------------------------------ */
   var Demo = (function () {
-    var KEY = 'demo_db_v8';
+    var KEY = 'demo_db_v9';
     function seed() {
       var yr = new Date().getFullYear();
       // id, name, category, working days override ('' = category default), role, manager
       var staff = [
-        ['S01', 'Thandi Mokoena', 'Pastoral Staff', '', 'Admin', ''],
-        ['S02', 'Pieter van Wyk', 'Pastoral Staff', '', 'Manager', 'thandi@example.com'],
+        ['S01', 'Thandi Mokoena', 'Pastoral Staff', '', 'Staff', ''],
+        ['S02', 'Pieter van Wyk', 'Pastoral Staff', '', 'Staff', ''],
         ['S03', 'Grace Ndlovu', 'Pastoral Staff', '', 'Staff', 'thandi@example.com'],
         ['S04', 'Sipho Dlamini', 'Support Staff', '', 'Staff', 'pieter@example.com'],
         ['S05', 'Lerato Khumalo', 'Support Staff', '', 'Staff', 'pieter@example.com'],
@@ -869,7 +884,8 @@
         ['S07', 'Megan Smith', 'Support Staff', '', 'Staff', 'pieter@example.com'],
         ['S08', 'Kagiso Molefe', 'Pastoral Staff', '', 'Staff', 'thandi@example.com'],
         ['S09', 'Nomvula Zulu', 'Cleaning Staff', '', 'Staff', 'pieter@example.com'],
-        ['S10', 'Ruan Botha', 'Support Staff', '', 'Staff', 'pieter@example.com']
+        ['S10', 'Ruan Botha', 'Support Staff', '', 'Staff', 'pieter@example.com'],
+        ['S11', 'Linda Pillay', 'Administrator', '', 'Administrator', '']
       ].map(function (s, i) {
         return { id: s[0], name: s[1], email: s[1].split(' ')[0].toLowerCase() + '@example.com', level: s[2], workDays: s[3], role: s[4], manager: s[5],
           start: s[0] === 'S01' ? (yr - 8) + '-01-15' : s[0] === 'S09' ? yr + '-04-01' : (yr - 2 - (i % 3)) + '-02-01', colour: PALETTE[i], active: true };
@@ -894,7 +910,8 @@
         levels: [
           { level: 'Pastoral Staff', label: 'Pastoral Staff', workDays: 'Mon, Wed, Thu, Fri, Sat, Sun', ent: { PSL: 24, SL: 7, WO: 4, SAB: 12.5, WA: 21 } },
           { level: 'Support Staff', label: 'Support Staff', workDays: 'Mon, Wed, Thu, Fri', ent: { SSL: 20, SL: 7 } },
-          { level: 'Cleaning Staff', label: 'Cleaning Staff', workDays: 'Fri', ent: { CSL: 3, SL: 7 } }
+          { level: 'Cleaning Staff', label: 'Cleaning Staff', workDays: 'Fri', ent: { CSL: 3, SL: 7 } },
+          { level: 'Administrator', label: 'Administrator', workDays: 'Mon, Wed, Thu, Fri', ent: {} }
         ],
         staff: staff,
         holidays: [yr - 1, yr, yr + 1].reduce(function (all, y) { return all.concat(C.saPublicHolidays(y)); }, []),
@@ -939,7 +956,7 @@
         var sub = C.addDays(s, -12) < now ? C.addDays(s, -12) : C.addDays(now, -(i % 5) - 1);
         var dec = C.addDays(s, -10) < now ? C.addDays(s, -10) : C.addDays(now, -(i % 4));
         var r = { id: 'D' + (100 + i), submitted: C.iso(sub) + ' 09:' + (10 + i), staffId: p[0], type: p[1], start: C.iso(s), end: C.iso(e),
-          half: p[5] || 'None', reason: p[6], status: p[4], decidedBy: p[4] === 'Pending' ? '' : (pieterTeam.indexOf(p[0]) >= 0 ? 'Pieter van Wyk' : 'Thandi Mokoena'),
+          half: p[5] || 'None', reason: p[6], status: p[4], decidedBy: p[4] === 'Pending' ? '' : 'Linda Pillay',
           decidedOn: p[4] === 'Pending' ? '' : C.iso(dec) + ' 14:05', note: p[4] === 'Declined' ? 'That’s the family service weekend. Could you take the next one?' : '', source: i % 4 === 1 ? 'Form' : 'App' };
         r.days = C.countDays(r, ctx);
         if (r.days > 0) data.requests.push(r);
