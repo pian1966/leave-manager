@@ -67,6 +67,7 @@
     month: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
     year: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
     approvals: '<path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/>',
+    employees: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2.2"/><path d="M5.5 16c.6-1.9 2-3 3.5-3s2.9 1.1 3.5 3"/><path d="M14.5 9h4M14.5 13h4"/>',
     team: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3 3 0 0 1 0 6M18 14c2 .7 3 2.6 3 6"/>',
     plus: '<path d="M12 5v14M5 12h14"/>'
   };
@@ -74,7 +75,7 @@
   function markHTML() { var on = [1, 4, 5]; var s = ''; for (var i = 0; i < 9; i++) s += '<i' + (on.indexOf(i) >= 0 ? ' class="on"' : '') + '></i>'; return '<span class="mark" aria-hidden="true">' + s + '</span>'; }
 
   /* ------------------------------ state ------------------------------ */
-  var VIEWS = ['home', 'wall', 'month', 'year', 'approvals', 'team'];
+  var VIEWS = ['home', 'wall', 'month', 'year', 'approvals', 'team', 'employees'];
   var hashView = (location.hash || '').replace('#', '');
   var S = {
     token: store.get(LIVE ? 'token' : 'demo_token'),
@@ -82,6 +83,7 @@
     view: VIEWS.indexOf(hashView) >= 0 ? hashView : (store.get('view') || 'home'),
     cursor: monthStart(new Date()),
     yearOffset: 0,
+    emp: null, empYear: 0, empType: 'all', empStatus: 'Approved',
     person: null,
     showPending: store.get('showPending') !== false,
     hidden: store.get('hidden') || {}
@@ -207,11 +209,13 @@
   function navItems() {
     var items = [['home', 'Overview'], ['wall', 'Wallchart'], ['month', 'Calendar'], ['year', 'Year planner']];
     if (isMgr()) items.push(['approvals', 'Approvals'], ['team', 'Team balances']);
+    if (me().role === 'Admin') items.push(['employees', 'Employees']);
     return items;
   }
   function render() {
     if (!S.data) return renderLogin();
     if (!isMgr() && (S.view === 'approvals' || S.view === 'team')) S.view = 'home';
+    if (S.view === 'employees' && me().role !== 'Admin') S.view = 'home';
     var v = VIEW_FN[S.view]();
     var u = me(), pend = isMgr() ? pendingForMe().length : 0;
     var nav = navItems().map(function (n) {
@@ -474,6 +478,102 @@
     };
   };
 
+  /* ---------- Employees (admins only): every date a person has had off ---------- */
+  var EMP_STATUS = [
+    ['Approved', 'Taken / approved'],
+    ['Pending', 'Waiting for approval'],
+    ['Booked', 'Approved + waiting'],
+    ['All', 'Everything, incl. declined & cancelled']
+  ];
+  function empDates(st, y, typeCode, status) {
+    var rng = C.lyRange(y, CTX.S), rows = [];
+    S.data.requests.forEach(function (r) {
+      if (r.staffId !== st.id) return;
+      if (typeCode !== 'all' && r.type !== typeCode) return;
+      var okStatus = status === 'All' || r.status === status || (status === 'Booked' && (r.status === 'Approved' || r.status === 'Pending'));
+      if (!okStatus) return;
+      if (r.end < rng.start || r.start > rng.end) return;
+      var t = typeOf(r.type);
+      var list = C.isCalendarUnit(t) ? (function () {
+        var out = [], d = C.parse(r.start), e = C.parse(r.end);
+        while (d <= e) { out.push({ date: C.iso(d), amt: 1 }); d = C.addDays(d, 1); }
+        return out;
+      })() : (DL[r.id] || C.dayList(r, CTX));
+      list.forEach(function (x) {
+        if (x.date < rng.start || x.date > rng.end) return;
+        rows.push({ date: x.date, amt: x.amt, r: r, t: t });
+      });
+    });
+    return rows.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+  }
+
+  VIEW_FN.employees = function () {
+    var staff = sortedStaff().slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
+    if (!S.emp || !staffById(S.emp)) S.emp = staff[0] && staff[0].id;
+    var st = staffById(S.emp), y = curLY() + S.empYear, today = todayISO();
+    var tsel = S.empType || 'all', ssel = S.empStatus || 'Approved';
+
+    var list = staff.map(function (p) {
+      var n = empDates(p, y, 'all', 'Approved').reduce(function (s, x) { return s + x.amt; }, 0);
+      return '<button class="emp-item" data-act="emp" data-id="' + esc(p.id) + '"' + (p.id === S.emp ? ' aria-current="true"' : '') + '>' + av(p) +
+        '<span class="grow"><b>' + esc(p.name) + '</b><span>' + esc(catName(p)) + '</span></span><span class="num emp-n" title="Days off in ' + esc(lyName(y)) + '">' + C.fmtDays(n) + '</span></button>';
+    }).join('');
+
+    var rows = st ? empDates(st, y, tsel, ssel) : [];
+    var totals = {}, totalDays = 0, months = {};
+    rows.forEach(function (x) {
+      totals[x.r.type] = (totals[x.r.type] || 0) + x.amt; totalDays += x.amt;
+      var mk = x.date.slice(0, 7);
+      (months[mk] || (months[mk] = [])).push(x);
+    });
+    var chips = Object.keys(totals).map(function (code) {
+      var t = typeOf(code);
+      return '<span class="chip" style="--c:' + esc(t.colour) + '"><span class="dot"></span>' + esc(t.name) + ' · ' + C.fmtDays(totals[code]) + ' ' + esc(C.isCalendarUnit(t) ? (totals[code] === 1 ? 'calendar day' : 'calendar days') : (totals[code] === 1 || totals[code] === 0.5 ? 'day' : 'days')) + '</span>';
+    }).join('');
+    var table = Object.keys(months).sort().map(function (mk) {
+      var items = months[mk], d0 = C.parse(mk + '-01');
+      var sum = items.reduce(function (s, x) { return s + x.amt; }, 0);
+      return '<tr class="mh"><th colspan="5">' + MONTHS[d0.getMonth()] + ' ' + d0.getFullYear() + '<span>' + days(sum) + '</span></th></tr>' +
+        items.map(function (x) {
+          var part = x.amt < 1 ? (x.r.half === 'PM' ? 'Afternoon' : 'Morning') : 'Full day';
+          return '<tr class="click' + (x.date > today ? ' future' : '') + '" data-act="open-req" data-id="' + esc(x.r.id) + '"><td class="num nowrap">' + esc(fmtLong(x.date)) + (CTX.hol[x.date] ? '<br><span class="muted small">' + esc(CTX.hol[x.date]) + '</span>' : '') + '</td>' +
+            '<td>' + typeChip(x.t, x.r.status === 'Pending') + '</td><td class="nowrap">' + part + '</td><td>' + pill(x.r.status) + '</td>' +
+            '<td class="muted small">' + esc(x.r.reason || '') + '</td></tr>';
+        }).join('');
+    }).join('');
+
+    var bal = st ? C.balances(S.data, st.id, y) : {};
+    var balLine = st ? S.data.types.filter(function (t) { return t.deducts && bal[t.code].offered; }).map(function (t) {
+      var b = bal[t.code];
+      return '<span><span class="dot" style="--c:' + esc(t.colour) + '"></span> ' + esc(t.name) + ': <b>' + C.fmtDays(b.remaining) + '</b> of ' + C.fmtDays(b.entitled) + ' left</span>';
+    }).join('') : '';
+
+    var mgr = st && st.manager ? S.data.staff.filter(function (s) { return s.email === st.manager; })[0] : null;
+    var typeOpts = '<option value="all">All leave types</option>' + S.data.types.map(function (t) {
+      return '<option value="' + esc(t.code) + '"' + (t.code === tsel ? ' selected' : '') + '>' + esc(t.name) + '</option>';
+    }).join('');
+    var statusOpts = EMP_STATUS.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === ssel ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('');
+    var personSel = '<select id="emp-person" class="btn emp-person" aria-label="Employee">' + staff.map(function (p) {
+      return '<option value="' + esc(p.id) + '"' + (p.id === S.emp ? ' selected' : '') + '>' + esc(p.name) + '</option>';
+    }).join('') + '</select>';
+
+    return {
+      title: 'Employees',
+      sub: 'Every date each person has had off. Click a date to see the request.',
+      controls: '<div class="seg"><button data-act="eprev" aria-label="Previous leave year">‹</button><button data-act="ethis">' + esc(lyName(y)) + '</button><button data-act="enext" aria-label="Next leave year">›</button></div>',
+      body: '<div class="emp-layout"><nav class="emp-list panel" aria-label="Employees">' + list + '</nav>' +
+        '<section class="emp-detail">' + personSel + (st ? '<div class="panel emp-head"><div class="who">' + av(st, true) + '<div><h2>' + esc(st.name) + '</h2>' +
+          '<p class="muted">' + esc(catName(st)) + ' · works ' + esc(workLabel(st)) + ' · ' + esc(st.role) + (st.start ? ' · started ' + esc(fmt(st.start, true)) : '') + (mgr ? ' · manager ' + esc(mgr.name) : '') + '</p>' +
+          '<p class="small">' + esc(st.email) + '</p></div></div><div class="emp-bal small">' + balLine + '</div></div>' +
+          '<div class="emp-filters"><label class="field">Leave type<select id="emp-type">' + typeOpts + '</select></label>' +
+          '<label class="field">Show<select id="emp-status">' + statusOpts + '</select></label></div>' +
+          '<div class="emp-sum"><span class="big num">' + days(totalDays) + '</span><span class="muted"> in the ' + esc(lyName(y)) + ' leave year</span><div class="legend" style="margin:8px 0 0">' + chips + '</div></div>' +
+          (rows.length ? '<div class="panel tbl-wrap"><table class="tbl dates"><thead><tr><th>Date</th><th>Leave type</th><th>Length</th><th>Status</th><th>Note</th></tr></thead><tbody>' + table + '</tbody></table></div>'
+            : '<div class="panel muted">No days off match these filters in ' + esc(lyName(y)) + '.</div>') : '') +
+        '</section></div>'
+    };
+  };
+
   VIEW_FN.team = function () {
     var y = curLY() + S.yearOffset, today = todayISO();
     var dt = S.data.types.filter(function (t) { return t.deducts; });
@@ -664,6 +764,10 @@
       case 'yprev': S.yearOffset--; render(); break;
       case 'ynext': S.yearOffset++; render(); break;
       case 'ythis': S.yearOffset = 0; render(); break;
+      case 'emp': S.emp = el.dataset.id; render(); break;
+      case 'eprev': S.empYear--; render(); break;
+      case 'enext': S.empYear++; render(); break;
+      case 'ethis': S.empYear = 0; render(); break;
       case 'toggle-type': S.hidden[el.dataset.code] = !S.hidden[el.dataset.code]; store.set('hidden', S.hidden); render(); break;
       case 'toggle-pending': S.showPending = !S.showPending; store.set('showPending', S.showPending); render(); break;
       case 'new': requestModal(); break;
@@ -709,6 +813,9 @@
   });
   document.addEventListener('change', function (ev) {
     if (ev.target.id === 'yr-person') { S.person = ev.target.value; render(); }
+    else if (ev.target.id === 'emp-person') { S.emp = ev.target.value; render(); }
+    else if (ev.target.id === 'emp-type') { S.empType = ev.target.value; render(); }
+    else if (ev.target.id === 'emp-status') { S.empStatus = ev.target.value; render(); }
     else if (ev.target.id === 'f-staff') {
       var sel = document.getElementById('f-type');
       sel.innerHTML = typeOptions(staffById(ev.target.value), sel.value);
@@ -748,7 +855,7 @@
 
   /* ------------------------------ demo backend ------------------------------ */
   var Demo = (function () {
-    var KEY = 'demo_db_v7';
+    var KEY = 'demo_db_v8';
     function seed() {
       var yr = new Date().getFullYear();
       // id, name, category, working days override ('' = category default), role, manager
@@ -790,16 +897,7 @@
           { level: 'Cleaning Staff', label: 'Cleaning Staff', workDays: 'Fri', ent: { CSL: 3, SL: 7 } }
         ],
         staff: staff,
-        holidays: [
-          ['2026-01-01', "New Year's Day"], ['2026-03-21', 'Human Rights Day'], ['2026-04-03', 'Good Friday'], ['2026-04-06', 'Family Day'],
-          ['2026-04-27', 'Freedom Day'], ['2026-05-01', "Workers' Day"], ['2026-06-16', 'Youth Day'], ['2026-08-09', "National Women's Day"],
-          ['2026-08-10', "Women's Day (observed)"], ['2026-09-24', 'Heritage Day'], ['2026-12-16', 'Day of Reconciliation'],
-          ['2026-12-25', 'Christmas Day'], ['2026-12-26', 'Day of Goodwill'],
-          ['2027-01-01', "New Year's Day"], ['2027-03-21', 'Human Rights Day'], ['2027-03-22', 'Human Rights Day (observed)'],
-          ['2027-03-26', 'Good Friday'], ['2027-03-29', 'Family Day'], ['2027-04-27', 'Freedom Day'], ['2027-05-01', "Workers' Day"],
-          ['2027-06-16', 'Youth Day'], ['2027-08-09', "National Women's Day"], ['2027-09-24', 'Heritage Day'],
-          ['2027-12-16', 'Day of Reconciliation'], ['2027-12-25', 'Christmas Day'], ['2027-12-26', 'Day of Goodwill'], ['2027-12-27', 'Day of Goodwill (observed)']
-        ].map(function (h) { return { date: h[0], name: h[1] }; }),
+        holidays: [yr - 1, yr, yr + 1].reduce(function (all, y) { return all.concat(C.saPublicHolidays(y)); }, []),
         requests: [],
         adjustments: [{ staffId: 'S05', year: yr, type: 'SSL', days: 2, note: 'Long service' }]
       };

@@ -116,6 +116,34 @@ var LeaveCore = (function () {
     return { start: iso(new Date(y, S - 1, 1, 12)), end: iso(addDays(new Date(y + 1, S - 1, 1, 12), -1)) };
   }
 
+  /* ---------- South African public holidays (Public Holidays Act 36 of 1994) ---------- */
+  function easter(y) { // Anonymous Gregorian algorithm
+    var a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+    var g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;
+    var l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+    var n = h + l - 7 * m + 114;
+    return new Date(y, Math.floor(n / 31) - 1, (n % 31) + 1, 12);
+  }
+  /** All statutory public holidays for a year, including the Monday after any that fall on a Sunday. */
+  function saPublicHolidays(y) {
+    var fixed = [[1, 1, "New Year's Day"], [3, 21, 'Human Rights Day'], [4, 27, 'Freedom Day'], [5, 1, "Workers' Day"],
+      [6, 16, 'Youth Day'], [8, 9, "National Women's Day"], [9, 24, 'Heritage Day'], [12, 16, 'Day of Reconciliation'],
+      [12, 25, 'Christmas Day'], [12, 26, 'Day of Goodwill']];
+    var e = easter(y), list = [], taken = {};
+    function push(dt, name) { var k = iso(dt); if (!taken[k]) { taken[k] = 1; list.push({ date: k, name: name }); } }
+    fixed.forEach(function (x) { push(new Date(y, x[0] - 1, x[1], 12), x[2]); });
+    push(addDays(e, -2), 'Good Friday');
+    push(addDays(e, 1), 'Family Day');
+    list.slice().forEach(function (h) {
+      var d = parse(h.date);
+      if (d.getDay() !== 0) return;
+      var next = addDays(d, 1);
+      while (taken[iso(next)]) next = addDays(next, 1); // e.g. Christmas on a Sunday: Monday is already Day of Goodwill
+      push(next, h.name + ' (observed)');
+    });
+    return list.sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+  }
+
   var MON = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
   /** "1 Feb", "Feb 1" or "02-01" → [2, 1]. */
   function parseMonthDay(v) {
@@ -422,6 +450,7 @@ var LeaveCore = (function () {
     DAYS: DAYS, iso: iso, parse: parse, addDays: addDays, isISO: isISO, truthy: truthy, parseDays: parseDays, daysLabel: daysLabel,
     ctx: ctx, staffDays: staffDays, isOpen: isOpen, isWorking: isWorking,
     dayList: dayList, countDays: countDays, isDayUnit: isDayUnit, isCalendarUnit: isCalendarUnit, unitName: unitName, fmtAmount: fmtAmount, amount: amount,
+    easter: easter, saPublicHolidays: saPublicHolidays,
     lyOf: lyOf, lyLabel: lyLabel, lyRange: lyRange, graceEnd: graceEnd, parseMonthDay: parseMonthDay, terms: terms, termOf: termOf, termBookings: termBookings,
     type: type, staffById: staffById, level: level, canManage: canManage, offered: offered, yearAllowance: yearAllowance,
     balances: balances, validate: validate, fmtDays: fmtDays, findReq: findReq,
