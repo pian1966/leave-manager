@@ -378,3 +378,5 @@ h3 { font-size: 1rem; }
   .emp-list { display: none; }
   .emp-person { display: block; width: 100%; text-align: left; }
 }
+.emp-n small { font-weight: 400; color: var(--muted); margin-left: 1px; }
+.emp-item .emp-n { color: var(--ink); white-space: nowrap; }

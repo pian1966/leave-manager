@@ -543,6 +543,18 @@
     return rows.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
   }
 
+  /** A person's main leave type for the year: their staff leave (e.g. Pastoral Staff Leave), not sick or special leave. */
+  function mainType(st, y) {
+    var bal = C.balances(S.data, st.id, y), best = null;
+    S.data.types.forEach(function (t) {
+      var b = bal[t.code];
+      if (!t.deducts || !b || b.entitled == null || !C.isDayUnit(t) || t.accumulates) return;
+      var score = (t.useBy ? 1000 : 0) + b.entitled;
+      if (!best || score > best.score) best = { t: t, b: b, score: score };
+    });
+    return best;
+  }
+
   VIEW_FN.employees = function () {
     var staff = sortedStaff().slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
     if (!S.emp || !staffById(S.emp)) S.emp = staff[0] && staff[0].id;
@@ -550,9 +562,15 @@
     var tsel = S.empType || 'all', ssel = S.empStatus || 'Approved';
 
     var list = staff.map(function (p) {
-      var n = empDates(p, y, 'all', 'Approved').reduce(function (s, x) { return s + x.amt; }, 0);
+      var all = empDates(p, y, 'all', 'Approved').reduce(function (s, x) { return s + x.amt; }, 0);
+      var main = mainType(p, y), label, tip;
+      if (main) {
+        label = C.fmtDays(main.b.approved) + '<small>/' + C.fmtDays(main.b.entitled) + '</small>';
+        tip = C.fmtDays(main.b.approved) + ' of ' + C.fmtDays(main.b.entitled) + ' days of ' + main.t.name + ' taken in ' + lyName(y) +
+          ' (' + C.fmtDays(main.b.remaining) + ' left)' + (all > main.b.approved ? '. All leave: ' + days(all) + ' off.' : '');
+      } else { label = C.fmtDays(all); tip = days(all) + ' off in ' + lyName(y); }
       return '<button class="emp-item" data-act="emp" data-id="' + esc(p.id) + '"' + (p.id === S.emp ? ' aria-current="true"' : '') + '>' + av(p) +
-        '<span class="grow"><b>' + esc(p.name) + '</b><span>' + esc(catName(p)) + '</span></span><span class="num emp-n" title="Days off in ' + esc(lyName(y)) + '">' + C.fmtDays(n) + '</span></button>';
+        '<span class="grow"><b>' + esc(p.name) + '</b><span>' + esc(catName(p)) + '</span></span><span class="num emp-n" title="' + esc(tip) + '">' + label + '</span></button>';
     }).join('');
 
     var rows = st ? empDates(st, y, tsel, ssel) : [];
