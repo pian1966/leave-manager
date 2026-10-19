@@ -58,7 +58,22 @@
   var PALETTE = ['#2F6FB3', '#C2410C', '#7C3AED', '#0F766E', '#B45309', '#BE185D', '#4D7C0F', '#1D4ED8', '#9333EA', '#0E7490'];
   function colourOf(st) { if (st.colour) return st.colour; var i = S.data.staff.indexOf(st); return PALETTE[(i < 0 ? 0 : i) % PALETTE.length]; }
   function av(st, lg) { return '<span class="av' + (lg ? ' lg' : '') + '" style="--c:' + esc(colourOf(st)) + '" aria-hidden="true">' + esc(initials(st.name)) + '</span>'; }
-  function typeChip(t, pend, label) { return '<span class="chip' + (pend ? ' pend' : '') + '" style="--c:' + esc(t.colour) + '">' + esc(label || t.name) + '</span>'; }
+  function typeChip(t, pend, label) { return '<span class="chip' + (pend ? ' pend' : '') + '" style="--c:' + esc(t.colour) + '" title="' + esc(typeDesc(t)) + '">' + esc(label || t.name) + '</span>'; }
+  /** Hover text for a leave type: its full name and how it works. */
+  function typeDesc(t) {
+    var bits = [];
+    if (!t.deducts) bits.push('Doesn’t use an allowance');
+    else if (C.isCalendarUnit(t)) bits.push('Counted in calendar days, including weekends and holidays');
+    else if (!C.isDayUnit(t)) bits.push('Counted per ' + String(t.unit || 'booking').toLowerCase().replace(/s$/, ''));
+    else bits.push('Counted in working days');
+    if (Number(t.perTerm) > 0) bits.push(t.perTerm + ' per school term');
+    if (t.allowedDays) bits.push('Only ' + C.daysLabel(C.parseDays(t.allowedDays, [])));
+    if (t.accumulates) bits.push('Builds up each year' + (Number(t.maxBalance) > 0 ? ', up to ' + C.fmtDays(Number(t.maxBalance)) + ' days' : ''));
+    if (t.useBy) bits.push('Unused days can be taken until ' + t.useBy + ' next year');
+    if (t.halfDay) bits.push('Half days allowed');
+    bits.push(t.needsApproval === false ? 'No approval needed' : 'Needs Administrator approval');
+    return t.name + (t.code && t.code !== t.name ? ' (' + t.code + ')' : '') + '\n' + bits.join(' · ');
+  }
   function pill(status) { return '<span class="pill ' + esc(status) + '">' + esc(status) + '</span>'; }
 
   var ICON = {
@@ -95,7 +110,13 @@
   function takesLeave(st) { return C.tracksLeave(st || me()); }
   function canManage(st) { return C.canManage(me(), st); }
   function staffById(id) { return C.staffById(S.data, id); }
-  function typeOf(code) { return C.type(S.data, code) || { code: code, name: code, colour: '#64748B' }; }
+  var KNOWN_TYPES = { PSL: 'Pastoral Staff Leave', SSL: 'Support Staff Leave', CSL: 'Cleaning Staff Leave', SL: 'Sick Leave',
+    WO: 'Weekend Off (Fri–Sun)', SAB: 'Sabbatical Leave', WA: 'Working Away from Office', UL: 'Unpaid Leave' };
+  function typeOf(code) {
+    var t = C.type(S.data, code);
+    if (t) return t.name && t.name !== t.code ? t : Object.assign({}, t, { name: KNOWN_TYPES[code] || t.name || code });
+    return { code: code, name: KNOWN_TYPES[code] || code, colour: '#64748B', deducts: true, needsApproval: true };
+  }
   function curLY() { return C.lyOf(todayISO(), CTX.S); }
   function lyName(y) { return C.lyLabel(y, CTX.S); }
   function settings() { return S.data.settings || {}; }
@@ -252,7 +273,7 @@
   }
   function legend() {
     return '<div class="legend" role="group" aria-label="Filter leave types">' + S.data.types.map(function (t) {
-      return '<button class="chip" style="--c:' + esc(t.colour) + '" data-act="toggle-type" data-code="' + esc(t.code) + '" aria-pressed="' + (!S.hidden[t.code]) + '"><span class="dot"></span>' + esc(t.name) + '</button>';
+      return '<button class="chip" style="--c:' + esc(t.colour) + '" title="' + esc(typeDesc(t) + '\nClick to hide or show') + '" data-act="toggle-type" data-code="' + esc(t.code) + '" aria-pressed="' + (!S.hidden[t.code]) + '"><span class="dot"></span>' + esc(t.name) + '</button>';
     }).join('') + '<span class="sep"></span><button class="chip pend" style="--c:var(--muted)" data-act="toggle-pending" aria-pressed="' + S.showPending + '">Pending requests</button></div>';
   }
 
@@ -542,8 +563,16 @@
       (months[mk] || (months[mk] = [])).push(x);
     });
     var chips = Object.keys(totals).map(function (code) {
-      var t = typeOf(code);
-      return '<span class="chip" style="--c:' + esc(t.colour) + '"><span class="dot"></span>' + esc(t.name) + ' · ' + C.fmtDays(totals[code]) + ' ' + esc(C.isCalendarUnit(t) ? (totals[code] === 1 ? 'calendar day' : 'calendar days') : (totals[code] === 1 || totals[code] === 0.5 ? 'day' : 'days')) + '</span>';
+      var t = typeOf(code), n = totals[code], word;
+      if (C.isCalendarUnit(t)) word = n === 1 ? 'calendar day' : 'calendar days';
+      else if (!C.isDayUnit(t)) {   // counted per booking, e.g. Weekend Off
+        var ids = {};
+        rows.forEach(function (x) { if (x.r.type === code) ids[x.r.id] = 1; });
+        n = Object.keys(ids).length; word = C.unitName(t, n);
+      } else word = n === 1 || n === 0.5 ? 'day' : 'days';
+      var b = C.balances(S.data, st.id, y)[code];
+      var left = b && b.entitled != null ? ' · ' + C.fmtDays(b.remaining) + ' of ' + C.fmtAmount(t, b.entitled) + ' left' : '';
+      return '<span class="chip" style="--c:' + esc(t.colour) + '" title="' + esc(typeDesc(t)) + '"><span class="dot"></span>' + esc(t.name) + ' · ' + C.fmtDays(n) + ' ' + esc(word) + ({ Approved: ' taken', Pending: ' waiting', Booked: ' booked' }[ssel] || '') + left + '</span>';
     }).join('');
     var table = Object.keys(months).sort().map(function (mk) {
       var items = months[mk], d0 = C.parse(mk + '-01');
@@ -647,7 +676,7 @@
       title: 'Team balances <span class="muted" style="font-weight:500">' + esc(lyName(y)) + '</span>',
       sub: 'Remaining of allowance, including carry-over, saved sabbatical and adjustments. – means that leave type isn’t available to that category.',
       controls: '<div class="seg"><button data-act="yprev" aria-label="Previous leave year">‹</button><button data-act="ythis">This year</button><button data-act="ynext" aria-label="Next leave year">›</button></div>',
-      body: '<section class="panel"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Person</th><th>Category</th>' + dt.map(function (t) { return '<th><span class="dot" style="--c:' + esc(t.colour) + '"></span> ' + esc(t.name) + '</th>'; }).join('') + '<th>Pending</th><th>Next leave</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>' +
+      body: '<section class="panel"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Person</th><th>Category</th>' + dt.map(function (t) { return '<th title="' + esc(typeDesc(t)) + '"><span class="dot" style="--c:' + esc(t.colour) + '"></span> ' + esc(t.name) + '</th>'; }).join('') + '<th>Pending</th><th>Next leave</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>' +
         '<section class="panel chart" style="margin-top:16px"><h2>Days taken per month <small>approved leave, ' + people.length + ' people</small></h2>' + svg +
         '<div class="legend" style="margin:8px 0 0">' + S.data.types.map(function (t) { return '<span class="chip" style="--c:' + esc(t.colour) + '"><span class="dot"></span>' + esc(t.name) + '</span>'; }).join('') + '</div></section>'
     };

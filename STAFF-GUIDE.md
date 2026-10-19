@@ -109,7 +109,7 @@ Use the left panel (on a phone, the tabs along the bottom).
 - **Hatched “Closed” column** — the church is closed (Tuesdays).
 - **Yellow day / outlined date** — a public holiday.
 
-Click the leave-type buttons above a calendar to hide or show that type, or **Pending requests** to hide leave that isn't approved yet. You see when colleagues are away, but not their notes or balances.
+Hold your mouse over any leave-type label to see its full name and how it works. Click the leave-type buttons above a calendar to hide or show that type, or **Pending requests** to hide leave that isn't approved yet. You see when colleagues are away, but not their notes or balances.
 
 ## Common questions
 
