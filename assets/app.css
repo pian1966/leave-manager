@@ -381,6 +381,10 @@ h3 { font-size: 1rem; }
 .emp-n small { font-weight: 400; color: var(--muted); margin-left: 1px; }
 .emp-item .emp-n { color: var(--ink); white-space: nowrap; }
 
-/* month name in the wallchart's top-left corner */
-.wall thead .p .wmonth { display: block; font-family: var(--f-display); font-size: 1.15rem; font-weight: 700; color: var(--ink); line-height: 1.2; }
-.wall thead .p .wteam { display: block; color: var(--muted); font-weight: 400; font-size: .78rem; }
+/* month name centred across the wallchart's date columns */
+.wall thead tr.mrow th.mband { position: static; text-align: center; padding: 10px 0 6px; font-family: var(--f-display); font-size: 1.1rem; font-weight: 700; color: var(--ink); border-bottom: 1px solid var(--line); }
+.wall thead tr.mrow th.p { vertical-align: bottom; padding-bottom: 10px; }
+@media (max-width: 820px) {
+  .wall thead tr.mrow th.mband { text-align: left; }
+  .wall thead tr.mrow th.mband span { position: sticky; left: 144px; padding-left: 4px; }
+}

@@ -355,7 +355,8 @@
     var dates = [];
     for (var i = 1; i <= n; i++) dates.push(new Date(y, m, i, 12));
     var maxOff = Number(settings().MaxOffPerDay) || 0;
-    var head = '<tr><th class="p" scope="col"><span class="wmonth">' + MONTHS[m] + ' ' + y + '</span><span class="wteam">Team · ' + sortedStaff().length + '</span></th>' + dates.map(function (d) {
+    var head = '<tr class="mrow"><th class="p" scope="col" rowspan="2">Team · ' + sortedStaff().length + '</th>' +
+      '<th class="mband" scope="colgroup" colspan="' + dates.length + '"><span>' + MONTHS[m] + ' ' + y + '</span></th></tr><tr class="drow">' + dates.map(function (d) {
       var ds = C.iso(d), closed = !C.isOpen(d, CTX);
       return '<th scope="col" class="' + (ds === today ? 'today' : '') + (closed ? ' closed' : '') + '" title="' + esc(CTX.hol[ds] || (closed ? 'Church closed' : '')) + '">' + DOW[d.getDay()][0] + '<b>' + d.getDate() + '</b>' +
         (CTX.hol[ds] ? '<span class="holname">PH</span>' : (closed ? '<span class="holname closedname">Closed</span>' : '')) + '</th>';
