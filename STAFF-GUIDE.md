@@ -6,7 +6,7 @@ The Leave Manager is where you request leave, see how many days you have left, a
 
 ## Welcome
 
-**Web address:** <https://pian1966.github.io/leave-planner/> — bookmark it.
+**Web address:** <https://pian1966.github.io/leave-manager/> — bookmark it.
 
 You need two things to sign in:
 

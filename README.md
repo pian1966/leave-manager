@@ -78,7 +78,7 @@ Open `web/index.html` in a browser before you set anything up: with no API URL c
 
 ### 4. Put the web app on GitHub Pages
 
-1. Create a new repository on GitHub, e.g. `leave-planner` (it can be public; there's no data in it).
+1. Create a new repository on GitHub, e.g. `leave-manager` (it can be public; there's no data in it).
 2. Upload everything inside the **`web/`** folder (`index.html` and the `assets` folder) to the root of the repo.
 3. Edit **`assets/config.js`** on GitHub and paste your URL:
    ```js
@@ -89,15 +89,15 @@ Open `web/index.html` in a browser before you set anything up: with no API URL c
    };
    ```
 4. **Settings → Pages → Build and deployment → Source: Deploy from a branch → `main` / root → Save.**
-5. After a minute your app is live at `https://YOUR-NAME.github.io/leave-planner/`.
+5. After a minute your app is live at `https://YOUR-NAME.github.io/leave-manager/`.
 6. Paste that address into **Settings → AppURL** in the sheet so email links point to it.
 
 Using the GitHub command line instead:
 ```bash
 cd web
 git init && git add . && git commit -m "Leave Manager"
-gh repo create leave-planner --public --source=. --push
-gh api -X POST repos/{owner}/leave-planner/pages -f "source[branch]=main" -f "source[path]=/"
+gh repo create leave-manager --public --source=. --push
+gh api -X POST repos/{owner}/leave-manager/pages -f "source[branch]=main" -f "source[path]=/"
 ```
 
 ### 5. Tell the team
