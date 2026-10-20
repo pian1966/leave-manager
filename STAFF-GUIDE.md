@@ -25,7 +25,7 @@ All leave requests go to the Administrator, who approves or declines them. You g
 
 **Sign in with Google:** if your email on the staff list is a Google account (Gmail or a Google Workspace address), you can tap **Sign in with Google** instead and skip the PIN. In the Android app, choose your account from the list that pops up. If it says your account isn't on the staff list, ask the Administrator to check your email address in the Staff sheet.
 
-**To sign out:** click **Sign out** at the bottom of the left panel (on a phone, the button at the top right).
+**To sign out:** click **Sign out** at the bottom of the left panel (on a phone, the **Out** button at the top right), then confirm.
 
 **Forgotten your PIN, or it doesn't work?** Ask the Administrator. They can set a new one for you straight away.
 
@@ -59,6 +59,8 @@ The Overview opens first and shows your own leave at a glance.
 5. Add a **note** for the Administrator if you like.
 6. Check the grey box: it shows how many days this uses and what you'll have left. A red message means the request can't be sent yet and says why.
 7. Click **Send request**.
+
+**Cover warnings:** if your dates leave too few people on duty (for example no pastor on a Sunday) or fall in a no-leave period such as Easter or Christmas, an orange **Cover warning** appears. You can usually still send the request; the Administrator sees the warning and decides. If the request is blocked, a red message says so; speak to the Administrator.
 
 <p><img src="docs/images/d-request.png" alt="The Request leave window, showing 3 days and the balance after this request" width="100%"></p>
 
@@ -150,7 +152,7 @@ You can print a professional report of your leave, or save it as a PDF.
 2. Use **‹ 2026 ›** at the top to choose the leave year.
 3. Click **Print / Save as PDF**. In the print window, choose your printer, or choose **Save as PDF** as the destination.
 
-The report shows your details, a table of each leave type (allowance, taken, pending, remaining), every request with its status and who approved it, and lines for your and the Administrator's signatures.
+Leave you've requested that isn't approved yet appears in a highlighted **Waiting for approval** box at the top of the report. The report shows your details, a table of each leave type (allowance, taken, pending, remaining), every request with its status and who approved it, and lines for your and the Administrator's signatures.
 
 <p><img src="docs/images/d-report.png" alt="A printable leave report with balances and requests" width="100%"></p>
 
@@ -196,3 +198,5 @@ Then open **Leave Manager** from your apps and sign in with your email and PIN. 
 | The page looks out of date | Refresh the page (on a computer, Ctrl+Shift+R). |
 
 Any other questions about your leave or allowance: speak to the Administrator.
+
+*Administrators: see the [Administrator Guide](ADMIN-GUIDE.md).*

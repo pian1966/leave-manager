@@ -581,3 +581,12 @@ button.kpi:hover { border-color: var(--accent); }
   .qd-row .qd { width: 100%; justify-content: flex-end; }
 }
 @media print { .rp-act { display: none !important; } .rp-pending { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+.dash .tbl .person span { white-space: normal; }
+.dash .flags { margin: 4px 0 0 37px; }
+.dash .flag { white-space: normal; }
+.dash .tbl th.num, .dash .tbl td.num { text-align: right; }
+.dash .tbl .person span { white-space: nowrap; }
+.dash .tbl tr.hasflags td { border-bottom: 0; padding-bottom: 2px; }
+.dash .tbl tr.flagrow td { padding-top: 0; }
+.dash .flags { margin: 0 0 0 37px; }
+.dash .flag { white-space: nowrap; }

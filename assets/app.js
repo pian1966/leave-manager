@@ -554,20 +554,21 @@
 
     var useIt = '<section class="panel"><h2>Use it or lose it <small>unused leave is lost after the date shown</small></h2>' + (risk.length ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Person</th><th>Still to take</th><th>By</th></tr></thead><tbody>' +
       risk.map(function (x) {
-        return '<tr><td>' + av(x.st) + ' ' + esc(x.st.name) + '</td><td>' + x.items.map(function (i) { return '<span class="dot" style="--c:' + esc(i.type.colour) + '"></span> <b class="num">' + C.fmtAmount(i.type, i.left) + '</b> ' + esc(i.type.name); }).join('<br>') + '</td>' +
+        return '<tr><td><div class="person">' + av(x.st) + '<span>' + esc(x.st.name) + '</span></div></td><td>' + x.items.map(function (i) { return '<span class="dot" style="--c:' + esc(i.type.colour) + '"></span> <b class="num">' + C.fmtAmount(i.type, i.left) + '</b> ' + esc(i.type.name); }).join('<br>') + '</td>' +
           '<td>' + x.items.map(function (i) { return esc(fmt(i.until, true)); }).join('<br>') + '</td></tr>';
       }).join('') + '</tbody></table></div><p class="muted small" style="margin:10px 0 0">Reminder emails go out automatically on ' + esc(settings().ReminderDates || '1 Nov, 1 Dec, 15 Jan') + '.</p>' : '<p class="muted">Nobody has leave at risk.</p>') + '</section>';
 
     var sick = sickStats(y), st = sickType();
     var sickHtml = '<section class="panel"><h2>Sick leave patterns <small>' + esc(lyName(y)) + '</small></h2>' + (!sick.length ? '<p class="muted">No sick leave taken this year.</p>' :
-      '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Person</th><th class="num">Days</th><th class="num">Times</th><th class="num">Next to a day off</th><th>Flags</th></tr></thead><tbody>' +
+      '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Person</th><th class="num">Days</th><th class="num">Times</th><th class="num" title="Spells that start or end next to a weekend, day off or public holiday">By a day off</th></tr></thead><tbody>' +
       sick.map(function (x) {
         var flags = [];
         if (x.long) flags.push('<span class="flag">More than 2 days in a row' + (x.long > 1 ? ' (' + x.long + '×)' : '') + '</span>');
         if (x.cluster) flags.push('<span class="flag">3 or more times in 8 weeks</span>');
         if (x.spells >= 3 && x.edge / x.spells >= 0.67) flags.push('<span class="flag soft">Mostly next to weekends</span>');
-        return '<tr><td>' + av(x.st) + ' ' + esc(x.st.name) + '</td><td class="num">' + C.fmtDays(x.total) + (st && C.balances(d, x.st.id, y)[st.code].entitled != null ? ' <span class="muted">/ ' + C.fmtDays(C.balances(d, x.st.id, y)[st.code].entitled) + '</span>' : '') + '</td>' +
-          '<td class="num">' + x.spells + '</td><td class="num">' + x.edge + '</td><td>' + (flags.join(' ') || '<span class="muted">–</span>') + '</td></tr>';
+        return '<tr' + (flags.length ? ' class="hasflags"' : '') + '><td><div class="person">' + av(x.st) + '<span>' + esc(x.st.name) + '</span></div></td><td class="num">' + C.fmtDays(x.total) + (st && C.balances(d, x.st.id, y)[st.code].entitled != null ? ' <span class="muted">/ ' + C.fmtDays(C.balances(d, x.st.id, y)[st.code].entitled) + '</span>' : '') + '</td>' +
+          '<td class="num">' + x.spells + '</td><td class="num">' + x.edge + '</td></tr>' +
+          (flags.length ? '<tr class="flagrow"><td colspan="4"><div class="flags">' + flags.join(' ') + '</div></td></tr>' : '');
       }).join('') + '</tbody></table></div><p class="muted small" style="margin:10px 0 0">South African law lets an employer ask for a medical certificate when someone is off sick for more than 2 days in a row, or more than twice in 8 weeks. Flags are a prompt to check, not proof of anything.</p>') + '</section>';
 
     var months = '<section class="panel"><h2>Busiest months <small>approved working days off, ' + esc(lyName(y)) + '</small></h2>' + monthChart(y) + '</section>';
