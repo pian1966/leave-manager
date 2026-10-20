@@ -82,6 +82,7 @@
     month: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
     year: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
     approvals: '<path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/>',
+    history: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     reports: '<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M10 13h6M10 17h6"/><path d="M4 7v14h3"/>',
     employees: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2.2"/><path d="M5.5 16c.6-1.9 2-3 3.5-3s2.9 1.1 3.5 3"/><path d="M14.5 9h4M14.5 13h4"/>',
     team: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3 3 0 0 1 0 6M18 14c2 .7 3 2.6 3 6"/>',
@@ -91,7 +92,7 @@
   function markHTML() { var on = [1, 4, 5]; var s = ''; for (var i = 0; i < 9; i++) s += '<i' + (on.indexOf(i) >= 0 ? ' class="on"' : '') + '></i>'; return '<span class="mark" aria-hidden="true">' + s + '</span>'; }
 
   /* ------------------------------ state ------------------------------ */
-  var VIEWS = ['home', 'wall', 'month', 'year', 'approvals', 'team', 'employees', 'reports'];
+  var VIEWS = ['home', 'wall', 'month', 'year', 'approvals', 'team', 'employees', 'history', 'reports'];
   var hashView = (location.hash || '').replace('#', '');
   var S = {
     token: store.get(LIVE ? 'token' : 'demo_token'),
@@ -101,6 +102,7 @@
     yearOffset: 0,
     emp: null, empYear: 0, empType: 'all', empStatus: 'Approved',
     repKind: null, repPerson: null, repYear: 0,
+    hist: null, histLimit: 60, histF: { period: 'month', person: 'all', kind: 'all', q: '' },
     person: null,
     showPending: store.get('showPending') !== false,
     hidden: store.get('hidden') || {}
@@ -177,6 +179,7 @@
       .then(function (j) { if (!j.ok) throw new Error(j.error || 'Something went wrong.'); return j.data; });
   }
   function call(action, payload, okMsg) {
+    if (action !== 'bootstrap') S.hist = null;
     return api(action, payload).then(function (d) {
       if (d && d.staff) setData(d);
       if (okMsg) toast(okMsg);
@@ -237,13 +240,14 @@
     var items = [['home', 'Overview'], ['wall', 'Wallchart'], ['month', 'Calendar'], ['year', 'Year planner']];
     if (isMgr()) items.push(['approvals', 'Approvals'], ['team', 'Team balances']);
     if (isMgr()) items.push(['employees', 'Employees']);
+    if (isMgr()) items.push(['history', 'History']);
     items.push(['reports', 'Reports']);
     return items;
   }
   function render() {
     if (!S.data) return renderLogin();
     if (!isMgr() && (S.view === 'approvals' || S.view === 'team')) S.view = 'home';
-    if (S.view === 'employees' && !isMgr()) S.view = 'home';
+    if ((S.view === 'employees' || S.view === 'history') && !isMgr()) S.view = 'home';
     var v = VIEW_FN[S.view]();
     var u = me(), pend = isMgr() ? pendingForMe().length : 0;
     var nav = navItems().map(function (n) {
@@ -546,6 +550,131 @@
     });
     return rows.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
   }
+
+  /* ---------- History (Administrator): a readable timeline of every leave action ---------- */
+  var HIST_KINDS = {
+    request: { label: 'Requested', colour: 'var(--accent)' },
+    booked: { label: 'Booked by Administrator', colour: '#2F80C0' },
+    approve: { label: 'Approved', colour: 'var(--ok)' },
+    decline: { label: 'Declined', colour: 'var(--bad)' },
+    cancel: { label: 'Cancelled', colour: 'var(--warn)' },
+    problem: { label: 'Form problem', colour: 'var(--bad)' }
+  };
+  function histKind(action) {
+    var a = String(action || '').toLowerCase();
+    if (a.indexOf('not booked') >= 0) return 'problem';
+    if (a.indexOf('booked by') >= 0) return 'booked';
+    if (a.indexOf('approved') === 0) return 'approve';
+    if (a.indexOf('declined') === 0) return 'decline';
+    if (a.indexOf('cancel') === 0) return 'cancel';
+    return 'request';
+  }
+  function niceDates(txt) {
+    var m = String(txt || '').match(/(\d{4}-\d{2}-\d{2})(?:\s*(?:to|–|-)\s*(\d{4}-\d{2}-\d{2}))?(.*)$/);
+    if (!m) return String(txt || '');
+    return fmtRange({ start: m[1], end: m[2] || m[1], half: /morning/.test(m[3]) ? 'AM' : /afternoon/.test(m[3]) ? 'PM' : 'None' });
+  }
+  /** Entries rebuilt from the Requests themselves, for activity before the History tab existed. */
+  function derivedHistory(logged) {
+    // Skip any event the log already has for that request, so nothing shows twice.
+    var seen = {}, out = [];
+    logged.forEach(function (h) { if (h.requestId) (seen[h.requestId] || (seen[h.requestId] = {}))[histKind(h.action) === 'booked' ? 'request' : histKind(h.action)] = 1; });
+    var push = function (r, ev) { var k = histKind(ev.action); if (!(seen[r.id] || {})[k === 'booked' ? 'request' : k]) out.push(ev); };
+    S.data.requests.forEach(function (r) {
+      var st = staffById(r.staffId) || { name: '' }, t = typeOf(r.type);
+      var base = { requestId: r.id, staff: st.name, type: t.name, dates: r.start + ' to ' + r.end + (r.half === 'AM' ? ' (morning)' : r.half === 'PM' ? ' (afternoon)' : ''), days: r.days, derived: true };
+      var bookedByAdmin = r.decidedBy && r.decidedBy !== 'Auto-approved' && r.decidedOn && String(r.decidedOn).slice(0, 16) === String(r.submitted).slice(0, 16);
+      push(r, Object.assign({}, base, { when: r.submitted, action: bookedByAdmin ? 'Booked by Administrator' : (r.decidedBy === 'Auto-approved' ? 'Requested (no approval needed)' : 'Requested') + (r.source === 'Form' ? ' via Google Form' : ''), by: bookedByAdmin ? r.decidedBy : st.name, note: r.reason, status: bookedByAdmin ? 'Approved' : 'Pending' }));
+      var legacyCancel = r.status === 'Cancelled' && !r.cancelledBy;
+      if (r.decidedOn && !bookedByAdmin && r.decidedBy !== 'Auto-approved' && !legacyCancel) {
+        push(r, Object.assign({}, base, { when: r.decidedOn, action: r.status === 'Declined' ? 'Declined' : 'Approved', by: r.decidedBy, note: r.note, status: r.status === 'Declined' ? 'Declined' : 'Approved' }));
+      }
+      if (r.cancelledOn || legacyCancel) {
+        push(r, Object.assign({}, base, { when: r.cancelledOn || r.decidedOn, action: 'Cancelled', by: r.cancelledBy || r.decidedBy, note: '', status: 'Cancelled' }));
+      }
+    });
+    return out;
+  }
+  function histSentence(h) {
+    var k = histKind(h.action), who = '<b>' + esc(h.by || 'Someone') + '</b>', staff = '<b>' + esc(h.staff || '') + '</b>';
+    var own = h.by && h.staff && h.by === h.staff, type = esc(h.type || 'leave');
+    var via = /google form/i.test(h.action) ? ' via the Google Form' : '';
+    if (k === 'request') return staff + ' requested ' + type + via + (/no approval/i.test(h.action) ? ' <span class="muted">(no approval needed)</span>' : '');
+    if (k === 'booked') return who + ' booked ' + type + ' for ' + staff;
+    if (k === 'approve') return who + ' approved ' + staff + '’s ' + type;
+    if (k === 'decline') return who + ' declined ' + staff + '’s ' + type;
+    if (k === 'cancel') {
+      var was = /was approved/i.test(h.action) ? 'approved ' : /waiting/i.test(h.action) ? 'pending ' : '';
+      return (own ? staff + ' cancelled their own ' : who + ' cancelled ' + staff + '’s ') + was + type;
+    }
+    return staff + '’s Google Form request for ' + type + ' couldn’t be booked';
+  }
+  function loadHistory(force) {
+    if (S.hist && !force) return;
+    S.hist = { loading: true, list: [] };
+    api('history').then(function (list) { S.hist = { list: list || [], at: new Date() }; if (S.view === 'history') render(); })
+      .catch(function (err) { S.hist = { list: [], error: String(err && err.message || err) }; if (S.view === 'history') render(); });
+  }
+
+  VIEW_FN.history = function () {
+    loadHistory(false);
+    var logged = (S.hist && S.hist.list) || [];
+    var all = logged.concat(derivedHistory(logged)).filter(function (h) { return h.when; })
+      .sort(function (a, b) { return String(a.when) < String(b.when) ? 1 : String(a.when) > String(b.when) ? -1 : 0; });
+    var today = todayISO(), f = S.histF;
+    var since = { week: C.iso(C.addDays(C.parse(today), -7)), month: C.iso(C.addDays(C.parse(today), -31)), year: C.lyRange(curLY(), CTX.S).start, all: '' }[f.period] || '';
+    var q = f.q.trim().toLowerCase();
+    var shown = all.filter(function (h) {
+      if (since && String(h.when).slice(0, 10) < since) return false;
+      if (f.person !== 'all' && h.staff !== f.person && h.by !== f.person) return false;
+      if (f.kind !== 'all' && histKind(h.action) !== f.kind) return false;
+      if (q && [h.staff, h.by, h.type, h.note, h.action, h.dates].join(' ').toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    });
+    var counts = {};
+    shown.forEach(function (h) { var k = histKind(h.action); counts[k] = (counts[k] || 0) + 1; });
+    var people = {};
+    all.forEach(function (h) { if (h.staff) people[h.staff] = 1; if (h.by && h.by !== 'Auto-approved') people[h.by] = 1; });
+    var groups = [], cur = null, yest = C.iso(C.addDays(C.parse(today), -1));
+    shown.slice(0, S.histLimit).forEach(function (h) {
+      var d = String(h.when).slice(0, 10);
+      if (!cur || cur.d !== d) { cur = { d: d, items: [] }; groups.push(cur); }
+      cur.items.push(h);
+    });
+    var body = groups.map(function (g) {
+      var label = g.d === today ? 'Today' : g.d === yest ? 'Yesterday' : (C.isISO(g.d) ? fmtLong(g.d) : g.d);
+      return '<section class="hist-day"><h3>' + esc(label) + '</h3><ol>' + g.items.map(function (h) {
+        var k = histKind(h.action), exists = h.requestId && S.data.requests.some(function (r) { return r.id === h.requestId; });
+        var t = S.data.types.filter(function (x) { return x.name === h.type; })[0];
+        return '<li class="hist-item k-' + k + (exists ? ' click' : '') + '"' + (exists ? ' data-act="open-req" data-id="' + esc(h.requestId) + '" tabindex="0" role="button"' : '') + '>' +
+          '<span class="hist-time num">' + esc(String(h.when).slice(11, 16)) + '</span>' +
+          '<span class="hist-mark" style="--c:' + HIST_KINDS[k].colour + '" aria-hidden="true"></span>' +
+          '<div class="hist-body"><div class="hist-text">' + histSentence(h) + '</div>' +
+          '<div class="hist-meta">' + (t ? '<span class="dot" style="--c:' + esc(t.colour) + '"></span>' : '') + esc(niceDates(h.dates)) +
+          (h.days !== '' && h.days != null && k !== 'problem' ? ' · ' + days(Number(h.days)) : '') +
+          ' · <span class="hist-tag">' + esc(HIST_KINDS[k].label) + '</span>' + (h.derived ? ' <span class="hist-derived" title="Rebuilt from the request record (before the History log started)">from request record</span>' : '') + '</div>' +
+          (h.note ? '<blockquote>' + esc(h.note) + '</blockquote>' : '') + '</div></li>';
+      }).join('') + '</ol></section>';
+    }).join('');
+    var status = S.hist && S.hist.loading ? '<p class="muted">Loading the History log…</p>' :
+      S.hist && S.hist.error ? '<p class="err">Couldn’t load the History log (' + esc(S.hist.error) + '). Showing what can be rebuilt from the requests. Update the Google script to the latest version to get the full log.</p>' : '';
+    var opt = function (v, l, cur) { return '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(l) + '</option>'; };
+    return {
+      title: 'History',
+      sub: 'Every leave request, decision and cancellation, newest first.',
+      controls: '<button class="btn" data-act="hist-refresh">Refresh</button>',
+      body: '<div class="hist-filters">' +
+        '<label class="field">Period<select id="hist-period">' + opt('week', 'Last 7 days', f.period) + opt('month', 'Last 31 days', f.period) + opt('year', 'This leave year', f.period) + opt('all', 'Everything', f.period) + '</select></label>' +
+        '<label class="field">Person<select id="hist-person">' + opt('all', 'Everyone', f.person) + Object.keys(people).sort().map(function (p) { return opt(p, p, f.person); }).join('') + '</select></label>' +
+        '<label class="field">Action<select id="hist-kind">' + opt('all', 'All actions', f.kind) + Object.keys(HIST_KINDS).map(function (k) { return opt(k, HIST_KINDS[k].label, f.kind); }).join('') + '</select></label>' +
+        '<label class="field hist-q">Search<input id="hist-q" type="search" placeholder="Name, leave type, note…" value="' + esc(f.q) + '"></label></div>' +
+        '<div class="hist-counts">' + Object.keys(HIST_KINDS).filter(function (k) { return counts[k]; }).map(function (k) {
+          return '<span class="hist-count" style="--c:' + HIST_KINDS[k].colour + '"><b class="num">' + counts[k] + '</b> ' + esc(HIST_KINDS[k].label.toLowerCase()) + '</span>';
+        }).join('') + (shown.length ? '' : '') + '</div>' + status +
+        (groups.length ? '<div class="panel hist">' + body + '</div>' : '<div class="panel muted">Nothing matches these filters.</div>') +
+        (shown.length > S.histLimit ? '<p style="text-align:center;margin-top:12px"><button class="btn" data-act="hist-more">Show more (' + (shown.length - S.histLimit) + ' older)</button></p>' : '')
+    };
+  };
 
   /* ---------- Reports: printable leave reports ---------- */
   function datesOf(r) {
@@ -991,6 +1120,8 @@
       case 'rprev': S.repYear--; render(); break;
       case 'rnext': S.repYear++; render(); break;
       case 'rthis': S.repYear = 0; render(); break;
+      case 'hist-refresh': loadHistory(true); render(); break;
+      case 'hist-more': S.histLimit += 100; render(); break;
       case 'print':
         try { window.print(); } catch (e) { toast('Printing isn’t available here. Open Leave Manager in your browser to print.', true); }
         break;
@@ -1028,7 +1159,17 @@
     if (ev.key === 'Escape' && modalRoot.innerHTML) closeModal();
     if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches && ev.target.matches('[role="button"][data-act]')) { ev.preventDefault(); ev.target.click(); }
   });
+  var histTimer;
   document.addEventListener('input', function (ev) {
+    if (ev.target.id === 'hist-q') {
+      S.histF.q = ev.target.value;
+      clearTimeout(histTimer);
+      histTimer = setTimeout(function () {
+        var pos = ev.target.selectionStart; render();
+        var el = document.getElementById('hist-q'); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (e) { /* ignore */ } }
+      }, 250);
+      return;
+    }
     if (ev.target.closest('#reqForm')) {
       if (ev.target.id === 'f-start') syncLastDay(ev.target);
       updateRequestSummary();
@@ -1049,6 +1190,9 @@
     else if (ev.target.id === 'emp-type') { S.empType = ev.target.value; render(); }
     else if (ev.target.id === 'emp-status') { S.empStatus = ev.target.value; render(); }
     else if (ev.target.id === 'rep-kind') { S.repKind = ev.target.value; render(); }
+    else if (ev.target.id === 'hist-period') { S.histF.period = ev.target.value; S.histLimit = 60; render(); }
+    else if (ev.target.id === 'hist-person') { S.histF.person = ev.target.value; S.histLimit = 60; render(); }
+    else if (ev.target.id === 'hist-kind') { S.histF.kind = ev.target.value; S.histLimit = 60; render(); }
     else if (ev.target.id === 'rep-person') { S.repPerson = ev.target.value; render(); }
     else if (ev.target.id === 'f-staff') {
       var sel = document.getElementById('f-type');
@@ -1199,18 +1343,31 @@
         }
         var u = d.staff.filter(function (s) { return 'demo-' + s.id === b.token; })[0];
         if (!u) throw new Error('AUTH: Choose who to sign in as.');
+        if (action === 'history') {
+          if (!C.isAdmin(u)) throw new Error('Only an Administrator can see the History log.');
+          return (d.history || []).slice().reverse();
+        }
+        var log = function (act, r, note) {
+          var st = C.staffById(d, r.staffId) || {}, t = C.type(d, r.type) || {};
+          (d.history || (d.history = [])).push({ when: nowStr(), action: act, requestId: r.id, staff: st.name, type: t.name,
+            dates: r.start + ' to ' + r.end + (r.half === 'AM' ? ' (morning)' : r.half === 'PM' ? ' (afternoon)' : ''), days: r.days, status: r.status, by: u.name, note: note || '' });
+        };
         if (action === 'request') {
           var p = C.prepareRequest(d, u, b);
           p.req.id = 'D' + Date.now().toString(36).toUpperCase();
           p.req.submitted = nowStr(); p.req.source = 'App'; p.req.note = '';
           p.req.decidedOn = p.req.status === 'Approved' ? nowStr() : '';
           d.requests.push(p.req);
+          log(p.staff.id !== u.id ? 'Booked by Administrator' : (p.req.status === 'Approved' ? 'Requested (no approval needed)' : 'Requested'), p.req, p.req.reason);
         } else if (action === 'decide') {
           var q = C.prepareDecision(d, u, b.id, b.decision);
           q.req.status = b.decision; q.req.decidedBy = u.name; q.req.decidedOn = nowStr(); q.req.note = String(b.note || '');
+          log(b.decision, q.req, q.req.note);
         } else if (action === 'cancel') {
           var c = C.prepareCancel(d, u, b.id, todayISO());
+          var wasApproved = c.req.status === 'Approved';
           c.req.status = 'Cancelled'; c.req.cancelledBy = u.name; c.req.cancelledOn = nowStr();
+          log('Cancelled (was ' + (wasApproved ? 'approved' : 'waiting for approval') + ')', c.req, '');
         }
         save();
         return C.publicView(d, u);

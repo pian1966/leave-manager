@@ -459,3 +459,33 @@ h3 { font-size: 1rem; }
 .notcounted ul { margin: 2px 0 0; padding-left: 18px; }
 .notcounted li { margin: 1px 0; }
 .notcounted .why { white-space: nowrap; }
+
+/* ---------- History timeline (Administrator) ---------- */
+.hist-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 170px)) minmax(0, 1fr); gap: 12px; margin-bottom: 12px; }
+.hist-filters .field { margin: 0; }
+.hist-counts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.hist-count { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 8px; border-radius: 99px; background: var(--surface); border: 1px solid var(--line); font-size: .85rem; }
+.hist-count::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.hist { padding: 6px 18px 12px; }
+.hist-day h3 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 16px 0 6px; font-family: var(--f-body); }
+.hist-day ol { list-style: none; margin: 0; padding: 0; }
+.hist-item { display: grid; grid-template-columns: 46px 14px minmax(0, 1fr); gap: 10px; padding: 9px 6px; border-radius: 8px; position: relative; }
+.hist-item + .hist-item { border-top: 1px solid var(--line); }
+.hist-item.click { cursor: pointer; }
+.hist-item.click:hover { background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
+.hist-time { color: var(--muted); font-size: .85rem; padding-top: 1px; }
+.hist-mark { width: 11px; height: 11px; border-radius: 50%; background: var(--c); margin-top: 5px; box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 22%, transparent); }
+.hist-text { line-height: 1.4; }
+.hist-meta { color: var(--muted); font-size: .82rem; margin-top: 2px; }
+.hist-meta .dot { margin-right: 4px; vertical-align: 0; }
+.hist-tag { font-weight: 700; }
+.hist-derived { font-style: italic; opacity: .8; }
+.hist-item blockquote { margin: 6px 0 0; padding: 4px 10px; border-left: 3px solid var(--line); color: var(--ink); font-size: .88rem; }
+@media (max-width: 820px) {
+  .hist-filters { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .hist-filters .hist-q { grid-column: 1 / -1; }
+  .hist { padding: 4px 10px 10px; }
+  .hist-item { grid-template-columns: 38px 12px minmax(0, 1fr); gap: 8px; }
+  .tabbar { display: flex; overflow-x: auto; }
+  .tabbar button { flex: 1 0 64px; }
+}
