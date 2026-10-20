@@ -598,7 +598,9 @@
     }).join('');
     var reqRows = reqs.map(function (r) {
       var t = typeOf(r.type);
-      var dec = r.status === 'Pending' ? 'Awaiting decision' : (r.decidedBy ? esc(r.decidedBy) + (r.decidedOn ? '<small>' + esc(fmt(String(r.decidedOn).slice(0, 10), true)) + '</small>' : '') : '');
+      var dec = (r.status === 'Pending' || (r.status === 'Cancelled' && r.cancelledBy && !r.decidedOn)) ? (r.status === 'Pending' ? 'Awaiting decision' : '') :
+        (r.decidedBy ? esc(r.decidedBy) + (r.decidedOn ? '<small>' + esc(fmt(String(r.decidedOn).slice(0, 10), true)) + '</small>' : '') : '');
+      if (r.cancelledBy) dec += '<small>Cancelled by ' + esc(r.cancelledBy) + (r.cancelledOn ? ', ' + esc(fmt(String(r.cancelledOn).slice(0, 10), true)) : '') + '</small>';
       return '<tr class="st-' + esc(r.status) + '"><td>' + esc(fmtRange(r)) + '</td><td><span class="rp-dot" style="background:' + esc(t.colour) + '"></span>' + esc(t.name) + '</td>' +
         '<td class="n">' + reqUseText(r, y) + '</td><td><span class="rp-status">' + esc(r.status) + '</span></td><td>' + dec + '</td><td class="rp-note">' + esc(r.reason || '') + (r.note ? '<small>Administrator: ' + esc(r.note) + '</small>' : '') + '</td></tr>';
     }).join('');
@@ -935,7 +937,8 @@
       '<dl class="kv"><dt>Status</dt><dd>' + pill(r.status) + '</dd><dt>Dates</dt><dd>' + esc(fmtRange(r)) + '</dd><dt>Time away</dt><dd>' + reqAmount(r) + '</dd>' +
       (r.reason ? '<dt>Note</dt><dd>' + esc(r.reason) + '</dd>' : '') +
       '<dt>Requested</dt><dd>' + esc(r.submitted) + (r.source ? ' · ' + esc(r.source === 'Form' ? 'Google Form' : 'app') : '') + '</dd>' +
-      (r.decidedBy ? '<dt>' + (r.status === 'Cancelled' ? 'Cancelled by' : 'Decided by') + '</dt><dd>' + esc(r.decidedBy) + (r.decidedOn ? ' · ' + esc(r.decidedOn) : '') + '</dd>' : '') +
+      (r.decidedBy ? '<dt>' + (r.cancelledBy ? (r.decidedOn ? 'Approved by' : 'Decided by') : (r.status === 'Cancelled' ? 'Cancelled by' : r.status === 'Declined' ? 'Declined by' : 'Approved by')) + '</dt><dd>' + esc(r.decidedBy) + (r.decidedOn ? ' · ' + esc(r.decidedOn) : '') + '</dd>' : '') +
+      (r.cancelledBy ? '<dt>Cancelled by</dt><dd>' + esc(r.cancelledBy) + (r.cancelledOn ? ' · ' + esc(r.cancelledOn) : '') + '</dd>' : '') +
       (r.note ? '<dt>Manager note</dt><dd>' + esc(r.note) + '</dd>' : '') + '</dl>' +
       (mgr && r.status === 'Pending' ? '<label class="field">Note to ' + esc(firstName(st.name)) + ' (optional)<textarea id="note-' + esc(r.id) + '" rows="2"></textarea></label>' : '') +
       '<div class="actions">' + (canCancel ? '<button class="btn bad" data-act="cancel-req" data-id="' + esc(r.id) + '">Cancel this leave</button>' : '') +
@@ -1207,7 +1210,7 @@
           q.req.status = b.decision; q.req.decidedBy = u.name; q.req.decidedOn = nowStr(); q.req.note = String(b.note || '');
         } else if (action === 'cancel') {
           var c = C.prepareCancel(d, u, b.id, todayISO());
-          c.req.status = 'Cancelled'; c.req.decidedBy = u.name; c.req.decidedOn = nowStr();
+          c.req.status = 'Cancelled'; c.req.cancelledBy = u.name; c.req.cancelledOn = nowStr();
         }
         save();
         return C.publicView(d, u);
