@@ -652,15 +652,50 @@ function route_(b) {
 
 function login_(b) {
   var data = loadData_();
+  if (b.google) {
+    var gEmail = googleEmail_(String(b.google));
+    var gs = data.staff.filter(function (s) { return s.email === gEmail && s.active; })[0];
+    if (!gs) throw new Error('Your Google account (' + gEmail + ') isn’t on the staff list. Ask the Administrator to put this address in the Staff sheet, or sign in with your email and PIN.');
+    return startSession_(data, gs);
+  }
   var email = String(b.email || '').trim().toLowerCase();
   var st = data.staff.filter(function (s) { return s.email === email && s.active; })[0];
   if (!st || !checkPin_(st, String(b.pin || '').trim())) {
     Utilities.sleep(700);
     throw new Error('That email and PIN don’t match. Ask your leave administrator to check the Staff sheet.');
   }
+  return startSession_(data, st);
+}
+
+function startSession_(data, st) {
   var token = Utilities.getUuid();
   CacheService.getScriptCache().put('tok_' + token, st.id, 21600); // 6 hours
   return { token: token, data: LeaveCore.publicView(data, st) };
+}
+
+/* ---------- Sign in with Google ----------
+   The Google sign-in client ID (from Google Cloud → Google Auth Platform → Clients, type "Web application").
+   It isn't secret. Extra IDs can be added on the Settings tab as GoogleClientID (comma-separated). */
+var GOOGLE_CLIENT_ID = '';
+
+function googleClientIds_() {
+  var ids = [GOOGLE_CLIENT_ID];
+  try { String(getSetting_('GoogleClientID') || '').split(',').forEach(function (x) { ids.push(x); }); } catch (e) { /* no setting */ }
+  return ids.map(function (x) { return String(x || '').trim(); }).filter(String);
+}
+
+/** Checks a Google sign-in token with Google and returns the verified email address. */
+function googleEmail_(idToken) {
+  var ids = googleClientIds_();
+  if (!ids.length) throw new Error('Sign in with Google isn’t switched on yet. Use your email and PIN.');
+  var res = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken), { muteHttpExceptions: true });
+  if (res.getResponseCode() !== 200) throw new Error('Google couldn’t confirm your sign-in. Please try again.');
+  var t = JSON.parse(res.getContentText());
+  if (ids.indexOf(String(t.aud)) < 0) throw new Error('This Google sign-in wasn’t made for Leave Manager.');
+  if (['accounts.google.com', 'https://accounts.google.com'].indexOf(String(t.iss)) < 0) throw new Error('This Google sign-in didn’t come from Google.');
+  if (Number(t.exp) * 1000 < Date.now()) throw new Error('Your Google sign-in has expired. Please try again.');
+  if (String(t.email_verified) !== 'true' || !t.email) throw new Error('Your Google account’s email address isn’t verified.');
+  return String(t.email).trim().toLowerCase();
 }
 
 function auth_(token, data) {

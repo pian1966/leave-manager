@@ -525,3 +525,10 @@ h3 { font-size: 1rem; }
 .set-help { margin: 12px 0 0; font-size: .85rem; line-height: 1.6; }
 .login-app { text-align: center; margin: 14px 0 0; font-size: .9rem; } .login-app a { color: var(--accent); font-weight: 700; }
 a.btn { text-decoration: none; color: var(--ink); } a.btn.primary { color: var(--accent-ink); }
+/* Sign in with Google */
+.gwrap { min-height: 44px; display: flex; justify-content: center; }
+.gbtn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 11px 16px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; }
+.gbtn:hover { border-color: var(--muted); }
+.or { display: flex; align-items: center; gap: 10px; margin: 18px 0 14px; color: var(--muted); font-size: .82rem; }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }

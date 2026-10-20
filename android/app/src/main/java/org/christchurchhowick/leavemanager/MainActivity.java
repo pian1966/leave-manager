@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.CancellationSignal;
 import android.os.SystemClock;
 import android.print.PrintAttributes;
 import android.print.PrintManager;
@@ -19,6 +20,21 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
+
+import androidx.credentials.Credential;
+import androidx.credentials.CredentialManager;
+import androidx.credentials.CredentialManagerCallback;
+import androidx.credentials.CustomCredential;
+import androidx.credentials.GetCredentialRequest;
+import androidx.credentials.GetCredentialResponse;
+import androidx.credentials.exceptions.GetCredentialCancellationException;
+import androidx.credentials.exceptions.GetCredentialException;
+import androidx.credentials.exceptions.NoCredentialException;
+
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
+
+import org.json.JSONObject;
 
 /**
  * Leave Manager for Android.
@@ -158,10 +174,56 @@ public class MainActivity extends Activity {
             runOnUiThread(() -> tintBars(hex));
         }
 
+        /** Shows Android's Google account picker; the result goes back to the page. */
+        @JavascriptInterface
+        public void googleSignIn(String webClientId) {
+            runOnUiThread(() -> startGoogleSignIn(webClientId));
+        }
+
         @JavascriptInterface
         public void retry() {
             runOnUiThread(() -> web.loadUrl(APP_URL));
         }
+    }
+
+    private void startGoogleSignIn(String webClientId) {
+        if (webClientId == null || webClientId.trim().isEmpty()) {
+            sendToPage("leaveAppGoogleError", "Sign in with Google isn't switched on yet. Use your email and PIN.");
+            return;
+        }
+        GetSignInWithGoogleOption option = new GetSignInWithGoogleOption.Builder(webClientId.trim()).build();
+        GetCredentialRequest request = new GetCredentialRequest.Builder().addCredentialOption(option).build();
+        CredentialManager cm = CredentialManager.create(this);
+        cm.getCredentialAsync(this, request, new CancellationSignal(), this::runOnUiThread,
+                new CredentialManagerCallback<GetCredentialResponse, GetCredentialException>() {
+                    @Override
+                    public void onResult(GetCredentialResponse response) {
+                        Credential c = response.getCredential();
+                        if (c instanceof CustomCredential) {
+                            try {
+                                GoogleIdTokenCredential g = GoogleIdTokenCredential.createFrom(c.getData());
+                                sendToPage("leaveAppGoogle", g.getIdToken());
+                                return;
+                            } catch (Exception e) { /* fall through */ }
+                        }
+                        sendToPage("leaveAppGoogleError", "Google sign-in didn't return an account. Please try again.");
+                    }
+
+                    @Override
+                    public void onError(GetCredentialException e) {
+                        if (e instanceof GetCredentialCancellationException) return; // they closed the picker
+                        String msg = (e instanceof NoCredentialException)
+                                ? "No Google account is set up on this phone. Add one in Settings → Accounts, or sign in with your email and PIN."
+                                : "Google sign-in didn't work on this phone. Sign in with your email and PIN instead.";
+                        sendToPage("leaveAppGoogleError", msg);
+                    }
+                });
+    }
+
+    /** Calls window.<fn>(text) in the page, with the text safely quoted. */
+    private void sendToPage(String fn, String text) {
+        String arg = JSONObject.quote(text == null ? "" : text);
+        web.evaluateJavascript("window." + fn + " && window." + fn + "(" + arg + ")", null);
     }
 
     /** Status bar in the signed-in person's colour, slightly darker; light icons on dark colours. */

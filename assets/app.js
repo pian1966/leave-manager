@@ -258,8 +258,13 @@
     pattern.forEach(function (p, i) { strip += '<i style="' + (p ? 'background:' + cols[p] : '') + (i % 7 >= 5 ? ';opacity:.4' : '') + '"></i>'; });
     var right;
     if (LIVE) {
+      var gOn = googleReady();
       right = '<form id="loginForm" novalidate>' +
-        '<h2 style="margin-bottom:6px">Sign in</h2><p class="muted" style="margin:0 0 20px">Use your work email and the PIN your leave administrator gave you.</p>' +
+        '<h2 style="margin-bottom:6px">Sign in</h2>' +
+        (gOn ? '<p class="muted" style="margin:0 0 16px">Use the Google account that matches your email on the staff list.</p>' +
+          (NATIVE ? '<button type="button" class="gbtn" data-act="google-native">' + GOOGLE_G + '<span>Sign in with Google</span></button>' : '<div id="g-btn" class="gwrap"></div>') +
+          '<div id="g-err"></div><div class="or"><span>or use your email and PIN</span></div>'
+          : '<p class="muted" style="margin:0 0 20px">Use your work email and the PIN your leave administrator gave you.</p>') +
         '<label class="field">Work email<input id="l-email" type="email" autocomplete="username" required value="' + esc(store.get('email') || '') + '"></label>' +
         '<label class="field">PIN<input id="l-pin" type="password" inputmode="numeric" autocomplete="current-password" required></label>' +
         '<div id="l-err"></div><button class="btn primary" style="width:100%;padding:11px" type="submit" id="l-go">Sign in</button></form>' +
@@ -275,7 +280,59 @@
     app.innerHTML = '<div class="login"><section class="art"><div class="brand">' + markHTML() + '<div><b>Leave Manager</b><small>Team leave, at a glance</small></div></div>' +
       '<div><h1>Who’s in, who’s out, and how many days are left.</h1><p style="margin-top:14px">Request leave, get it approved, and see the whole team on one wallchart. Only your own working days are counted, so days you don’t work and public holidays never come off your balance.</p></div>' +
       '<div class="ministrip" aria-hidden="true">' + strip + '</div></section><section class="form">' + right + '</section></div>';
+    if (LIVE && googleReady() && !NATIVE) mountGoogleButton();
   }
+
+  /* ------------------------------ Sign in with Google ------------------------------ */
+  var GOOGLE_ID = String(CFG.GOOGLE_CLIENT_ID || '').trim();
+  var GOOGLE_G = '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17.1z"/><path fill="#FBBC05" d="M10.6 28.6A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.6l-7.9-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.7 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.2 0-11.5-4.1-13.4-9.8l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg>';
+  function googleReady() {
+    if (!GOOGLE_ID) return false;
+    return !NATIVE || typeof NATIVE.googleSignIn === 'function';
+  }
+  var gisLoading = null;
+  function loadGis() {
+    if (window.google && google.accounts && google.accounts.id) return Promise.resolve();
+    if (gisLoading) return gisLoading;
+    gisLoading = new Promise(function (ok, bad) {
+      var sc = document.createElement('script');
+      sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true;
+      sc.onload = ok; sc.onerror = function () { gisLoading = null; bad(new Error('Couldn’t load Google sign-in.')); };
+      document.head.appendChild(sc);
+    });
+    return gisLoading;
+  }
+  var gisInit = false;
+  function mountGoogleButton() {
+    loadGis().then(function () {
+      var box = document.getElementById('g-btn');
+      if (!box) return;
+      if (!gisInit) {
+        google.accounts.id.initialize({ client_id: GOOGLE_ID, callback: function (resp) { googleLogin(resp.credential); }, ux_mode: 'popup', auto_select: false });
+        gisInit = true;
+      }
+      var dark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+        (!document.documentElement.getAttribute('data-theme') && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+      google.accounts.id.renderButton(box, { type: 'standard', theme: dark ? 'filled_black' : 'outline', size: 'large', text: 'signin_with', shape: 'pill', logo_alignment: 'left', width: Math.min(box.clientWidth || 320, 400) });
+    }).catch(function (e) { googleError(e.message); });
+  }
+  function googleError(msg) {
+    var box = document.getElementById('g-err');
+    if (box) box.innerHTML = '<div class="err" role="alert">' + esc(msg) + '</div>';
+    else toast(msg, true);
+  }
+  function googleLogin(credential) {
+    if (!credential) return;
+    var box = document.getElementById('g-err'); if (box) box.innerHTML = '<p class="muted small">Signing you in…</p>';
+    api('login', { google: credential }).then(function (res) {
+      S.token = res.token; store.set('token', res.token); if (res.data && res.data.user) store.set('email', res.data.user.email); setData(res.data);
+    }).catch(function (err) {
+      googleError(err.message === 'Failed to fetch' ? 'Can’t reach the leave server. Check your connection.' : err.message);
+    });
+  }
+  /* Called by the Android app after its own Google sign-in. */
+  window.leaveAppGoogle = function (token) { googleLogin(token); };
+  window.leaveAppGoogleError = function (msg) { if (msg) googleError(msg); };
 
   /* ------------------------------ shell ------------------------------ */
   function navItems() {
@@ -1246,6 +1303,7 @@
           .catch(function () { busy(el, false); });
         break;
       }
+      case 'google-native': nativeCall('googleSignIn', GOOGLE_ID); break;
       case 'pwa-install':
         if (installPrompt) { installPrompt.prompt(); installPrompt.userChoice.then(function () { installPrompt = null; render(); }); }
         break;
