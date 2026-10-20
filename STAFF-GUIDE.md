@@ -122,6 +122,16 @@ You can print a professional report of your leave, or save it as a PDF.
 
 The report shows your details, a table of each leave type (allowance, taken, pending, remaining), every request with its status and who approved it, and lines for your and the Administrator's signatures.
 
+## My settings
+
+Click **My settings** at the bottom of the left-hand menu (on a phone, tap the ⚙ gear at the top).
+
+- **My colour.** Choose one of the colours, or click the colour box to pick any colour. The page shows a preview straight away. Click **Save my colour** to keep it. Your buttons and the sidebar change to your colour, and other people see it on your name badge. It's saved in the Staff sheet, so it follows you to every device.
+- **Appearance.** Choose *Match my device*, *Light* or *Dark*.
+- **Start page.** Choose the page that opens when you sign in, for example the Wallchart.
+
+Appearance and Start page are remembered on the device you set them on, so you can choose differently on your phone and your computer.
+
 ## Common questions
 
 | Problem | What to do |

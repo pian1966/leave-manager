@@ -86,18 +86,25 @@
     reports: '<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M10 13h6M10 17h6"/><path d="M4 7v14h3"/>',
     employees: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2.2"/><path d="M5.5 16c.6-1.9 2-3 3.5-3s2.9 1.1 3.5 3"/><path d="M14.5 9h4M14.5 13h4"/>',
     team: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3 3 0 0 1 0 6M18 14c2 .7 3 2.6 3 6"/>',
-    plus: '<path d="M12 5v14M5 12h14"/>'
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'
   };
   function icon(n) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICON[n] + '</svg>'; }
   function markHTML() { var on = [1, 4, 5]; var s = ''; for (var i = 0; i < 9; i++) s += '<i' + (on.indexOf(i) >= 0 ? ' class="on"' : '') + '></i>'; return '<span class="mark" aria-hidden="true">' + s + '</span>'; }
 
   /* ------------------------------ state ------------------------------ */
-  var VIEWS = ['home', 'wall', 'month', 'year', 'approvals', 'team', 'employees', 'history', 'reports'];
+  var VIEWS = ['home', 'wall', 'month', 'year', 'approvals', 'team', 'employees', 'history', 'reports', 'settings'];
   var hashView = (location.hash || '').replace('#', '');
+  /* Per-device choices from My settings: light/dark/auto appearance and the page that opens first. */
+  function applyTheme(t) {
+    var root = document.documentElement;
+    if (t === 'light' || t === 'dark') root.setAttribute('data-theme', t); else root.removeAttribute('data-theme');
+  }
+  applyTheme(store.get('theme'));
   var S = {
     token: store.get(LIVE ? 'token' : 'demo_token'),
     data: null,
-    view: VIEWS.indexOf(hashView) >= 0 ? hashView : (store.get('view') || 'home'),
+    view: VIEWS.indexOf(hashView) >= 0 ? hashView : (store.get('startView') || store.get('view') || 'home'),
     cursor: monthStart(new Date()),
     yearOffset: 0,
     emp: null, empYear: 0, empType: 'all', empStatus: 'Approved',
@@ -266,7 +273,7 @@
     if (isMgr()) items.push(['approvals', 'Approvals'], ['team', 'Team balances']);
     if (isMgr()) items.push(['employees', 'Employees']);
     if (isMgr()) items.push(['history', 'History']);
-    items.push(['reports', 'Reports']);
+    items.push(['reports', 'Reports'], ['settings', 'My settings']);
     return items;
   }
   function render() {
@@ -284,13 +291,13 @@
     var links = '<a href="' + esc(guideUrl) + '" target="_blank" rel="noopener">Staff guide: how to use Leave Manager ↗</a>' + (formUrl ? '<a href="' + esc(formUrl) + '" target="_blank" rel="noopener">Prefer a form? Request via Google Forms ↗</a>' : '') +
       (isMgr() && CFG.SHEET_URL ? '<a href="' + esc(CFG.SHEET_URL) + '" target="_blank" rel="noopener">Open the Google Sheet ↗</a>' : '');
     var brand = '<div class="brand">' + markHTML() + '<div><b>Leave Manager</b><small>' + esc(settings().CompanyName || 'My Team') + '</small></div></div>';
-    var tabs = navItems().filter(function (n) { return n[0] !== 'year' || !isMgr(); });
+    var tabs = navItems().filter(function (n) { return n[0] !== 'settings' && (n[0] !== 'year' || !isMgr()); });
     app.innerHTML =
       '<div class="shell"><aside class="side">' + brand +
       '<button class="btn primary" data-act="new">' + icon('plus').replace('<svg', '<svg width="16" height="16"') + (takesLeave(u) ? 'Request leave' : 'Book leave') + '</button>' +
       '<nav class="nav" aria-label="Main">' + nav + '</nav>' + (links ? '<div class="side-links">' + links + '</div>' : '') +
       '<div class="me">' + av(u) + '<div class="who"><b>' + esc(u.name) + '</b><span>' + (takesLeave(u) ? esc(catName(u)) + ' · ' + esc(u.role) : 'Administrator') + '</span></div><button data-act="logout">Sign out</button></div></aside>' +
-      '<main class="main"><div class="mhead">' + brand + '<div class="controls"><button class="btn primary small" data-act="new">+ ' + (takesLeave(u) ? 'Request' : 'Book') + '</button><button class="btn small" data-act="logout" aria-label="Sign out">' + esc(initials(u.name)) + ' · Out</button></div></div>' +
+      '<main class="main"><div class="mhead">' + brand + '<div class="controls"><button class="btn primary small" data-act="new">+ ' + (takesLeave(u) ? 'Request' : 'Book') + '</button><button class="btn small icon-btn" data-act="nav" data-view="settings" aria-label="My settings">' + icon('settings') + '</button><button class="btn small" data-act="logout" aria-label="Sign out">' + esc(initials(u.name)) + ' · Out</button></div></div>' +
       (!LIVE ? '<div class="demo-note"><span><b>Demo mode.</b> You’re signed in as ' + esc(u.name) + ' (' + esc(u.role) + '). Connect your Google Sheet in config.js to go live.</span><span class="controls"><button class="btn small" data-act="logout">Switch person</button><button class="btn small ghost" data-act="demo-reset">Reset sample data</button></span></div>' : '') +
       '<header class="top"><div class="t"><h1>' + v.title + '</h1>' + (v.sub ? '<p>' + v.sub + '</p>' : '') + '</div><div class="controls">' + (v.controls || '') + '</div></header>' +
       '<div class="view">' + v.body + '</div></main></div>' +
@@ -311,6 +318,45 @@
 
   /* ------------------------------ views ------------------------------ */
   var VIEW_FN = {};
+
+  /* ------------------------------ My settings ------------------------------ */
+  var SWATCHES = ['#2F6FB3', '#1D4ED8', '#0E7490', '#0F766E', '#2A9D8F', '#4D7C0F', '#15803D', '#B45309',
+    '#C2410C', '#B91C1C', '#BE185D', '#B0527A', '#9333EA', '#7C3AED', '#4F46E5', '#475569'];
+  function startOptions() { return navItems().filter(function (n) { return n[0] !== 'settings'; }); }
+  VIEW_FN.settings = function () {
+    var u = me(), mine = staffById(u.id) || u, cur = S.pickColour || colourOf(mine);
+    var theme = store.get('theme') || 'auto', start = store.get('startView') || '';
+    var sw = SWATCHES.map(function (c) {
+      return '<button type="button" class="swatch" style="--c:' + c + '" data-act="pick-colour" data-c="' + c + '" aria-label="Colour ' + c + '" aria-pressed="' + (c.toUpperCase() === String(cur).toUpperCase()) + '"></button>';
+    }).join('');
+    var changed = S.pickColour && S.pickColour.toUpperCase() !== String(colourOf(mine)).toUpperCase();
+    var seg = [['auto', 'Match my device'], ['light', 'Light'], ['dark', 'Dark']].map(function (o) {
+      return '<label><input type="radio" name="theme" value="' + o[0] + '"' + (theme === o[0] ? ' checked' : '') + '> ' + o[1] + '</label>';
+    }).join('');
+    var opts = '<option value="">The page I used last</option>' + startOptions().map(function (n) {
+      return '<option value="' + n[0] + '"' + (start === n[0] ? ' selected' : '') + '>' + esc(n[1]) + '</option>';
+    }).join('');
+    return {
+      title: 'My settings',
+      sub: 'Make Leave Manager yours. Your colour is saved for you everywhere; the other choices are remembered on this device.',
+      body:
+        '<section class="panel set-block"><h2>My colour</h2>' +
+        '<p class="muted">Used for your buttons, the sidebar and your name badge. Other people see it on your badge.</p>' +
+        '<div class="set-preview">' + av({ name: u.name, colour: cur }, true) +
+        '<button class="btn primary" type="button" tabindex="-1">' + icon('plus').replace('<svg', '<svg width="16" height="16"') + (takesLeave(u) ? 'Request leave' : 'Book leave') + '</button></div>' +
+        '<div class="swatches">' + sw + '</div>' +
+        '<div class="set-row"><label class="set-custom">Or pick any colour <input type="color" id="set-colour" value="' + esc(String(cur).toLowerCase()) + '"></label>' +
+        '<span class="num muted">' + esc(String(cur).toUpperCase()) + '</span></div>' +
+        '<div class="btns"><button class="btn primary" data-act="save-colour"' + (changed ? '' : ' disabled') + '>Save my colour</button>' +
+        (changed ? '<button class="btn ghost" data-act="undo-colour">Undo</button>' : '') + '</div></section>' +
+
+        '<section class="panel set-block"><h2>Appearance</h2><p class="muted">Light or dark screens on this device.</p>' +
+        '<div class="radios" id="set-theme">' + seg + '</div></section>' +
+
+        '<section class="panel set-block"><h2>Start page</h2><p class="muted">The page that opens when you sign in on this device.</p>' +
+        '<select id="set-start" class="btn">' + opts + '</select></section>'
+    };
+  };
 
   VIEW_FN.home = function () {
     var d = S.data, u = me(), y = curLY(), bal = C.balances(d, u.id, y), today = todayISO();
@@ -1115,6 +1161,7 @@
 
   /* ------------------------------ events ------------------------------ */
   function go(view) {
+    if (S.pickColour && view !== 'settings') { S.pickColour = null; applyAccent(colourOf(staffById(me().id) || me())); }
     S.view = view;
     store.set('view', view);
     try { history.replaceState(null, '', '#' + view); } catch (e) { /* ignore */ }
@@ -1152,6 +1199,15 @@
         break;
       case 'toggle-type': S.hidden[el.dataset.code] = !S.hidden[el.dataset.code]; store.set('hidden', S.hidden); render(); break;
       case 'toggle-pending': S.showPending = !S.showPending; store.set('showPending', S.showPending); render(); break;
+      case 'pick-colour': S.pickColour = el.dataset.c; applyAccent(S.pickColour); render(); break;
+      case 'undo-colour': S.pickColour = null; applyAccent(colourOf(staffById(me().id) || me())); render(); break;
+      case 'save-colour': {
+        var col = S.pickColour; if (!col) break;
+        busy(el, true);
+        call('prefs', { colour: col }, 'Your colour is saved').then(function () { S.pickColour = null; render(); })
+          .catch(function () { busy(el, false); });
+        break;
+      }
       case 'new': requestModal(); break;
       case 'book': requestModal({ date: el.dataset.date, staffId: el.dataset.staff }); break;
       case 'open-req': requestDetail(el.dataset.id); break;
@@ -1186,6 +1242,7 @@
   });
   var histTimer;
   document.addEventListener('input', function (ev) {
+    if (ev.target.id === 'set-colour') { applyAccent(normHex(ev.target.value)); return; }
     if (ev.target.id === 'hist-q') {
       S.histF.q = ev.target.value;
       clearTimeout(histTimer);
@@ -1210,6 +1267,9 @@
   }
   document.addEventListener('change', function (ev) {
     if (ev.target.id === 'f-start') syncLastDay(ev.target);
+    if (ev.target.id === 'set-colour') { S.pickColour = normHex(ev.target.value); applyAccent(S.pickColour); render(); return; }
+    if (ev.target.name === 'theme' && ev.target.closest('#set-theme')) { store.set('theme', ev.target.value); applyTheme(ev.target.value); toast('Appearance saved on this device'); return; }
+    if (ev.target.id === 'set-start') { if (ev.target.value) store.set('startView', ev.target.value); else store.del('startView'); toast('Start page saved on this device'); return; }
     if (ev.target.id === 'yr-person') { S.person = ev.target.value; render(); }
     else if (ev.target.id === 'emp-person') { S.emp = ev.target.value; render(); }
     else if (ev.target.id === 'emp-type') { S.empType = ev.target.value; render(); }
@@ -1388,6 +1448,10 @@
           var q = C.prepareDecision(d, u, b.id, b.decision);
           q.req.status = b.decision; q.req.decidedBy = u.name; q.req.decidedOn = nowStr(); q.req.note = String(b.note || '');
           log(b.decision, q.req, q.req.note);
+        } else if (action === 'prefs') {
+          var hx = normHex(b.colour);
+          if (!hx) throw new Error('Choose a colour first.');
+          u.colour = hx;
         } else if (action === 'cancel') {
           var c = C.prepareCancel(d, u, b.id, todayISO());
           var wasApproved = c.req.status === 'Approved';

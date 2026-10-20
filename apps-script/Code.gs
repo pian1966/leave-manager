@@ -641,6 +641,9 @@ function route_(b) {
     case 'cancel':
       cancel_(user, b.id);
       break;
+    case 'prefs':
+      savePrefs_(user, b);
+      break;
     default:
       throw new Error('Unknown action: ' + b.action);
   }
@@ -687,6 +690,20 @@ function hashPins() {
     if (s._pin && s._pin.indexOf('h:') !== 0) { setCells_(SHEET.STAFF, s._row, { 'PIN': hash_(s._pin) }); n++; }
   });
   SpreadsheetApp.getUi().alert(n + ' PIN(s) secured. Staff sign in with the same PINs as before.');
+}
+
+/** My settings: a person can change their own colour (Staff tab, column J). */
+function savePrefs_(user, b) {
+  var hex = String(b.colour || '').trim();
+  if (/^#?[0-9a-f]{3}$/i.test(hex)) hex = hex.replace(/^#?(.)(.)(.)$/, '#$1$1$2$2$3$3');
+  if (/^[0-9a-f]{6}$/i.test(hex)) hex = '#' + hex;
+  if (!/^#[0-9a-f]{6}$/i.test(hex)) throw new Error('That isn’t a colour code. Pick one of the colours shown.');
+  hex = hex.toUpperCase();
+  withLock_(function () {
+    setCells_(SHEET.STAFF, user._row, { 'Colour': hex });
+    var sh = ss_().getSheetByName(SHEET.STAFF);
+    paintRange_(sh.getRange(user._row, COLOUR_COLS_['Staff'], 1, 1));
+  });
 }
 
 /* ============================ LEAVE ACTIONS ============================ */
