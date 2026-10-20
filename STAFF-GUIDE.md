@@ -62,6 +62,8 @@ The Overview opens first and shows your own leave at a glance.
 
 **Cover warnings:** if your dates leave too few people on duty (for example no pastor on a Sunday) or fall in a no-leave period such as Easter or Christmas, an orange **Cover warning** appears. You can usually still send the request; the Administrator sees the warning and decides. If the request is blocked, a red message says so; speak to the Administrator.
 
+**Cover warnings:** if your dates leave too few people on duty (for example no pastor on a Sunday) or fall in a no-leave period such as Easter or Christmas, an orange **Cover warning** appears. You can usually still send the request; the Administrator sees the warning and decides. If the request is blocked, a red message says so; speak to the Administrator.
+
 <p><img src="docs/images/d-request.png" alt="The Request leave window, showing 3 days and the balance after this request" width="100%"></p>
 
 <p align="center"><img src="docs/images/m-request.png" alt="Requesting leave in the Android app" width="250"></p>
@@ -152,7 +154,7 @@ You can print a professional report of your leave, or save it as a PDF.
 2. Use **‹ 2026 ›** at the top to choose the leave year.
 3. Click **Print / Save as PDF**. In the print window, choose your printer, or choose **Save as PDF** as the destination.
 
-Leave you've requested that isn't approved yet appears in a highlighted **Waiting for approval** box at the top of the report. The report shows your details, a table of each leave type (allowance, taken, pending, remaining), every request with its status and who approved it, and lines for your and the Administrator's signatures.
+Leave you've requested that isn't approved yet appears in a highlighted **Waiting for approval** box at the top of the report. Leave you've requested that isn't approved yet appears in a highlighted **Waiting for approval** box at the top of the report. The report shows your details, a table of each leave type (allowance, taken, pending, remaining), every request with its status and who approved it, and lines for your and the Administrator's signatures.
 
 <p><img src="docs/images/d-report.png" alt="A printable leave report with balances and requests" width="100%"></p>
 
@@ -198,5 +200,7 @@ Then open **Leave Manager** from your apps and sign in with your email and PIN. 
 | The page looks out of date | Refresh the page (on a computer, Ctrl+Shift+R). |
 
 Any other questions about your leave or allowance: speak to the Administrator.
+
+*Administrators: see the [Administrator Guide](ADMIN-GUIDE.md).*
 
 *Administrators: see the [Administrator Guide](ADMIN-GUIDE.md).*

@@ -37,6 +37,21 @@ Open `web/index.html` in a browser before you set anything up: with no API URL c
 
 ---
 
+## Guides
+
+- [Staff Guide](STAFF-GUIDE.md): for everyone who requests leave.
+- [Administrator Guide](ADMIN-GUIDE.md): approvals, Dashboard, cover rules, stand-in approver, emails, reports, payroll and the Google Sheet.
+
+## Administrator tools
+
+- **Dashboard:** waiting requests with one-click Approve/Decline, who's away today, leave still to take, cover problems in the next 8 weeks, "use it or lose it", busiest months and sick-leave patterns.
+- **Cover rules** (Cover Rules tab): minimum people on duty (e.g. one pastor every Sunday) and no-leave periods (Easter, Christmas), set to Warn or Block. The Administrator can always override.
+- **Stand-in approver:** set on the Dashboard; while active they get request emails and an Approvals page.
+- **Scheduled emails:** "Who's away this week" every Monday, and "use it or lose it" reminders on 1 Nov, 1 Dec and 15 Jan (Settings: WeeklyEmail, ReminderDates). The sheet menu has previews that go only to you.
+- **Payroll report:** unpaid leave per person per month, printable and as a CSV download.
+
+The script adds the Cover Rules tab, the new Settings rows and the daily 6am trigger by itself the first time the app is used after an update (or when you run Set up).
+
 ## Setup (about 20 minutes)
 
 ### 1. Create the Google Sheet and script
