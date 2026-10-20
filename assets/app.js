@@ -167,7 +167,7 @@
     (d.types || []).forEach(function (t) { t.colour = normHex(t.colour) || '#64748B'; });
     S.data = d;
     var meSt = (d.staff || []).filter(function (s) { return d.user && s.id === d.user.id; })[0];
-    applyAccent((meSt && meSt.colour) || (d.user && d.user.colour) || '');
+    applyAccent(S.pickColour || (meSt ? normHex(colourOf(meSt)) : (d.user && d.user.colour) || ''));
     CTX = C.ctx(d);
     IX = {}; DL = {};
     d.requests.forEach(function (r) {
@@ -771,6 +771,18 @@
     return S.data.requests.filter(function (r) { return r.staffId === st.id && r.end >= rng.start && r.start <= rng.end; })
       .sort(function (a, b) { return a.start < b.start ? -1 : 1; });
   }
+  /** Report colours come from a person's own colour (Staff tab, column J); very pale ones are deepened to read on white paper. */
+  function rpStyle(hex) {
+    hex = normHex(hex);
+    if (!hex) return '';
+    var r = parseInt(hex.substr(1, 2), 16), g = parseInt(hex.substr(3, 2), 16), b = parseInt(hex.substr(5, 2), 16);
+    var lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    var acc = lum > 150 ? 'color-mix(in srgb, ' + hex + ' 55%, #000000)' : hex;
+    return ' style="--rp-accent:' + acc + ';--rp-soft:color-mix(in srgb, ' + hex + ' 9%, #FFFFFF);--rp-c:' + hex + '"';
+  }
+  function rpBadge(st) {
+    return '<span class="rp-badge" style="background:' + esc(normHex(colourOf(st)) || '#0F4F43') + '">' + esc(initials(st.name)) + '</span>';
+  }
   function rpHead(title, sub, y) {
     var rng = C.lyRange(y, CTX.S);
     return '<header class="rp-head"><div><div class="rp-org">' + esc(settings().CompanyName || 'Leave Manager') + '</div>' +
@@ -806,7 +818,7 @@
     }).join('');
     var totalOff = 0;
     reqs.forEach(function (r) { if (r.status === 'Approved') totalOff += inYear(datesOf(r), y).reduce(function (s, x) { return s + x.amt; }, 0); });
-    return '<section class="rp-page">' + rpHead('Leave report', esc(st.name), y) +
+    return '<section class="rp-page"' + rpStyle(colourOf(st)) + '>' + rpHead('Leave report', rpBadge(st) + esc(st.name), y) +
       '<dl class="rp-who"><div><dt>Employee</dt><dd>' + esc(st.name) + '</dd></div><div><dt>Category</dt><dd>' + esc(catName(st)) + '</dd></div>' +
       '<div><dt>Working days</dt><dd>' + esc(workLabel(st)) + '</dd></div><div><dt>Start date</dt><dd>' + (st.start ? esc(fmt(st.start, true)) : '—') + '</dd></div>' +
       '<div><dt>Days off approved</dt><dd>' + days(totalOff) + '</dd></div><div><dt>Requests</dt><dd>' + reqs.length + '</dd></div></dl>' +
@@ -830,7 +842,7 @@
         if (r.status === 'Approved') off += n; else if (r.status === 'Pending') pend += n;
       });
       tot.pend += pend; tot.off += off; if (m) tot.main += m.b.approved;
-      rows.push('<tr><td><b>' + esc(st.name) + '</b><small>' + esc(catName(st)) + '</small></td>' +
+      rows.push('<tr><td><b><span class="rp-dot rp-pdot" style="background:' + esc(normHex(colourOf(st)) || '#64748B') + '"></span>' + esc(st.name) + '</b><small>' + esc(catName(st)) + '</small></td>' +
         '<td class="n">' + (m ? '<b>' + C.fmtDays(m.b.approved) + '</b> / ' + C.fmtDays(m.b.entitled) + '<small>' + C.fmtDays(m.b.remaining) + ' left</small>' : '–') + '</td>' +
         others.map(function (t) {
           var b = bal[t.code];
@@ -845,7 +857,7 @@
     }).join('') + '<th class="n">Pending<small>days</small></th><th class="n">Total off<small>days</small></th>';
     var away = S.data.requests.filter(function (r) { return r.status === 'Approved' && r.end >= todayISO() && C.tracksLeave(staffById(r.staffId)); })
       .sort(function (a, b) { return a.start < b.start ? -1 : 1; }).slice(0, 12);
-    return '<section class="rp-page rp-wide">' + rpHead('Staff leave summary', staff.length + ' staff members', y) +
+    return '<section class="rp-page rp-wide"' + rpStyle(colourOf(staffById(me().id) || me())) + '>' + rpHead('Staff leave summary', staff.length + ' staff members', y) +
       '<table class="rp-tbl rp-sum"><thead><tr>' + heads + '</tr></thead><tbody>' + rows.join('') + '</tbody>' +
       '<tfoot><tr><td>Total</td><td class="n">' + C.fmtDays(tot.main) + '</td>' + others.map(function () { return '<td></td>'; }).join('') +
       '<td class="n">' + C.fmtDays(tot.pend) + '</td><td class="n">' + C.fmtDays(tot.off) + '</td></tr></tfoot></table>' +
