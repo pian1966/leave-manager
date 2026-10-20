@@ -2,6 +2,8 @@
 
 *Last updated: 20 October 2026*
 
+**Finding this guide:** on a computer, click **Administrator guide** in the left-hand panel. On a phone or in the Android app, tap **⚙** → **Help** → **Administrator guide**.
+
 This guide is for the **Administrator**: the person who approves leave, keeps the staff list up to date and prints reports. For everyday use by staff, see the [Staff Guide](STAFF-GUIDE.md).
 
 > **About the pictures:** they come from the demo, so they show sample staff. On a phone, the left-hand menu becomes the tabs along the bottom (swipe them sideways to see them all), and **⚙** at the top opens My settings.
@@ -133,7 +135,9 @@ They don't see the Dashboard, Reports for others or History. You keep full acces
 | Reminder summary | You | Same days as the reminders |
 | You're the stand-in | The stand-in | When you choose them |
 
-Change the timing on the **Settings** tab:
+**To switch them on or off:** in the app, go to **My settings → Automatic emails** (on a phone, tap **⚙** at the top). Untick **“Who's away this week” email** to stop the Monday email, or choose a different day. Untick **“Use it or lose it” reminders** to stop the reminders. Changes take effect straight away and are recorded in History.
+
+You can also change them on the **Settings** tab of the sheet:
 - **WeeklyEmail**: the day of the week, or blank to switch it off.
 - **ReminderDates**: e.g. *1 Nov, 1 Dec, 15 Jan*, or blank to switch them off.
 
@@ -202,7 +206,7 @@ Their leave is pro-rated automatically if they start part-way through the year.
 | --- | --- |
 | Someone booked the wrong leave type | Cancel it and book the right type for them. |
 | A cover warning seems wrong | Check the rule's Category and Days on Cover Rules, and the staff member's category on Staff. |
-| The weekly email didn't arrive | Check **WeeklyEmail** on Settings, and use the Preview menu item to test. Emails go to staff with real email addresses only. |
+| The weekly email didn't arrive | Check it's switched on under **My settings → Automatic emails**, and use the Preview menu item to test. Emails go to staff with real email addresses only. |
 | A stand-in can't see Approvals | Check today is between the From and To dates on the Dashboard. |
 | Balances look wrong | Check the person's category, start date and any Adjustments rows. |
 | Staff can't sign in | Check their email on Staff and that **Active** is ticked. Reset the PIN if needed. |

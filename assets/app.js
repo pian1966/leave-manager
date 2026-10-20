@@ -397,6 +397,33 @@
   var SWATCHES = ['#2F6FB3', '#1D4ED8', '#0E7490', '#0F766E', '#2A9D8F', '#4D7C0F', '#15803D', '#B45309',
     '#C2410C', '#B91C1C', '#BE185D', '#B0527A', '#9333EA', '#7C3AED', '#4F46E5', '#475569'];
   function startOptions() { return navItems().filter(function (n) { return n[0] !== 'settings'; }); }
+  /** Links to the user manuals (they open in the browser, also from the Android app). */
+  function helpSection() {
+    var staffUrl = CFG.GUIDE_URL || 'https://github.com/pian1966/leave-manager/blob/main/STAFF-GUIDE.md';
+    return '<section class="panel set-block"><h2>Help</h2><p class="muted">Step-by-step guides with pictures. They open in your browser.</p>' +
+      '<div class="btns"><a class="btn" href="' + esc(staffUrl) + '" target="_blank" rel="noopener">Staff guide ↗</a>' +
+      (isApprover() ? '<a class="btn" href="' + esc(staffUrl.replace('STAFF-GUIDE', 'ADMIN-GUIDE')) + '" target="_blank" rel="noopener">Administrator guide ↗</a>' : '') + '</div></section>';
+  }
+  /** Administrator: switch the automatic staff emails on or off. */
+  var WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  var DEFAULT_REMINDERS = '1 Nov, 1 Dec, 15 Jan';
+  function emailSection() {
+    if (!isMgr()) return '';
+    var set = settings(), weekly = String(set.WeeklyEmail || '').trim(), rem = String(set.ReminderDates || '').trim();
+    var day = WEEKDAYS.filter(function (d) { return d.slice(0, 3).toLowerCase() === weekly.slice(0, 3).toLowerCase(); })[0] || 'Monday';
+    return '<section class="panel set-block"><h2>Automatic emails</h2><p class="muted">Emails Leave Manager sends to staff by itself. Request and decision emails always go out.</p>' +
+      '<label class="toggle"><input type="checkbox" id="em-weekly"' + (weekly ? ' checked' : '') + '><span><b>“Who’s away this week” email to all staff</b>' +
+      '<small>Sent about 6am every <select id="em-day" class="btn small"' + (weekly ? '' : ' disabled') + '>' + WEEKDAYS.map(function (d) { return '<option' + (d === day ? ' selected' : '') + '>' + d + '</option>'; }).join('') + '</select></small></span></label>' +
+      '<label class="toggle"><input type="checkbox" id="em-rem"' + (rem ? ' checked' : '') + '><span><b>“Use it or lose it” reminders</b>' +
+      '<small>To staff with unused leave on ' + esc(rem || DEFAULT_REMINDERS) + ', with a summary for you</small></span></label></section>';
+  }
+  function saveEmails() {
+    var w = document.getElementById('em-weekly'), dsel = document.getElementById('em-day'), r = document.getElementById('em-rem');
+    var cur = String(settings().ReminderDates || '').trim();
+    var body = { weekly: w.checked ? dsel.value : '', reminders: r.checked ? (cur || DEFAULT_REMINDERS) : '' };
+    var msg = (w.checked ? 'Weekly email on (' + dsel.value + 's)' : 'Weekly email off') + ' · ' + (r.checked ? 'reminders on' : 'reminders off');
+    call('emails', body, msg).then(render).catch(render);
+  }
   function appSection() {
     if (NATIVE) {
       var ver = nativeCall('version');
@@ -443,6 +470,7 @@
 
         '<section class="panel set-block"><h2>Start page</h2><p class="muted">The page that opens when you sign in on this device.</p>' +
         '<select id="set-start" class="btn">' + opts + '</select></section>' +
+        emailSection() + helpSection() +
         appSection()
     };
   };
@@ -926,11 +954,11 @@
     decline: { label: 'Declined', colour: 'var(--bad)' },
     cancel: { label: 'Cancelled', colour: 'var(--warn)' },
     problem: { label: 'Form problem', colour: 'var(--bad)' },
-    setting: { label: 'Stand-in change', colour: 'var(--muted)' }
+    setting: { label: 'Settings change', colour: 'var(--muted)' }
   };
   function histKind(action) {
     var a = String(action || '').toLowerCase();
-    if (a.indexOf('stand-in') >= 0) return 'setting';
+    if (a.indexOf('stand-in') >= 0 || a.indexOf('automatic emails') >= 0) return 'setting';
     if (a.indexOf('not booked') >= 0) return 'problem';
     if (a.indexOf('booked by') >= 0) return 'booked';
     if (a.indexOf('approved') === 0) return 'approve';
@@ -1641,6 +1669,7 @@
     if (ev.target.id === 'f-start') syncLastDay(ev.target);
     if (ev.target.id === 'set-colour') { S.pickColour = normHex(ev.target.value); applyAccent(S.pickColour); render(); return; }
     if (ev.target.name === 'theme' && ev.target.closest('#set-theme')) { store.set('theme', ev.target.value); applyTheme(ev.target.value); toast('Appearance saved on this device'); return; }
+    if (ev.target.id === 'em-weekly' || ev.target.id === 'em-day' || ev.target.id === 'em-rem') { saveEmails(); return; }
     if (ev.target.id === 'set-start') { if (ev.target.value) store.set('startView', ev.target.value); else store.del('startView'); toast('Start page saved on this device'); return; }
     if (ev.target.id === 'yr-person') { S.person = ev.target.value; render(); }
     else if (ev.target.id === 'emp-person') { S.emp = ev.target.value; render(); }
@@ -1846,6 +1875,11 @@
           var q = C.prepareDecision(d, u, b.id, b.decision);
           q.req.status = b.decision; q.req.decidedBy = u.name; q.req.decidedOn = nowStr(); q.req.note = String(b.note || '');
           log(b.decision, q.req, q.req.note);
+        } else if (action === 'emails') {
+          if (!C.isAdmin(u)) throw new Error('Only an Administrator can change the automatic emails.');
+          d.settings.WeeklyEmail = String(b.weekly || ''); d.settings.ReminderDates = String(b.reminders || '');
+          (d.history || (d.history = [])).push({ when: nowStr(), action: 'Automatic emails changed', requestId: '', staff: '', type: '', dates: '', days: '', status: '', by: u.name,
+            note: 'Weekly email: ' + (b.weekly || 'off') + ' · Reminders: ' + (b.reminders || 'off') });
         } else if (action === 'standin') {
           if (!C.isAdmin(u)) throw new Error('Only an Administrator can choose a stand-in approver.');
           if (b.staffId && (!b.from || !b.to || b.to < b.from)) throw new Error('Choose the first and last day of the stand-in period.');

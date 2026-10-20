@@ -10,6 +10,8 @@ The Leave Manager is where you request leave, see how many days you have left, a
 
 **Web address:** <https://pian1966.github.io/leave-manager/> — bookmark it.
 
+**Finding this guide again:** on a computer, click **Staff guide** in the left-hand panel. On a phone or in the Android app, tap **⚙** (top right) → **Help** → **Staff guide**.
+
 You need two things to sign in:
 
 - **Your work email** — the one the church has on record for you.
@@ -169,6 +171,7 @@ Click **My settings** at the bottom of the left-hand menu (on a phone, tap the �
 - **My colour.** Choose one of the colours, or click the colour box to pick any colour. The page shows a preview straight away. Click **Save my colour** to keep it. Your buttons and the sidebar change to your colour, and other people see it on your name badge. It's saved in the Staff sheet, so it follows you to every device.
 - **Appearance.** Choose *Match my device*, *Light* or *Dark*.
 - **Start page.** Choose the page that opens when you sign in, for example the Wallchart.
+- **Help.** Opens this Staff guide (and, for the Administrator, the Administrator guide) in your browser. This is the easiest way to find the guide on a phone or in the Android app.
 
 Appearance and Start page are remembered on the device you set them on, so you can choose differently on your phone and your computer.
 

@@ -590,3 +590,10 @@ button.kpi:hover { border-color: var(--accent); }
 .dash .tbl tr.flagrow td { padding-top: 0; }
 .dash .flags { margin: 0 0 0 37px; }
 .dash .flag { white-space: nowrap; }
+.toggle { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); cursor: pointer; }
+.toggle:first-of-type { border-top: 0; }
+.toggle input { width: 20px; height: 20px; margin-top: 2px; accent-color: var(--accent); flex: none; }
+.toggle span { display: flex; flex-direction: column; gap: 4px; }
+.toggle small { color: var(--muted); font-size: .85rem; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.toggle select.btn { padding: 2px 6px; font-size: .85rem; }
+.set-block .btns { flex-wrap: wrap; }

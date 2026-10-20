@@ -730,6 +730,9 @@ function route_(b) {
     case 'standin':
       saveStandIn_(user, b, data);
       break;
+    case 'emails':
+      saveEmailSettings_(user, b);
+      break;
     default:
       throw new Error('Unknown action: ' + b.action);
   }
@@ -1275,4 +1278,14 @@ function sendReminders_(data, today, onlyTo) {
         '<p>The Dashboard in Leave Manager shows the latest figures.</p>') });
   }
   return sent;
+}
+
+
+/** Administrator: switch the weekly "who's away" email and the "use it or lose it" reminders on or off. */
+function saveEmailSettings_(user, b) {
+  if (!LeaveCore.isAdmin(user)) throw new Error('Only an Administrator can change the automatic emails.');
+  var weekly = String(b.weekly || '').trim(), rem = String(b.reminders || '').trim();
+  if (weekly && !LeaveCore.parseDays(weekly, []).length) throw new Error('Choose a day of the week for the weekly email.');
+  withLock_(function () { setSetting_('WeeklyEmail', weekly); setSetting_('ReminderDates', rem); });
+  logHistory_('Automatic emails changed', {}, '', '', user.name, 'Weekly email: ' + (weekly || 'off') + ' · Reminders: ' + (rem || 'off'));
 }
