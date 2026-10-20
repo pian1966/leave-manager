@@ -38,6 +38,7 @@ function onOpen() {
     .addItem('Refresh form lists (after editing staff or leave types)', 'refreshForm')
     .addItem('Secure PINs now', 'hashPins')
     .addItem('Update public holidays and school terms now', 'updateCalendarsNow')
+    .addItem('Colour the colour codes', 'paintColours')
     .addSeparator()
     .addItem('Show my links', 'showLinks')
     .addToUi();
@@ -226,6 +227,41 @@ function build_(ss, name, rows) {
   return sh;
 }
 
+/* Colour cells: shade each hex code (e.g. #2F6FB3) in its own colour – Staff column J and Leave Types column C. */
+var COLOUR_COLS_ = { 'Staff': 10, 'Leave Types': 3 };
+
+function onEdit(e) {
+  try {
+    var sh = e.range.getSheet(), col = COLOUR_COLS_[sh.getName()];
+    if (!col || e.range.getLastColumn() < col || e.range.getColumn() > col || e.range.getLastRow() < 2) return;
+    var top = Math.max(2, e.range.getRow());
+    paintRange_(sh.getRange(top, col, e.range.getLastRow() - top + 1, 1));
+  } catch (err) { /* never block an edit */ }
+}
+
+function paintColours(ss) {
+  ss = ss || SpreadsheetApp.getActive();
+  Object.keys(COLOUR_COLS_).forEach(function (name) {
+    var sh = ss.getSheetByName(name);
+    if (sh && sh.getLastRow() > 1) paintRange_(sh.getRange(2, COLOUR_COLS_[name], sh.getLastRow() - 1, 1));
+  });
+}
+
+function paintRange_(rng) {
+  var vals = rng.getDisplayValues();
+  var bg = [], fg = [];
+  vals.forEach(function (row) {
+    var hex = String(row[0]).trim();
+    if (/^#?[0-9a-f]{3}$/i.test(hex)) hex = hex.replace(/^#?(.)(.)(.)$/, '#$1$1$2$2$3$3');
+    if (/^[0-9a-f]{6}$/i.test(hex)) hex = '#' + hex;
+    if (/^#[0-9a-f]{6}$/i.test(hex)) {
+      var r = parseInt(hex.substr(1, 2), 16), g = parseInt(hex.substr(3, 2), 16), b = parseInt(hex.substr(5, 2), 16);
+      bg.push([hex]); fg.push([(0.299 * r + 0.587 * g + 0.114 * b) > 150 ? '#000000' : '#FFFFFF']);
+    } else { bg.push([null]); fg.push([null]); }
+  });
+  rng.setBackgrounds(bg).setFontColors(fg);
+}
+
 function formatSheets_(ss) {
   Object.keys(HEADERS).forEach(function (name) {
     var sh = ss.getSheetByName(name);
@@ -264,6 +300,7 @@ function formatSheets_(ss) {
   req.setConditionalFormatRules(rules);
 
   ss.getSheetByName(SHEET.HOL).getRange('A2:A').setNumberFormat('yyyy-mm-dd');
+  paintColours(ss);
   var types = ss.getSheetByName(SHEET.TYPES);
   types.getRange('D2:G').insertCheckboxes();
   types.getRange('J2:J').insertCheckboxes();
