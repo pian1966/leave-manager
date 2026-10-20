@@ -1,0 +1,74 @@
+# Uploads the Google Apps Script (apps-script/) to the Leave Manager Google Sheet
+# and publishes it as a new version of the existing web app deployment.
+#
+# One-time setup (see README → "Automatic Google script updates"):
+#   Repository secrets:  CLASPRC_JSON  – the contents of ~/.clasprc.json after `clasp login` (clasp 2.4.2)
+#                        SCRIPT_ID     – Apps Script editor → Project Settings → Script ID
+# The web app's deployment ID is read from assets/config.js (API_URL), so the web address never changes.
+name: Deploy Google Apps Script
+
+on:
+  push:
+    branches: [main]
+    paths: ['apps-script/**', 'assets/core.js', '.github/workflows/deploy-apps-script.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: apps-script-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the one-time setup is done
+        id: check
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          SCRIPT_ID: ${{ secrets.SCRIPT_ID }}
+        run: |
+          if [ -z "$CLASPRC_JSON" ] || [ -z "$SCRIPT_ID" ]; then
+            echo "::notice::Automatic Google script updates aren't set up yet (secrets CLASPRC_JSON and SCRIPT_ID). Skipping."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.ready == 'true'
+        with:
+          node-version: 20
+
+      - name: Install clasp
+        if: steps.check.outputs.ready == 'true'
+        run: npm install -g @google/clasp@2.4.2
+
+      - name: Prepare files
+        if: steps.check.outputs.ready == 'true'
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          SCRIPT_ID: ${{ secrets.SCRIPT_ID }}
+        run: |
+          printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
+          # The shared leave rules must be identical on the website and in the script.
+          cp assets/core.js apps-script/Core.gs
+          printf '{"scriptId":"%s","rootDir":"."}' "$SCRIPT_ID" > apps-script/.clasp.json
+          DEPLOYMENT_ID=$(grep -o 'macros/s/[A-Za-z0-9_-]*/exec' assets/config.js | head -1 | sed 's#macros/s/##; s#/exec##')
+          if [ -z "$DEPLOYMENT_ID" ]; then echo "::error::No Apps Script web app URL (API_URL) found in assets/config.js"; exit 1; fi
+          echo "DEPLOYMENT_ID=$DEPLOYMENT_ID" >> "$GITHUB_ENV"
+
+      - name: Upload the script
+        if: steps.check.outputs.ready == 'true'
+        working-directory: apps-script
+        run: clasp push --force
+
+      - name: Publish a new version of the web app
+        if: steps.check.outputs.ready == 'true'
+        working-directory: apps-script
+        run: clasp deploy --deploymentId "$DEPLOYMENT_ID" --description "Leave Manager ${GITHUB_SHA::7} ($(date -u +%Y-%m-%d))"
+
+      - name: Summary
+        if: steps.check.outputs.ready == 'true'
+        run: echo "### Google script updated and published ✅" >> "$GITHUB_STEP_SUMMARY"

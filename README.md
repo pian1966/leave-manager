@@ -154,3 +154,19 @@ web/                 upload this folder's contents to GitHub Pages
   assets/app.js      the app
   assets/app.css     styles (light + dark)
 ```
+
+## Automatic Google script updates (optional)
+
+The `apps-script/` folder holds the Google Apps Script. A GitHub Action (`.github/workflows/deploy-apps-script.yml`) uploads it to your Google Sheet and publishes a new version whenever it changes, so nobody has to paste code into the Apps Script editor.
+
+One-time setup:
+
+1. Turn on **Google Apps Script API** at <https://script.google.com/home/usersettings>.
+2. On any computer with Node.js: `npm install -g @google/clasp@2.4.2`, then `clasp login` and sign in with the Google account that owns the sheet.
+3. Open the file it created (`~/.clasprc.json` on Ubuntu, `C:\Users\<you>\.clasprc.json` on Windows) and copy its whole contents.
+4. On GitHub: **Settings → Secrets and variables → Actions → New repository secret**
+   - `CLASPRC_JSON` = the contents from step 3
+   - `SCRIPT_ID` = Apps Script editor → **Project Settings** → **Script ID**
+5. **Actions → Deploy Google Apps Script → Run workflow** to test it.
+
+The web app keeps the same address: the deployment ID is read from `assets/config.js`. After a change that adds sheet tabs or columns you still run **Leave Manager → 1. Set up** once.
