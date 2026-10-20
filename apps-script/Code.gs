@@ -240,7 +240,7 @@ function onEdit(e) {
 }
 
 function paintColours(ss) {
-  ss = ss || SpreadsheetApp.getActive();
+  if (!ss || !ss.getSheetByName) ss = SpreadsheetApp.getActive();
   Object.keys(COLOUR_COLS_).forEach(function (name) {
     var sh = ss.getSheetByName(name);
     if (sh && sh.getLastRow() > 1) paintRange_(sh.getRange(2, COLOUR_COLS_[name], sh.getLastRow() - 1, 1));
