@@ -21,7 +21,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check the one-time setup is done
         id: check
@@ -36,10 +36,10 @@ jobs:
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         if: steps.check.outputs.ready == 'true'
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install clasp
         if: steps.check.outputs.ready == 'true'
@@ -52,6 +52,15 @@ jobs:
           SCRIPT_ID: ${{ secrets.SCRIPT_ID }}
         run: |
           printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
+          # Sanity-check the login file without printing it.
+          node -e '
+            let j; try { j = JSON.parse(require("fs").readFileSync(process.env.HOME + "/.clasprc.json", "utf8")); }
+            catch (e) { console.log("::error::CLASPRC_JSON is not valid JSON – copy the whole file again."); process.exit(1); }
+            const keys = Object.keys(j);
+            const ok = (j.token && j.token.refresh_token) || (j.tokens && Object.keys(j.tokens).length);
+            console.log("Login file keys: " + keys.join(", "));
+            if (!ok) { console.log("::error::CLASPRC_JSON has no login token in it – run clasp login again and copy the new file."); process.exit(1); }
+            if (j.tokens && !j.token) console.log("::warning::This login file looks like it was made by clasp 3, but this job uses clasp 2.4.2.");'
           # The shared leave rules must be identical on the website and in the script.
           cp assets/core.js apps-script/Core.gs
           printf '{"scriptId":"%s","rootDir":"."}' "$SCRIPT_ID" > apps-script/.clasp.json
@@ -62,12 +71,24 @@ jobs:
       - name: Upload the script
         if: steps.check.outputs.ready == 'true'
         working-directory: apps-script
-        run: clasp push --force
+        run: |
+          set -o pipefail
+          if ! clasp push --force 2>&1 | tee /tmp/push.txt; then
+            msg=$(tail -n 6 /tmp/push.txt | tr '\n' ' ' | sed -E 's/(token|secret)[^ ]*/\1:***/Ig')
+            echo "::error::clasp push failed: $msg"
+            exit 1
+          fi
 
       - name: Publish a new version of the web app
         if: steps.check.outputs.ready == 'true'
         working-directory: apps-script
-        run: clasp deploy --deploymentId "$DEPLOYMENT_ID" --description "Leave Manager ${GITHUB_SHA::7} ($(date -u +%Y-%m-%d))"
+        run: |
+          set -o pipefail
+          if ! clasp deploy --deploymentId "$DEPLOYMENT_ID" --description "Leave Manager ${GITHUB_SHA::7} ($(date -u +%Y-%m-%d))" 2>&1 | tee /tmp/deploy.txt; then
+            msg=$(tail -n 6 /tmp/deploy.txt | tr '\n' ' ')
+            echo "::error::clasp deploy failed: $msg"
+            exit 1
+          fi
 
       - name: Summary
         if: steps.check.outputs.ready == 'true'
