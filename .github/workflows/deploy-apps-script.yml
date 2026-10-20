@@ -58,7 +58,7 @@ jobs:
             catch (e) { console.log("::error::CLASPRC_JSON is not valid JSON – copy the whole file again."); process.exit(1); }
             const keys = Object.keys(j);
             const ok = (j.token && j.token.refresh_token) || (j.tokens && Object.keys(j.tokens).length);
-            console.log("Login file keys: " + keys.join(", "));
+            console.log("::notice::Login file contains: " + keys.join(", ") + (j.token ? " (token: " + Object.keys(j.token).join(", ") + ")" : ""));
             if (!ok) { console.log("::error::CLASPRC_JSON has no login token in it – run clasp login again and copy the new file."); process.exit(1); }
             if (j.tokens && !j.token) console.log("::warning::This login file looks like it was made by clasp 3, but this job uses clasp 2.4.2.");'
           # The shared leave rules must be identical on the website and in the script.
