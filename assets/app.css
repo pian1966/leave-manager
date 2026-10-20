@@ -453,3 +453,9 @@ h3 { font-size: 1rem; }
   .rp-sign, .rp-foot { break-inside: avoid; }
   .rp-dot, .rp-who, .rp-head { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+.notcounted { font-size: .84rem; color: var(--muted); }
+.notcounted b { color: var(--ink); font-weight: 700; }
+.notcounted ul { margin: 2px 0 0; padding-left: 18px; }
+.notcounted li { margin: 1px 0; }
+.notcounted .why { white-space: nowrap; }

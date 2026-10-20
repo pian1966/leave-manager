@@ -885,12 +885,29 @@
     if (!C.isISO(r.start) || !C.isISO(r.end)) { sum.innerHTML = '<span class="muted">Pick your dates to see how many working days this uses.</span>'; setErr(''); return; }
     var dl = r.end >= r.start ? C.dayList(r, CTX) : [];
     var n = dl.reduce(function (s, x) { return s + x.amt; }, 0);
-    var skipped = [];
-    if (r.end >= r.start) {
-      var d = C.parse(r.start), e = C.parse(r.end), hol = 0, we = 0, guard = 0;
+    // Which dates in the range aren't counted, and why.
+    var skip = { hol: [], closed: [], off: [] }, nSkip = 0;
+    if (r.end >= r.start && !(t && C.isCalendarUnit(t))) {
+      var d = C.parse(r.start), e = C.parse(r.end), guard = 0;
       var wdays = st ? C.staffDays(CTX, st.id) : CTX.open;
-      while (d <= e && guard++ < 800) { var ds = C.iso(d); if (CTX.hol[ds]) { hol++; skipped.push(CTX.hol[ds]); } else if (wdays.indexOf(d.getDay()) < 0) we++; d = C.addDays(d, 1); }
+      while (d <= e && guard++ < 800) {
+        var ds = C.iso(d), label = DOW[d.getDay()] + ' ' + fmt(ds);
+        if (CTX.hol[ds]) { skip.hol.push(label + ': ' + CTX.hol[ds] + ' (public holiday)'); nSkip++; }
+        else if (!C.isOpen(d, CTX)) { skip.closed.push(label); nSkip++; }
+        else if (wdays.indexOf(d.getDay()) < 0) { skip.off.push(label); nSkip++; }
+        d = C.addDays(d, 1);
+      }
     }
+    var mine = st && st.id === me().id, who = mine ? 'your' : (st ? firstName(st.name) + '’s' : '');
+    var skipItems = [];
+    if (skip.off.length) skipItems.push(esc(skip.off.join(', ')) + ': not ' + esc(who) + ' working day' + (skip.off.length > 1 ? 's' : '') +
+      ' <span class="why">(' + (mine ? 'you work ' : esc(st ? firstName(st.name) : '') + ' works ') + esc(st ? workLabel(st) : '') + ')</span>');
+    if (skip.closed.length) {
+      var closedDays = C.daysLabel([0, 1, 2, 3, 4, 5, 6].filter(function (x) { return CTX.open.indexOf(x) < 0; }));
+      skipItems.push(esc(skip.closed.join(', ')) + ': the church is closed <span class="why">(closed ' + esc(closedDays) + ')</span>');
+    }
+    skip.hol.forEach(function (h) { skipItems.push(esc(h)); });
+    var skipHtml = skipItems.length ? '<div class="notcounted"><b>Not counted (' + days(nSkip) + '):</b><ul>' + skipItems.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul></div>' : '';
     var line2 = '';
     var useAmt = t && !C.isDayUnit(t) ? (n ? C.amount(r, t, CTX) : 0) : n;
     if (t && t.deducts && st && n && C.offered(S.data, st, t)) {
@@ -899,7 +916,7 @@
       line2 = '<span>' + esc(t.name) + ': ' + C.fmtAmount(t, b.available) + ' available → <b class="' + (b.available - useAmt < 0 ? 'low' : '') + '">' + C.fmtDays(b.available - useAmt) + ' after this</b></span>';
     } else if (t && !t.deducts) line2 = '<span class="muted">' + esc(t.name) + ' doesn’t use any allowance.</span>';
     sum.innerHTML = '<span class="big num">' + (t && !C.isDayUnit(t) ? C.fmtAmount(t, useAmt) + '</span><span class="muted small">' + days(n) + ' away from work' : days(n)) + '</span>' +
-      ((we || skipped.length) ? '<span class="muted small">Not counted: ' + [we ? we + ' day' + (we > 1 ? 's' : '') + ' ' + (st && st.id === me().id ? 'you don’t' : firstName(st ? st.name : '') + ' doesn’t') + ' work' : '', skipped.length ? skipped.join(', ') : ''].filter(Boolean).join(' · ') + '</span>' : '') +
+      skipHtml +
       (t && t.allowedDays ? '<span class="muted small">' + esc(t.name) + ' can only be booked on ' + esc(C.daysLabel(C.parseDays(t.allowedDays, []))) + (Number(t.perTerm) > 0 ? ', ' + (Number(t.perTerm) === 1 ? 'once' : t.perTerm + ' times') + ' per school term' : '') + '.</span>' : '') +
       (t && st && Number(t.perTerm) > 0 && C.termOf(S.data, r.start) ? '<span class="muted small">Counts as ' + esc(C.termOf(S.data, r.start).name) + '’s ' + esc(t.name) + '.</span>' : '') + line2 +
       (t && t.needsApproval && st && st.id === me().id ? '<span class="muted small">Goes to the Administrator for approval.</span>' : '');
