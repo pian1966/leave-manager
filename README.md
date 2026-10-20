@@ -194,3 +194,16 @@ How it works:
 Installing on a phone: open the download link, tap the file, then **Install**. The first time, Android asks you to allow your browser (e.g. Chrome) to install apps; allow it. Google Play Protect may say it doesn't recognise the app, because it isn't from the Play Store; tap **More details → Install anyway**.
 
 iPhone: open the website in Safari → Share → **Add to Home Screen**. It then opens full screen like an app.
+
+## Sign in with Google (optional)
+
+Staff whose email on the Staff tab is a Google account can sign in with Google instead of a PIN. Email + PIN keeps working for everyone.
+
+Switching it on needs a free Google sign-in ID, created once in Google Cloud:
+1. Go to https://console.cloud.google.com, signed in as the account that owns the Leave Manager sheet. Create a project called **Leave Manager**.
+2. Open **Google Auth Platform** (APIs & Services → OAuth consent screen) → **Get started**. App name *Leave Manager*, your email as support email, Audience **External**, your email as contact. Then **Audience → Publish app**, so all staff can use it (only basic name/email access is asked for, so Google doesn't need to review it).
+3. **Clients → Create client → Web application.** Name *Leave Manager website*. Under *Authorised JavaScript origins* add `https://pian1966.github.io`. Create, then copy the **Client ID** (ends in `.apps.googleusercontent.com`).
+4. **Clients → Create client → Android.** Name *Leave Manager Android*, package name `org.christchurchhowick.leavemanager`, SHA-1 `4C:42:7C:4A:E5:0C:00:B4:36:7A:B6:3E:76:2B:53:F5:0E:8E:9F:52` (the app's signing key). Create. Nothing to copy.
+5. Put the Web client ID in `assets/config.js` as `GOOGLE_CLIENT_ID` and in `apps-script/Code.gs` as `GOOGLE_CLIENT_ID` (or on the Settings tab as `GoogleClientID`).
+
+The server checks every Google sign-in with Google, that it was made for this client ID, and that the email is verified, before matching it to the Staff tab.

@@ -21,6 +21,8 @@ All leave requests go to the Administrator, who approves or declines them. You g
 2. Type your **work email** and your **PIN**.
 3. Click **Sign in**. You stay signed in for about 6 hours.
 
+**Sign in with Google:** if your email on the staff list is a Google account (Gmail or a Google Workspace address), you can tap **Sign in with Google** instead and skip the PIN. In the Android app, choose your account from the list that pops up. If it says your account isn't on the staff list, ask the Administrator to check your email address in the Staff sheet.
+
 **To sign out:** click **Sign out** at the bottom of the left panel (on a phone, the button at the top right).
 
 **Forgotten your PIN, or it doesn't work?** Ask the Administrator. They can set a new one for you straight away.
