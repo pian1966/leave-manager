@@ -56,26 +56,27 @@ The Overview opens first and shows your own leave at a glance.
 
 What you get depends on your staff category. The leave year runs 1 January to 31 December.
 
-| Leave type | Pastoral Staff | Support Staff | Cleaning Staff | How it's counted |
-| --- | --- | --- | --- | --- |
-| Pastoral Staff Leave | 24 days | – | – | Working days |
-| Support Staff Leave | – | 20 days | – | Working days |
-| Cleaning Staff Leave | – | – | 3 days | Working days |
-| Sick Leave | 7 days | 7 days | 7 days | Working days |
-| Weekend Off (Fri–Sun) | 4 weekends | – | – | 1 per school term |
-| Sabbatical Leave | 12.5 days a year | – | – | Calendar days, builds up |
-| Working Away from Office | 21 days | – | – | Working days |
-| Unpaid Leave | Any | Any | Any | Doesn't use an allowance |
+| Leave type | Pastoral Staff | Support Staff | Technical Staff | Cleaning Staff | How it's counted |
+| --- | --- | --- | --- | --- | --- |
+| Pastoral Staff Leave | 24 days | – | – | – | Working days |
+| Support Staff Leave | – | 20 days | – | – | Working days |
+| Technical Staff Leave | – | – | 20 days | – | Working days |
+| Cleaning Staff Leave | – | – | – | 3 days | Working days |
+| Sick Leave | 7 days | 7 days | 7 days | 7 days | Working days |
+| Weekend Off (Fri–Sun) | 4 weekends | – | – | – | 1 per school term |
+| Sabbatical Leave | 12.5 days a year | – | – | – | Calendar days, builds up |
+| Working Away from Office | 21 days | – | – | – | Working days |
+| Unpaid Leave | Any | Any | Any | Any | Doesn't use an allowance |
 
-Usual working days: Pastoral Staff Mon and Wed–Sun; Support Staff Mon and Wed–Fri; Technical Staff Mon, Wed–Fri and Sun; Cleaning Staff Fridays. Technical Staff get the same allowances as Support Staff (Support Staff Leave and Sick Leave). Yours may differ; the Overview shows your own.
+Usual working days: Pastoral Staff Mon and Wed–Sun; Support Staff Mon and Wed–Fri; Technical Staff Mon, Wed–Fri and Sun; Cleaning Staff Fridays. Yours may differ; the Overview shows your own.
 
-**No carry-over — use it by 1 February.** Unused Pastoral, Support and Cleaning Staff Leave can still be taken up to and including 1 February of the next year. After that it's lost. Leave you take in January uses last year's days first. Sick Leave, Weekend Off and Working Away start fresh each 1 January.
+**No carry-over — use it by 1 February.** Unused Pastoral, Support, Technical and Cleaning Staff Leave can still be taken up to and including 1 February of the next year. After that it's lost. Leave you take in January uses last year's days first. Sick Leave, Weekend Off and Working Away start fresh each 1 January.
 
 **Weekend Off** is Friday to Sunday, one per school term. A weekend in the school holidays counts towards the term that has just ended.
 
 **Sabbatical** builds up by 12.5 calendar days each year from your start date, to a maximum of 87.5 days (about 3 months after 7 years).
 
-**Starting part-way through the year?** Your Pastoral, Support or Cleaning Staff Leave is reduced in proportion for that first year.
+**Starting part-way through the year?** Your Pastoral, Support, Technical or Cleaning Staff Leave is reduced in proportion for that first year.
 
 ## After you send a request
 

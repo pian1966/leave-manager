@@ -112,7 +112,7 @@
   function takesLeave(st) { return C.tracksLeave(st || me()); }
   function canManage(st) { return C.canManage(me(), st); }
   function staffById(id) { return C.staffById(S.data, id); }
-  var KNOWN_TYPES = { PSL: 'Pastoral Staff Leave', SSL: 'Support Staff Leave', CSL: 'Cleaning Staff Leave', SL: 'Sick Leave',
+  var KNOWN_TYPES = { PSL: 'Pastoral Staff Leave', SSL: 'Support Staff Leave', CSL: 'Cleaning Staff Leave', TSL: 'Technical Staff Leave', SL: 'Sick Leave',
     WO: 'Weekend Off (Fri–Sun)', SAB: 'Sabbatical Leave', WA: 'Working Away from Office', UL: 'Unpaid Leave' };
   function typeOf(code) {
     var t = C.type(S.data, code);
@@ -1086,7 +1086,7 @@
 
   /* ------------------------------ demo backend ------------------------------ */
   var Demo = (function () {
-    var KEY = 'demo_db_v10';
+    var KEY = 'demo_db_v11';
     function seed() {
       var yr = new Date().getFullYear();
       // id, name, category, working days override ('' = category default), role, manager
@@ -1117,6 +1117,7 @@
           { code: 'PSL', name: 'Pastoral Staff Leave', colour: '#2F80C0', deducts: true, halfDay: true, proRata: true, needsApproval: true, unit: 'Days', useBy: '1 Feb' },
           { code: 'SSL', name: 'Support Staff Leave', colour: '#3A86A8', deducts: true, halfDay: true, proRata: true, needsApproval: true, unit: 'Days', useBy: '1 Feb' },
           { code: 'CSL', name: 'Cleaning Staff Leave', colour: '#4C9A6A', deducts: true, halfDay: true, proRata: true, needsApproval: true, unit: 'Days', useBy: '1 Feb' },
+          { code: 'TSL', name: 'Technical Staff Leave', colour: '#B0527A', deducts: true, halfDay: true, proRata: true, needsApproval: true, unit: 'Days', useBy: '1 Feb' },
           { code: 'SL', name: 'Sick Leave', colour: '#D1495B', deducts: true, halfDay: true, proRata: false, needsApproval: true, unit: 'Days' },
           { code: 'WO', name: 'Weekend Off (Fri–Sun)', colour: '#E09F3E', deducts: true, halfDay: false, proRata: false, needsApproval: true, unit: 'Weekends', allowedDays: 'Fri, Sat, Sun', perTerm: 1 },
           { code: 'SAB', name: 'Sabbatical Leave', colour: '#7B61C9', deducts: true, halfDay: false, proRata: true, needsApproval: true, unit: 'Calendar days', accumulates: true, maxBalance: 87.5 },
@@ -1127,7 +1128,7 @@
           { level: 'Pastoral Staff', label: 'Pastoral Staff', workDays: 'Mon, Wed, Thu, Fri, Sat, Sun', ent: { PSL: 24, SL: 7, WO: 4, SAB: 12.5, WA: 21 } },
           { level: 'Support Staff', label: 'Support Staff', workDays: 'Mon, Wed, Thu, Fri', ent: { SSL: 20, SL: 7 } },
           { level: 'Cleaning Staff', label: 'Cleaning Staff', workDays: 'Fri', ent: { CSL: 3, SL: 7 } },
-          { level: 'Technical Staff', label: 'Technical Staff', workDays: 'Mon, Wed, Thu, Fri, Sun', ent: { SSL: 20, SL: 7 } },
+          { level: 'Technical Staff', label: 'Technical Staff', workDays: 'Mon, Wed, Thu, Fri, Sun', ent: { TSL: 20, SL: 7 } },
           { level: 'Administrator', label: 'Administrator', workDays: 'Mon, Wed, Thu, Fri', ent: {} }
         ],
         staff: staff,
@@ -1160,6 +1161,7 @@
         ['S06', 'SSL', -35, 2, 'Approved', '', ''],
         ['S01', 'WO', -45, 2, 'Approved', '', ''],
         ['S10', 'UL', -66, 0, 'Approved', '', ''],
+        ['S10', 'TSL', 28, 6, 'Approved', '', 'Family wedding in Durban'],
         ['S03', 'PSL', -75, 4, 'Approved', '', ''],
         ['S05', 'SSL', -90, 4, 'Approved', '', ''],
         ['S04', 'SSL', -120, 4, 'Approved', '', ''],

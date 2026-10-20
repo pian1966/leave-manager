@@ -110,7 +110,7 @@ Send everyone the GitHub Pages link and their PIN. Share the Google Form link (S
 
 - **Requesting:** *Request leave*, or click an empty day on your row of the wallchart. The app shows working days used and your balance afterwards before you send.
 - **Approving:** every request is emailed to the Administrator(s), who approve it from the email or the **Approvals** page.
-- **Year end:** there's nothing to do. Unused Pastoral, Support and Cleaning Staff Leave can still be taken until **1 February** of the next year. Leave taken in January uses up last year's days first, and anything left after 1 February is lost. Sick Leave, Weekend Off and Working Away reset on 1 January. Sabbatical keeps building up.
+- **Year end:** there's nothing to do. Unused Pastoral, Support, Technical and Cleaning Staff Leave can still be taken until **1 February** of the next year. Leave taken in January uses up last year's days first, and anything left after 1 February is lost. Sick Leave, Weekend Off and Working Away reset on 1 January. Sabbatical keeps building up.
 - **Starting part-way through the year:** **FirstLeaveYear** in Settings is the year you start using the app. For each person, add a negative row on Adjustments for leave they've already taken this year (e.g. `S03, 2026, PSL, -10, Taken before the app`) so their balance is right.
 - **Leave year:** set **LeaveYearStartMonth** to `3` for a March–February leave year. Balances reset at the start of that month.
 - **Google Calendar:** create a shared calendar, copy its ID (calendar settings → *Integrate calendar*) into **Settings → CalendarId**. Newly approved leave is added automatically.
