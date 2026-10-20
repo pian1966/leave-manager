@@ -153,6 +153,9 @@ web/                 upload this folder's contents to GitHub Pages
   assets/core.js     shared leave rules
   assets/app.js      the app
   assets/app.css     styles (light + dark)
+  assets/icons/      app icons
+  manifest.webmanifest, sw.js   make the site installable and work offline
+android/             the Android app (built automatically by GitHub, see below)
 ```
 
 ## Automatic Google script updates (optional)
@@ -170,3 +173,24 @@ One-time setup:
 5. **Actions → Deploy Google Apps Script → Run workflow** to test it.
 
 The web app keeps the same address: the deployment ID is read from `assets/config.js`. After a change that adds sheet tabs or columns you still run **Leave Manager → 1. Set up** once.
+
+## Android app
+
+Staff and the Administrator can use the same Android app: everyone signs in with their email and PIN, and the app shows them the right pages.
+
+**Download link for staff:** https://github.com/pian1966/leave-manager/releases/latest/download/LeaveManager.apk
+Staff can also find it under **My settings → Phone app**, or on the sign-in page when they open Leave Manager on an Android phone.
+
+How it works:
+- The app shows the live website full screen, so new features appear in the app straight away; it doesn't need updating for them.
+- It adds Android printing (Reports → Print / Save as PDF), the back button (closes a window, then goes to Overview), links opening in the right app, an offline screen, and a status bar in the person's own colour.
+- GitHub builds the app whenever something in `android/` changes (workflow **Build Android app**), and publishes it on the **Releases** page.
+
+**One-time setup: the signing key.** Android only installs updates signed with the same key as the first install.
+1. GitHub → **Settings → Secrets and variables → Actions → New repository secret**.
+2. Name: `ANDROID_KEYSTORE`. Value: the contents of the `ANDROID_KEYSTORE.txt` file you were given. Keep a copy of that file somewhere safe; if it's lost, everyone has to uninstall and reinstall the app once.
+3. **Actions → Build Android app → Run workflow.** After about 3 minutes the app appears on the Releases page.
+
+Installing on a phone: open the download link, tap the file, then **Install**. The first time, Android asks you to allow your browser (e.g. Chrome) to install apps; allow it. Google Play Protect may say it doesn't recognise the app, because it isn't from the Play Store; tap **More details → Install anyway**.
+
+iPhone: open the website in Safari → Share → **Add to Home Screen**. It then opens full screen like an app.

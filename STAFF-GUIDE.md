@@ -132,6 +132,16 @@ Click **My settings** at the bottom of the left-hand menu (on a phone, tap the â
 
 Appearance and Start page are remembered on the device you set them on, so you can choose differently on your phone and your computer.
 
+## Leave Manager on your phone
+
+**Android:** open https://github.com/pian1966/leave-manager/releases/latest/download/LeaveManager.apk on your phone (or tap **Download the Android app** under **My settings**). Open the downloaded file and tap **Install**.
+- If your phone asks, allow Chrome (or your browser) to install apps.
+- If Play Protect says it doesn't recognise the app, tap **More details â†’ Install anyway**. It's our own church app, so it isn't in the Play Store.
+
+Then open **Leave Manager** from your apps and sign in with your email and PIN. The back button closes windows and takes you back to Overview. You can print reports from the app too.
+
+**iPhone:** open Leave Manager in Safari, tap the **Share** button, then **Add to Home Screen**.
+
 ## Common questions
 
 | Problem | What to do |
