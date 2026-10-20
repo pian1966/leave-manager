@@ -676,7 +676,7 @@ function startSession_(data, st) {
 /* ---------- Sign in with Google ----------
    The Google sign-in client ID (from Google Cloud → Google Auth Platform → Clients, type "Web application").
    It isn't secret. Extra IDs can be added on the Settings tab as GoogleClientID (comma-separated). */
-var GOOGLE_CLIENT_ID = '';
+var GOOGLE_CLIENT_ID = '322205667113-v67fa17marrtvq3v9rpep2cnk83pcosp.apps.googleusercontent.com';
 
 function googleClientIds_() {
   var ids = [GOOGLE_CLIENT_ID];
