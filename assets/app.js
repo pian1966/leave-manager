@@ -134,8 +134,33 @@
       .sort(function (a, b) { return a.start < b.start ? -1 : 1; });
   }
 
+  /* Accept "#2F6FB3", "2F6FB3" or "#abc" from the sheet; anything else falls back. */
+  function normHex(v) {
+    var h = String(v || '').trim();
+    if (/^#?[0-9a-f]{3}$/i.test(h)) h = h.replace(/^#?(.)(.)(.)$/, '#$1$1$2$2$3$3');
+    if (/^[0-9a-f]{6}$/i.test(h)) h = '#' + h;
+    return /^#[0-9a-f]{6}$/i.test(h) ? h.toUpperCase() : '';
+  }
+  /* The signed-in person's colour (Staff tab, column J) becomes the app's accent colour. */
+  function applyAccent(hex) {
+    var root = document.documentElement;
+    if (!hex) { root.removeAttribute('data-uc'); root.style.removeProperty('--uc'); root.style.removeProperty('--uc-ink'); return; }
+    var r = parseInt(hex.substr(1, 2), 16), g = parseInt(hex.substr(3, 2), 16), b = parseInt(hex.substr(5, 2), 16);
+    var lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    // Very pale colours would vanish on white, so they are deepened just enough to read.
+    root.style.setProperty('--uc', lum > 185 ? 'color-mix(in srgb, ' + hex + ' 60%, #000000)' : hex);
+    root.style.setProperty('--uc-ink', lum > 150 && lum <= 185 ? '#14201C' : '#FFFFFF');
+    root.setAttribute('data-uc', '');
+    var meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.setAttribute('content', hex);
+  }
+
   function setData(d) {
+    (d.staff || []).forEach(function (s) { s.colour = normHex(s.colour); });
+    if (d.user) d.user.colour = normHex(d.user.colour);
+    (d.types || []).forEach(function (t) { t.colour = normHex(t.colour) || '#64748B'; });
     S.data = d;
+    var meSt = (d.staff || []).filter(function (s) { return d.user && s.id === d.user.id; })[0];
+    applyAccent((meSt && meSt.colour) || (d.user && d.user.colour) || '');
     CTX = C.ctx(d);
     IX = {}; DL = {};
     d.requests.forEach(function (r) {
@@ -193,7 +218,7 @@
     });
   }
   function logout(msg) {
-    S.token = null; S.data = null;
+    S.token = null; S.data = null; applyAccent('');
     store.del(LIVE ? 'token' : 'demo_token');
     closeModal();
     render();
