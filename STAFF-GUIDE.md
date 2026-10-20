@@ -1,8 +1,10 @@
 # Leave Manager – Staff Guide
 
-*Last updated: 19 October 2026*
+*Last updated: 20 October 2026*
 
 The Leave Manager is where you request leave, see how many days you have left, and check who else is away. It works on a computer, tablet or phone.
+
+> **About the pictures:** each section shows the computer view first, then the Android app. The people in the pictures are sample staff. The phone app works the same way as the computer version: the left-hand menu becomes the tabs along the bottom, and **⚙** at the top opens My settings.
 
 ## Welcome
 
@@ -27,6 +29,10 @@ All leave requests go to the Administrator, who approves or declines them. You g
 
 **Forgotten your PIN, or it doesn't work?** Ask the Administrator. They can set a new one for you straight away.
 
+<p><img src="docs/images/d-signin.png" alt="The sign-in page on a computer, with Sign in with Google above the email and PIN boxes" width="100%"></p>
+
+<p align="center"><img src="docs/images/m-signin.png" alt="Signing in on the Android app" width="250"></p>
+
 **On your phone:** open the web address in your browser, then use *Add to Home Screen* (iPhone: Share button; Android: the ⋮ menu). It then opens like an app.
 
 ## Your Overview page
@@ -40,6 +46,10 @@ The Overview opens first and shows your own leave at a glance.
 - **My leave** — your upcoming and recent requests with their status. Click one to see the details.
 - **Public holidays** — the next few holidays.
 
+<p><img src="docs/images/d-overview.png" alt="The Overview page: balance cards, who is away, and my leave" width="100%"></p>
+
+<p align="center"><img src="docs/images/m-overview.png" alt="The Overview page in the Android app" width="250"></p>
+
 ## Requesting leave
 
 1. Click **Request leave** (top of the left panel, or **+ Request** on a phone). You can also click an empty day on your own row of the **Wallchart**.
@@ -49,6 +59,10 @@ The Overview opens first and shows your own leave at a glance.
 5. Add a **note** for the Administrator if you like.
 6. Check the grey box: it shows how many days this uses and what you'll have left. A red message means the request can't be sent yet and says why.
 7. Click **Send request**.
+
+<p><img src="docs/images/d-request.png" alt="The Request leave window, showing 3 days and the balance after this request" width="100%"></p>
+
+<p align="center"><img src="docs/images/m-request.png" alt="Requesting leave in the Android app" width="250"></p>
 
 **What counts as a day off:** only *your own* working days. Days you don't normally work, days the church is closed (Tuesdays) and public holidays are never taken off your balance. Sabbatical is the exception: it counts every calendar day.
 
@@ -95,6 +109,9 @@ The Administrator gets an email straight away and approves or declines it. You g
 
 **To change dates:** cancel the request and send a new one.
 
+<p><img src="docs/images/d-detail.png" alt="A request opened to see its details, with the Cancel this leave button" width="100%"></p>
+<p><em>Click any request to see its status and details. Cancel this leave is at the bottom.</em></p>
+
 ## Seeing who's away
 
 Use the left panel (on a phone, the tabs along the bottom).
@@ -114,6 +131,17 @@ Use the left panel (on a phone, the tabs along the bottom).
 
 Hold your mouse over any leave-type label to see its full name and how it works. Click the leave-type buttons above a calendar to hide or show that type, or **Pending requests** to hide leave that isn't approved yet. You see when colleagues are away, but not their notes or balances.
 
+<p><img src="docs/images/d-wall.png" alt="The Wallchart: one row per person, coloured blocks for leave" width="100%"></p>
+<p><em>The Wallchart. Your own row is marked “(you)”.</em></p>
+
+<p><img src="docs/images/d-calendar.png" alt="The Calendar: names on each day" width="100%"></p>
+<p><em>The Calendar. Click a day to see everyone who is off.</em></p>
+
+<p><img src="docs/images/d-year.png" alt="The Year planner: twelve months with balances and requests" width="100%"></p>
+<p><em>The Year planner.</em></p>
+
+<p align="center"><img src="docs/images/m-wall.png" alt="The Wallchart in the Android app" width="250"> <img src="docs/images/m-calendar.png" alt="The Calendar in the Android app" width="250"></p>
+
 ## Printing a leave report
 
 You can print a professional report of your leave, or save it as a PDF.
@@ -124,6 +152,12 @@ You can print a professional report of your leave, or save it as a PDF.
 
 The report shows your details, a table of each leave type (allowance, taken, pending, remaining), every request with its status and who approved it, and lines for your and the Administrator's signatures.
 
+<p><img src="docs/images/d-report.png" alt="A printable leave report with balances and requests" width="100%"></p>
+
+<p align="center"><img src="docs/images/m-report.png" alt="A leave report in the Android app" width="250"></p>
+
+In the Android app, **Print / Save as PDF** opens the phone's print screen. Choose a printer, or **Save as PDF**.
+
 ## My settings
 
 Click **My settings** at the bottom of the left-hand menu (on a phone, tap the ⚙ gear at the top).
@@ -133,6 +167,10 @@ Click **My settings** at the bottom of the left-hand menu (on a phone, tap the �
 - **Start page.** Choose the page that opens when you sign in, for example the Wallchart.
 
 Appearance and Start page are remembered on the device you set them on, so you can choose differently on your phone and your computer.
+
+<p><img src="docs/images/d-settings.png" alt="My settings: colour, appearance and start page" width="100%"></p>
+
+<p align="center"><img src="docs/images/m-settings.png" alt="My settings in the Android app" width="250"> <img src="docs/images/m-app.png" alt="The Android app section of My settings" width="250"></p>
 
 ## Leave Manager on your phone
 
