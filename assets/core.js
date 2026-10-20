@@ -7,12 +7,27 @@
 var LeaveCore = (function () {
   var DAYN = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
   var DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  var MONS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   var WEEK = [1, 2, 3, 4, 5, 6, 0]; // display order, Monday first
 
   function pad(n) { return (n < 10 ? '0' : '') + n; }
   function iso(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
   function parse(s) { var p = String(s).slice(0, 10).split('-'); return new Date(+p[0], +p[1] - 1, +p[2], 12); }
   function addDays(d, n) { var x = new Date(d.getTime()); x.setDate(x.getDate() + n); return x; }
+  /** "2026-06-21" → "Sun 21 Jun 2026" (year left off when withYear is false). */
+  function niceDate(s, withYear) {
+    if (!/^\d{4}-\d{2}-\d{2}/.test(String(s || ''))) return String(s || '');
+    var d = parse(s);
+    return DAYS[d.getDay()] + ' ' + d.getDate() + ' ' + MONS[d.getMonth()] + (withYear === false ? '' : ' ' + d.getFullYear());
+  }
+  /** A request's dates: "Sun 21 Jun – Thu 25 Jun 2026", or "Sun 21 Jun 2026 (morning)" for one day. */
+  function niceRange(r) {
+    if (r.start === r.end || !r.end) {
+      return niceDate(r.start) + (r.half === 'AM' ? ' (morning)' : r.half === 'PM' ? ' (afternoon)' : '');
+    }
+    var sameYear = String(r.start).slice(0, 4) === String(r.end).slice(0, 4);
+    return niceDate(r.start, !sameYear) + ' – ' + niceDate(r.end);
+  }
   function isISO(s) { return /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')); }
   function truthy(v) { return v === true || /^(true|yes|y|1)$/i.test(String(v)); }
 
@@ -332,12 +347,12 @@ var LeaveCore = (function () {
     }
     if (Number(t.perTerm) > 0) {
       var term = termOf(data, r.start);
-      if (!term) return t.name + ' is limited per school term, but ' + r.start + ' isn’t in any term on the School Terms tab. Ask an admin to add the term dates.';
+      if (!term) return t.name + ' is limited per school term, but ' + niceDate(r.start) + ' isn’t in any term on the School Terms tab. Ask an admin to add the term dates.';
       if (r.end > term.until) return t.name + ' can’t run from one school term into the next.';
       var used = termBookings(data, st.id, t.code, term, ignoreId);
       if (used.length >= Number(t.perTerm)) {
         return st.name.split(' ')[0] + ' has already booked ' + (Number(t.perTerm) === 1 ? 'the ' : Number(t.perTerm) + ' of the ') + t.name + ' for ' + term.name +
-          ' (' + used[0].start + '). Only ' + t.perTerm + ' per term is allowed.';
+          ' (' + niceRange(used[0]) + '). Only ' + t.perTerm + ' per term is allowed.';
       }
     }
     var c = ctx(data), days = dayList(r, c);
@@ -353,7 +368,7 @@ var LeaveCore = (function () {
     });
     if (clash.length) {
       var ct = type(data, clash[0].type);
-      return st.name + ' already has ' + (ct ? ct.name : 'leave') + ' booked from ' + clash[0].start + ' to ' + clash[0].end + '.';
+      return st.name + ' already has ' + (ct ? ct.name : 'leave') + (clash[0].status === 'Pending' ? ' waiting for approval' : ' booked') + ' for ' + niceRange(clash[0]) + '.';
     }
     if (t.deducts && !truthy(data.settings.AllowNegative)) {
       // Compare balances with and without this request in every leave year it touches.
@@ -449,7 +464,7 @@ var LeaveCore = (function () {
   }
 
   return {
-    DAYS: DAYS, iso: iso, parse: parse, addDays: addDays, isISO: isISO, truthy: truthy, parseDays: parseDays, daysLabel: daysLabel,
+    DAYS: DAYS, iso: iso, niceDate: niceDate, niceRange: niceRange, parse: parse, addDays: addDays, isISO: isISO, truthy: truthy, parseDays: parseDays, daysLabel: daysLabel,
     ctx: ctx, staffDays: staffDays, isOpen: isOpen, isWorking: isWorking,
     dayList: dayList, countDays: countDays, isDayUnit: isDayUnit, isCalendarUnit: isCalendarUnit, unitName: unitName, fmtAmount: fmtAmount, amount: amount,
     easter: easter, saPublicHolidays: saPublicHolidays,
