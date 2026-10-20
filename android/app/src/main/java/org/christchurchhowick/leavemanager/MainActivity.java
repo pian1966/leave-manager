@@ -174,6 +174,23 @@ public class MainActivity extends Activity {
             runOnUiThread(() -> tintBars(hex));
         }
 
+        /** Shares a text file (e.g. the payroll CSV) through Android's share sheet: email, Drive, WhatsApp… */
+        @JavascriptInterface
+        public void shareText(String fileName, String text) {
+            runOnUiThread(() -> {
+                Intent send = new Intent(Intent.ACTION_SEND);
+                send.setType(fileName != null && fileName.endsWith(".csv") ? "text/csv" : "text/plain");
+                send.putExtra(Intent.EXTRA_SUBJECT, fileName);
+                send.putExtra(Intent.EXTRA_TITLE, fileName);
+                send.putExtra(Intent.EXTRA_TEXT, text);
+                try {
+                    startActivity(Intent.createChooser(send, "Share " + fileName));
+                } catch (ActivityNotFoundException e) {
+                    Toast.makeText(MainActivity.this, "No app on this phone can share that.", Toast.LENGTH_LONG).show();
+                }
+            });
+        }
+
         /** Shows Android's Google account picker; the result goes back to the page. */
         @JavascriptInterface
         public void googleSignIn(String webClientId) {

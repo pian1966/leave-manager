@@ -13,7 +13,7 @@
 
 var SHEET = {
   STAFF: 'Staff', LEVELS: 'Categories', TYPES: 'Leave Types', REQ: 'Requests',
-  HOL: 'Public Holidays', ADJ: 'Adjustments', SET: 'Settings', TERMS: 'School Terms', HIST: 'History'
+  HOL: 'Public Holidays', ADJ: 'Adjustments', SET: 'Settings', TERMS: 'School Terms', HIST: 'History', RULES: 'Cover Rules'
 };
 
 var HEADERS = {
@@ -27,8 +27,25 @@ var HEADERS = {
   'Public Holidays': ['Date', 'Name'],
   'School Terms': ['Term', 'Start', 'End'],
   'Adjustments': ['Staff ID', 'Leave Year', 'Type', 'Days', 'Note'],
-  'Settings': ['Key', 'Value', 'What it does']
+  'Settings': ['Key', 'Value', 'What it does'],
+  'Cover Rules': ['Rule', 'Type', 'Category', 'Days', 'From', 'To', 'Minimum', 'Action', 'Message', 'Active']
 };
+
+/** Settings added after the first version; added to existing sheets automatically. */
+var NEW_SETTINGS_ = [
+  ['WeeklyEmail', 'Monday', 'Day the “Who’s away this week” email goes to all staff (about 6am). Blank = off'],
+  ['ReminderDates', '1 Nov, 1 Dec, 15 Jan', 'Dates each year when staff with unused leave get a “use it or lose it” reminder, and the Administrator gets a summary. Blank = off'],
+  ['StandInID', '', 'Stand-in approver: the Staff ID of the person who approves leave while the Administrator is away. Set it in the app (Dashboard)'],
+  ['StandInFrom', '', 'First day the stand-in approves leave'],
+  ['StandInTo', '', 'Last day the stand-in approves leave']
+];
+
+/** Example cover rules for a new Cover Rules tab. */
+var EXAMPLE_RULES_ = [
+  ['Sunday cover', 'Minimum on duty', 'Pastoral Staff', 'Sun', '', '', 1, 'Warn', 'At least one pastor must be on duty every Sunday.', true],
+  ['Easter services', 'No leave', 'Pastoral Staff, Technical Staff', '', 'Easter-2', 'Easter+1', '', 'Warn', 'Good Friday to Family Day.', false],
+  ['Christmas services', 'No leave', 'Pastoral Staff, Technical Staff', '', '24 Dec', '26 Dec', '', 'Warn', '', false]
+];
 
 /* ============================== MENU & SETUP ============================== */
 
@@ -39,6 +56,9 @@ function onOpen() {
     .addItem('Secure PINs now', 'hashPins')
     .addItem('Update public holidays and school terms now', 'updateCalendarsNow')
     .addItem('Colour the colour codes', 'paintColours')
+    .addSeparator()
+    .addItem('Preview the weekly “who’s away” email (sent to you only)', 'previewWeeklyEmail')
+    .addItem('Preview the “use it or lose it” emails (sent to you only)', 'previewReminders')
     .addSeparator()
     .addItem('Show my links', 'showLinks')
     .addToUi();
@@ -116,8 +136,10 @@ function setup() {
   build_(ss, SHEET.REQ, []);
   build_(ss, SHEET.ADJ, []);
   build_(ss, SHEET.HIST, []);
+  buildRules_(ss);
 
   var problems = migrateToAdministrator_(ss);
+  try { upgrade_(true); } catch (e) { problems.push('Upgrading: ' + (e && e.message || e)); }
   formatSheets_(ss);
   var def = ss.getSheetByName('Sheet1');
   if (def && ss.getSheets().length > 1 && def.getLastRow() === 0) ss.deleteSheet(def);
@@ -214,6 +236,58 @@ function migrateToAdministrator_(ss) {
     }
   });
   return problems;
+}
+
+/** Creates the Cover Rules tab with examples. Dates stay as text so "24 Dec" means every year. */
+function buildRules_(ss) {
+  var sh = ss.getSheetByName(SHEET.RULES);
+  if (sh && sh.getLastRow() > 0) return sh;
+  if (!sh) sh = ss.insertSheet(SHEET.RULES);
+  var head = HEADERS[SHEET.RULES];
+  sh.getRange('D:F').setNumberFormat('@');
+  sh.getRange(1, 1, 1, head.length).setValues([head]);
+  sh.getRange(2, 1, EXAMPLE_RULES_.length, head.length).setValues(EXAMPLE_RULES_);
+  formatRules_(sh);
+  return sh;
+}
+function formatRules_(sh) {
+  var n = HEADERS[SHEET.RULES].length;
+  sh.getRange(1, 1, 1, n).setFontWeight('bold').setBackground('#0F4F43').setFontColor('#FFFFFF');
+  sh.setFrozenRows(1);
+  sh.getRange('D:F').setNumberFormat('@');
+  sh.getRange('B2:B').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(['Minimum on duty', 'No leave'], true).build());
+  sh.getRange('H2:H').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(['Warn', 'Block'], true).build());
+  sh.getRange('J2:J').insertCheckboxes();
+  sh.getRange('A1').setNote('A short name, shown in warnings, e.g. "Sunday cover".');
+  sh.getRange('B1').setNote('Minimum on duty: at least this many people of the category must be working on matching days.\nNo leave: no leave for the category on matching days (e.g. Easter, Christmas).');
+  sh.getRange('C1').setNote('Category from the Categories tab, or several separated by commas. Blank = all staff.');
+  sh.getRange('D1').setNote('Days of the week, e.g. "Sun" or "Sat, Sun". Blank = every day.');
+  sh.getRange('E1').setNote('Blank = all year. A date (2026-12-24), a date every year (24 Dec), or Easter-based: Easter-2 = Good Friday, Easter+1 = Family Day.');
+  sh.getRange('F1').setNote('Last day the rule applies (same formats as From).');
+  sh.getRange('G1').setNote('For "Minimum on duty": how many must be working. Default 1.');
+  sh.getRange('H1').setNote('Warn: the request can be sent, with a warning for the Administrator.\nBlock: staff can’t send it. The Administrator can always override.');
+  sh.getRange('I1').setNote('Optional: extra text added to the warning.');
+  sh.getRange('J1').setNote('Untick to switch a rule off without deleting it.');
+  sh.setColumnWidth(1, 160); sh.setColumnWidth(2, 130); sh.setColumnWidth(3, 220); sh.setColumnWidth(9, 300);
+}
+
+/**
+ * Brings the workbook up to date for new features, once (tracked in Script Properties).
+ * Runs automatically on the first app request after an update, and from setup.
+ */
+var SCHEMA_VERSION_ = '3';
+function upgrade_(force) {
+  var P = PropertiesService.getScriptProperties();
+  if (!force && P.getProperty('SCHEMA') === SCHEMA_VERSION_) return;
+  var ss = ss_();
+  buildRules_(ss);
+  var set = ss.getSheetByName(SHEET.SET);
+  if (set) {
+    var have = readTable_(SHEET.SET).map(function (r) { return String(r.Key); });
+    NEW_SETTINGS_.forEach(function (row) { if (have.indexOf(row[0]) < 0) set.appendRow(row); });
+  }
+  installDailyTrigger_();
+  P.setProperty('SCHEMA', SCHEMA_VERSION_);
 }
 
 function build_(ss, name, rows) {
@@ -581,7 +655,15 @@ function loadData_() {
   var adjustments = readTable_(SHEET.ADJ).filter(function (r) { return r['Staff ID']; }).map(function (r) {
     return { staffId: String(r['Staff ID']), year: Number(r['Leave Year']), type: String(r.Type), days: Number(r.Days) || 0, note: String(r.Note || '') };
   });
-  return { settings: settings, types: types, levels: levels, staff: staff, holidays: holidays, terms: terms, requests: requests, adjustments: adjustments };
+  var rules = readTable_(SHEET.RULES).filter(function (r) { return String(r.Rule || r.Type).trim() !== ''; }).map(function (r) {
+    var txt = function (v) { return v instanceof Date ? Utilities.formatDate(v, tz_(), 'yyyy-MM-dd') : String(v == null ? '' : v).trim(); };
+    return { name: String(r.Rule || '').trim(), kind: String(r.Type || '').trim(), category: String(r.Category || '').trim(),
+      days: txt(r.Days), from: txt(r.From), to: txt(r.To), min: Number(r.Minimum) || 0, action: String(r.Action || 'Warn').trim(),
+      message: String(r.Message || '').trim(), active: r.Active === '' ? true : B(r.Active) };
+  });
+  var data = { settings: settings, types: types, levels: levels, staff: staff, holidays: holidays, terms: terms, requests: requests, adjustments: adjustments, rules: rules };
+  LeaveCore.applyStandIn(data, todayStr_());
+  return data;
 }
 
 function setCells_(sheetName, row, values) {
@@ -608,6 +690,7 @@ function doPost(e) {
   var out;
   try {
     var body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    try { upgrade_(false); } catch (ue) { console.warn('Upgrade skipped: ' + ue); }
     out = { ok: true, data: route_(body) };
   } catch (err) {
     out = { ok: false, error: String(err && err.message || err) };
@@ -643,6 +726,9 @@ function route_(b) {
       break;
     case 'prefs':
       savePrefs_(user, b);
+      break;
+    case 'standin':
+      saveStandIn_(user, b, data);
       break;
     default:
       throw new Error('Unknown action: ' + b.action);
@@ -833,7 +919,23 @@ function sig_(id) {
 }
 /** Every leave request goes to the Administrator(s). */
 function managerEmails_(data, st) {
-  return data.staff.filter(function (s) { return LeaveCore.isAdmin(s) && s.active && s.id !== st.id; }).map(function (s) { return s.email; }).join(',');
+  return approvers_(data, st).map(function (s) { return s.email; }).join(',');
+}
+/** Administrators, plus the stand-in approver while active (never the person asking). */
+function approvers_(data, st) {
+  return data.staff.filter(function (s) {
+    return s.active && s.id !== st.id && (LeaveCore.isAdmin(s) || s.standIn) && s.email && s.email.indexOf('@example.com') < 0;
+  });
+}
+function reviewLink_(r, by) {
+  var url = ScriptApp.getService().getUrl();
+  if (!url) return '';
+  return url + '?action=review&id=' + encodeURIComponent(r.id) + '&by=' + encodeURIComponent(by.id) + '&sig=' + sig_(r.id + '|' + by.id);
+}
+function warningsHtml_(list) {
+  if (!list || !list.length) return '';
+  return '<div style="background:#FEF3C7;border-left:4px solid #D97706;padding:10px 14px;margin:14px 0;border-radius:4px">' +
+    '<b>Cover warning</b><br>' + list.map(esc_).join('<br>') + '</div>';
 }
 function mailShell_(data, inner) {
   var app = data.settings.AppURL ? '<p style="margin-top:24px"><a href="' + esc_(data.settings.AppURL) + '" style="color:#0F6E5C">Open Leave Manager</a></p>' : '';
@@ -842,23 +944,26 @@ function mailShell_(data, inner) {
 }
 
 function mailNewRequest_(data, r, st, t) {
-  var to = managerEmails_(data, st);
-  if (!to) return;
+  var who = approvers_(data, st);
+  if (!who.length) return;
   var c = LeaveCore.ctx(data);
   var b = LeaveCore.balances(data, st.id, LeaveCore.lyOf(r.start, c.S))[t.code];
   var amt = LeaveCore.amount(r, t, c);
-  var url = ScriptApp.getService().getUrl();
-  var review = url ? url + '?action=review&id=' + encodeURIComponent(r.id) + '&sig=' + sig_(r.id) : '';
-  var html = '<p><b>' + esc_(st.name) + '</b> has requested <b>' + esc_(t.name) + '</b>.</p>' +
+  var warn = r.warnings || (function () { var w = LeaveCore.coverCheck(data, st, r, r.id); return w.block.concat(w.warn); })();
+  who.forEach(function (ap, i) {
+  var review = reviewLink_(r, ap);
+  var html = '<p><b>' + esc_(st.name) + '</b> has requested <b>' + esc_(t.name) + '</b>.</p>' + warningsHtml_(warn) +
+    (ap.standIn ? '<p style="color:#5B6B67">You’re receiving this as the stand-in approver.</p>' : '') +
     '<table style="border-collapse:collapse">' +
     row_('Dates', range_(r)) + row_('Days away', LeaveCore.fmtAmount({ unit: 'Days' }, r.days)) +
     (LeaveCore.isDayUnit(t) ? '' : row_('Uses', LeaveCore.fmtAmount(t, amt))) +
     (b && b.entitled != null ? row_('Balance after approval', LeaveCore.fmtAmount(t, b.remaining - amt) + ' of ' + LeaveCore.fmtDays(b.entitled)) : '') +
     (r.reason ? row_('Note', esc_(r.reason)) : '') + '</table>' +
     (review ? '<p style="margin-top:20px"><a href="' + review + '" style="background:#0F6E5C;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">Review request</a></p>' : '');
-  var opt = { to: to, subject: 'Leave request: ' + st.name + ' – ' + t.name + ' (' + range_(r) + ')', htmlBody: mailShell_(data, html), replyTo: st.email };
-  if (data.settings.NotifyEmail) opt.cc = String(data.settings.NotifyEmail);
+  var opt = { to: ap.email, subject: (warn.length ? '⚠ ' : '') + 'Leave request: ' + st.name + ' – ' + t.name + ' (' + range_(r) + ')', htmlBody: mailShell_(data, html), replyTo: st.email };
+  if (i === 0 && data.settings.NotifyEmail) opt.cc = String(data.settings.NotifyEmail);
   MailApp.sendEmail(opt);
+  });
 }
 function row_(k, v) { return '<tr><td style="padding:4px 16px 4px 0;color:#5B6B67">' + k + '</td><td style="padding:4px 0">' + v + '</td></tr>'; }
 
@@ -874,19 +979,20 @@ function mailDecision_(data, r, st, t, by) {
 function reviewPage_(p) {
   var data = loadData_();
   var r = LeaveCore.findReq(data, String(p.id || ''));
-  var ok = r && String(p.sig) === sig_(r.id);
+  var byId = String(p.by || '');
+  var ok = r && String(p.sig) === (byId ? sig_(r.id + '|' + byId) : sig_(r.id));
   var st = r && LeaveCore.staffById(data, r.staffId);
   var t = r && LeaveCore.type(data, r.type);
   var body;
   if (!ok) body = '<h1>Link not valid</h1><p>Open Leave Manager to review requests.</p>';
   else if (r.status !== 'Pending') body = '<h1>Already ' + r.status.toLowerCase() + '</h1><p>' + esc_(st.name) + '’s request for ' + range_(r) + ' was ' + r.status.toLowerCase() + (r.decidedBy ? ' by ' + esc_(r.decidedBy) : '') + '.</p>';
   else body = '<h1>' + esc_(st.name) + '</h1><p class="t">' + esc_(t.name) + ' · ' + range_(r) + ' · ' + LeaveCore.fmtAmount({ unit: 'Days' }, r.days) + ' away</p>' +
-    (r.reason ? '<p>“' + esc_(r.reason) + '”</p>' : '') +
+    (r.reason ? '<p>“' + esc_(r.reason) + '”</p>' : '') + warningsHtml_((function () { var w = LeaveCore.coverCheck(data, st, r, r.id); return w.block.concat(w.warn); })()) +
     '<label>Note to ' + esc_(st.name.split(' ')[0]) + ' (optional)<textarea id="n" rows="3"></textarea></label>' +
     '<div class="b"><button class="ok" onclick="go(\'Approved\')">Approve</button><button onclick="go(\'Declined\')">Decline</button></div><p id="m"></p>' +
     '<script>function go(d){document.querySelectorAll("button").forEach(function(b){b.disabled=true});document.getElementById("m").textContent="Saving…";' +
     'google.script.run.withSuccessHandler(function(x){document.getElementById("m").textContent=x}).withFailureHandler(function(e){document.getElementById("m").textContent=e.message;document.querySelectorAll("button").forEach(function(b){b.disabled=false})})' +
-    '.reviewDecision(' + JSON.stringify(r.id) + ',' + JSON.stringify(String(p.sig)) + ',d,document.getElementById("n").value)}</script>';
+    '.reviewDecision(' + JSON.stringify(r.id) + ',' + JSON.stringify(String(p.sig)) + ',d,document.getElementById("n").value,' + JSON.stringify(byId) + ')}</script>';
   var html = '<style>body{font-family:Arial,sans-serif;max-width:480px;margin:40px auto;padding:0 16px;color:#14211F}h1{font-size:22px;margin:0 0 4px}.t{color:#5B6B67}' +
     'textarea{display:block;width:100%;margin-top:6px;font:inherit;padding:8px;box-sizing:border-box}label{display:block;margin-top:16px}' +
     '.b{display:flex;gap:8px;margin-top:16px}button{font:inherit;padding:10px 18px;border-radius:6px;border:1px solid #C9D3D0;background:#fff;cursor:pointer}' +
@@ -895,14 +1001,16 @@ function reviewPage_(p) {
 }
 
 /** Called from the review page. The signed link proves it came from the notification email. */
-function reviewDecision(id, sig, decision, note) {
-  if (String(sig) !== sig_(String(id))) throw new Error('This link is not valid.');
+function reviewDecision(id, sig, decision, note, byId) {
+  byId = String(byId || '');
+  if (String(sig) !== (byId ? sig_(String(id) + '|' + byId) : sig_(String(id)))) throw new Error('This link is not valid.');
   var data = loadData_();
   var r = LeaveCore.findReq(data, id);
   if (!r) throw new Error('That request no longer exists.');
   var st = LeaveCore.staffById(data, r.staffId);
-  var actor = data.staff.filter(function (s) { return LeaveCore.isAdmin(s) && s.active; })[0];
-  if (!actor) throw new Error('No manager or admin is set up on the Staff sheet.');
+  var actor = byId ? LeaveCore.staffById(data, byId) : null;
+  if (actor && !LeaveCore.canManage(actor, st)) throw new Error(actor.standIn === false && !LeaveCore.isAdmin(actor) ? 'Your time as stand-in approver has ended.' : 'You can’t approve this request.');
+  if (!actor) actor = data.staff.filter(function (s) { return LeaveCore.isAdmin(s) && s.active; })[0];
   if (!actor) throw new Error('No Administrator is set up on the Staff sheet.');
   decide_(actor, id, decision, note);
   return 'Done – the request is ' + decision.toLowerCase() + ' and ' + st.name.split(' ')[0] + ' has been emailed.';
@@ -1028,4 +1136,143 @@ function showLinks() {
     '\n\nGoogle Form:\n' + (getSetting_('FormURL') || 'Run setup first') +
     '\n\nWeb app on GitHub Pages:\n' + (getSetting_('AppURL') || 'Add it to Settings → AppURL'),
     SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+/* ============================ STAND-IN APPROVER ============================ */
+
+/** Administrator only: choose (or clear) who approves leave while they're away. */
+function saveStandIn_(user, b, data) {
+  if (!LeaveCore.isAdmin(user)) throw new Error('Only an Administrator can choose a stand-in approver.');
+  var id = String(b.staffId || '').trim(), from = String(b.from || '').slice(0, 10), to = String(b.to || '').slice(0, 10);
+  if (id) {
+    var st = LeaveCore.staffById(data, id);
+    if (!st || !st.active) throw new Error('Choose someone from the staff list.');
+    if (LeaveCore.isAdmin(st)) throw new Error(st.name + ' is already an Administrator.');
+    if (!LeaveCore.isISO(from) || !LeaveCore.isISO(to)) throw new Error('Choose the first and last day of the stand-in period.');
+    if (to < from) throw new Error('The last day is before the first day.');
+  } else { from = ''; to = ''; }
+  withLock_(function () {
+    setSetting_('StandInID', id); setSetting_('StandInFrom', from); setSetting_('StandInTo', to);
+  });
+  logHistory_(id ? 'Stand-in approver set' : 'Stand-in approver removed', {}, id ? LeaveCore.staffById(data, id).name : '', '',
+    user.name, id ? LeaveCore.niceRange({ start: from, end: to }) : '');
+  if (id) {
+    var si = LeaveCore.staffById(data, id);
+    if (si.email && si.email.indexOf('@example.com') < 0) {
+      MailApp.sendEmail({ to: si.email, subject: 'You’re the stand-in leave approver (' + LeaveCore.niceRange({ start: from, end: to }) + ')',
+        htmlBody: mailShell_(data, '<p>Hi ' + esc_(si.name.split(' ')[0]) + ',</p><p>' + esc_(user.name) + ' has asked you to approve leave requests from <b>' +
+          LeaveCore.niceRange({ start: from, end: to }) + '</b>.</p><p>During that time new requests are emailed to you, and an <b>Approvals</b> page appears in Leave Manager. You can’t approve your own leave.</p>') });
+    }
+  }
+}
+
+/* ============================ SCHEDULED EMAILS ============================ */
+
+/** Runs dailyJobs every morning at about 6am. */
+function installDailyTrigger_() {
+  ScriptApp.getProjectTriggers().forEach(function (tr) { if (tr.getHandlerFunction() === 'dailyJobs') ScriptApp.deleteTrigger(tr); });
+  ScriptApp.newTrigger('dailyJobs').timeBased().everyDays(1).atHour(6).create();
+}
+
+/** Every morning: the weekly "who's away" email on its day, and "use it or lose it" reminders on their dates. */
+function dailyJobs() {
+  var data = loadData_(), today = todayStr_(), d = LeaveCore.parse(today);
+  var day = String(data.settings.WeeklyEmail || '').trim();
+  if (day && LeaveCore.parseDays(day, []).indexOf(d.getDay()) >= 0) {
+    try { sendWeeklyEmail_(data, today, null); } catch (e) { console.warn('Weekly email failed: ' + e); }
+  }
+  var dates = String(data.settings.ReminderDates || '').split(',').map(function (x) { return LeaveCore.parseMonthDay(x.trim()); }).filter(Boolean);
+  if (dates.some(function (md) { return md[0] === d.getMonth() + 1 && md[1] === d.getDate(); })) {
+    try { sendReminders_(data, today, null); } catch (e) { console.warn('Reminders failed: ' + e); }
+  }
+}
+
+function realEmail_(s) { return s && s.email && s.email.indexOf('@') > 0 && s.email.indexOf('@example.com') < 0; }
+function me_() { return String(Session.getEffectiveUser().getEmail() || Session.getActiveUser().getEmail() || ''); }
+
+/** Menu: send this week's email to yourself only. */
+function previewWeeklyEmail() {
+  var to = me_();
+  sendWeeklyEmail_(loadData_(), todayStr_(), to);
+  SpreadsheetApp.getUi().alert('Sent a preview of the weekly email to ' + to + '.');
+}
+/** Menu: send the reminders that would go out today to yourself only. */
+function previewReminders() {
+  var to = me_();
+  var n = sendReminders_(loadData_(), todayStr_(), to);
+  SpreadsheetApp.getUi().alert(n ? 'Sent ' + n + ' preview email(s) to ' + to + '.' : 'Nobody has unused leave to remind them about right now. The Administrator summary was sent to ' + to + '.');
+}
+
+/** "Who's away this week": Monday–Sunday from the given day, to every active staff member (or to `onlyTo`). */
+function sendWeeklyEmail_(data, today, onlyTo) {
+  var c = LeaveCore.ctx(data), start = LeaveCore.parse(today);
+  while (start.getDay() !== 1) start = LeaveCore.addDays(start, -1);   // back to Monday
+  var end = LeaveCore.addDays(start, 6);
+  var sIso = LeaveCore.iso(start), eIso = LeaveCore.iso(end);
+  var breaches = LeaveCore.coverBreaches(data, sIso, eIso);
+  var rows = '', anyone = 0;
+  for (var d = start, i = 0; i < 7; i++, d = LeaveCore.addDays(d, 1)) {
+    var ds = LeaveCore.iso(d), hol = c.hol[ds], open = LeaveCore.isOpen(d, c);
+    var away = data.requests.filter(function (r) {
+      if (r.status !== 'Approved') return false;
+      var st = LeaveCore.staffById(data, r.staffId);
+      if (!st || !st.active) return false;
+      return LeaveCore.dayList(r, c).some(function (x) { return x.date === ds; });
+    }).map(function (r) {
+      var st = LeaveCore.staffById(data, r.staffId);
+      return esc_(st.name) + (r.half === 'AM' ? ' (morning)' : r.half === 'PM' ? ' (afternoon)' : '');
+    });
+    var pending = data.requests.filter(function (r) {
+      return r.status === 'Pending' && LeaveCore.dayList(r, c).some(function (x) { return x.date === ds; });
+    }).length;
+    anyone += away.length;
+    var cover = breaches.filter(function (b) { return b.date === ds; }).map(function (b) {
+      return '<div style="color:#B45309">⚠ ' + esc_(b.rule.name) + ': ' + b.onDuty + ' of ' + b.min + ' ' + esc_(b.rule.category || 'staff') + ' on duty</div>';
+    }).join('');
+    var what = hol ? '<i>' + esc_(hol) + ' (public holiday)</i>' : !open ? '<i style="color:#5B6B67">Church closed</i>' :
+      (away.length ? away.join(', ') : '<span style="color:#5B6B67">Everyone in</span>');
+    rows += '<tr><td style="padding:8px 14px 8px 0;vertical-align:top;white-space:nowrap;border-top:1px solid #E3E9E7"><b>' + LeaveCore.DAYS[d.getDay()] + '</b> ' +
+      d.getDate() + ' ' + LeaveCore.niceDate(ds).split(' ')[2] + '</td><td style="padding:8px 0;border-top:1px solid #E3E9E7">' + what +
+      (pending ? ' <span style="color:#92400E;font-size:12px">+ ' + pending + ' waiting for approval</span>' : '') + cover + '</td></tr>';
+  }
+  var title = 'Who’s away this week · ' + LeaveCore.niceRange({ start: sIso, end: eIso });
+  var html = '<h2 style="font-size:18px;margin:0 0 4px">Who’s away this week</h2><p style="color:#5B6B67;margin:0 0 14px">' + LeaveCore.niceRange({ start: sIso, end: eIso }) + '</p>' +
+    '<table style="border-collapse:collapse;width:100%">' + rows + '</table>' +
+    (anyone ? '' : '<p>Nobody has leave booked this week.</p>');
+  var to = onlyTo ? [onlyTo] : data.staff.filter(function (s) { return s.active && realEmail_(s); }).map(function (s) { return s.email; });
+  if (!to.length) return 0;
+  MailApp.sendEmail({ to: to[0], bcc: to.slice(1).join(','), subject: title, htmlBody: mailShell_(data, html) });
+  return 1;
+}
+
+/** "Use it or lose it": one email per person with unused leave, plus a summary for the Administrator(s). */
+function sendReminders_(data, today, onlyTo) {
+  var sent = 0, summary = [];
+  data.staff.forEach(function (st) {
+    var items = LeaveCore.useItOrLoseIt(data, st.id, today);
+    if (!items.length) return;
+    var total = items.reduce(function (s, x) { return s + x.left; }, 0);
+    summary.push({ st: st, items: items, total: total });
+    if (!onlyTo && !realEmail_(st)) return;
+    var list = items.map(function (x) {
+      return '<li><b>' + LeaveCore.fmtAmount(x.type, x.left) + '</b> of ' + esc_(x.type.name) + ' – take by <b>' + LeaveCore.niceDate(x.until, true) + '</b></li>';
+    }).join('');
+    var html = '<p>Hi ' + esc_(st.name.split(' ')[0]) + ',</p><p>A friendly reminder that you still have leave to take. Unused days are lost after the date shown:</p><ul>' + list + '</ul>' +
+      '<p>Book it in Leave Manager soon, so your time off can be planned around services and events.</p>';
+    MailApp.sendEmail({ to: onlyTo || st.email, subject: 'Reminder: you have ' + LeaveCore.fmtDays(total) + ' day' + (total === 1 ? '' : 's') + ' of leave to take', htmlBody: mailShell_(data, html) });
+    sent++;
+  });
+  summary.sort(function (a, b) { return b.total - a.total; });
+  var admins = onlyTo ? [onlyTo] : data.staff.filter(function (s) { return LeaveCore.isAdmin(s) && s.active && realEmail_(s); }).map(function (s) { return s.email; });
+  if (admins.length) {
+    var rows = summary.map(function (x) {
+      return '<tr><td style="padding:6px 14px 6px 0;border-top:1px solid #E3E9E7">' + esc_(x.st.name) + '</td><td style="padding:6px 0;border-top:1px solid #E3E9E7">' +
+        x.items.map(function (i) { return LeaveCore.fmtAmount(i.type, i.left) + ' ' + esc_(i.type.code) + ' by ' + LeaveCore.niceDate(i.until, true); }).join('<br>') + '</td></tr>';
+    }).join('');
+    MailApp.sendEmail({ to: admins.join(','), subject: 'Leave still to be taken: ' + summary.length + ' staff',
+      htmlBody: mailShell_(data, '<p>These staff were reminded today to use their leave before it’s lost:</p>' +
+        (rows ? '<table style="border-collapse:collapse">' + rows + '</table>' : '<p>Nobody has unused leave right now.</p>') +
+        '<p>The Dashboard in Leave Manager shows the latest figures.</p>') });
+  }
+  return sent;
 }

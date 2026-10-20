@@ -205,8 +205,150 @@ var LeaveCore = (function () {
 
   /** Administrators approve all leave and see everyone's details. ("Admin" is accepted for older sheets.) */
   function isAdmin(user) { return !!user && /^admin(istrator)?$/i.test(String(user.role || '').trim()); }
+  /** Administrators manage everyone; a stand-in approver (while active) can approve or decline other people's leave. */
   function canManage(user, st) {
-    return !!user && !!st && isAdmin(user);
+    return !!user && !!st && (isAdmin(user) || (user.standIn === true && st.id !== user.id));
+  }
+
+  /* ---------- Stand-in approver (Settings: StandInID, StandInFrom, StandInTo) ---------- */
+  function standInId(data, today) {
+    var s = data.settings || {}, id = String(s.StandInID || '').trim();
+    if (!id) return '';
+    var from = String(s.StandInFrom || '').slice(0, 10), to = String(s.StandInTo || '').slice(0, 10);
+    if (isISO(from) && today < from) return '';
+    if (isISO(to) && today > to) return '';
+    return id;
+  }
+  /** Marks the active stand-in on the staff list (staff.standIn = true). Returns their id, or ''. */
+  function applyStandIn(data, today) {
+    var id = standInId(data, today);
+    (data.staff || []).forEach(function (st) { st.standIn = !!id && st.id === id && !isAdmin(st); });
+    return id;
+  }
+
+  /* ---------- Cover rules (the Cover Rules tab) ----------
+     kind "Minimum on duty": at least `min` people of `category` must be working on matching days.
+     kind "No leave": leave isn't allowed for `category` on matching days (e.g. Easter, Christmas).
+     Days: weekdays (e.g. "Sun"); blank = every day. From/To: a date (2026-12-24), a yearly date ("24 Dec"),
+     or Easter-based ("Easter-2" = Good Friday, "Easter+1" = Family Day); blank = all year.
+     Action "Block" stops staff sending the request; "Warn" lets it through with a warning.
+     The Administrator can always override. */
+  function ruleDate(spec, y) {
+    var v = String(spec || '').trim();
+    if (!v) return '';
+    if (isISO(v.slice(0, 10))) return v.slice(0, 10);
+    var m = /^easter\s*([+-]\s*\d+)?$/i.exec(v);
+    if (m) return iso(addDays(easter(y), m[1] ? Number(m[1].replace(/\s/g, '')) : 0));
+    var md = parseMonthDay(v);
+    return md ? y + '-' + pad(md[0]) + '-' + pad(md[1]) : '';
+  }
+  function ruleCovers(rule, ds) {
+    if (rule.days) {
+      var wd = parseDays(rule.days, null);
+      if (wd && wd.indexOf(parse(ds).getDay()) < 0) return false;
+    }
+    if (!rule.from && !rule.to) return true;
+    var Y = Number(ds.slice(0, 4));
+    for (var y = Y - 1; y <= Y; y++) {
+      var f = rule.from ? ruleDate(rule.from, y) : '0000-01-01';
+      var t = rule.to ? ruleDate(rule.to, y) : '9999-12-31';
+      if (!f || !t) continue;
+      if (t < f) t = rule.to ? ruleDate(rule.to, y + 1) : t;   // e.g. 24 Dec – 2 Jan
+      if (ds >= f && ds <= t) return true;
+    }
+    return false;
+  }
+  function ruleCats(rule) {
+    return String(rule.category || '').split(',').map(function (x) { return x.trim().toLowerCase(); }).filter(String);
+  }
+  function inRuleGroup(rule, st) {
+    if (!st || !tracksLeave(st) || st.active === false) return false;
+    var cats = ruleCats(rule);
+    return !cats.length || cats.indexOf(String(st.level || '').trim().toLowerCase()) >= 0;
+  }
+  function activeRules(data) {
+    return (data.rules || []).filter(function (r) { return r && r.active !== false && r.kind; });
+  }
+  function isMinRule(rule) { return /min/i.test(String(rule.kind)); }
+  /** { date: { staffId: true } } for approved and pending leave (optionally ignoring one request). */
+  function awayMap(data, c, ignoreId) {
+    var away = {};
+    data.requests.forEach(function (o) {
+      if (o.id === ignoreId || (o.status !== 'Approved' && o.status !== 'Pending')) return;
+      dayList(o, c).forEach(function (d) { (away[d.date] || (away[d.date] = {}))[o.staffId] = true; });
+    });
+    return away;
+  }
+  function onDuty(data, c, away, rule, ds) {
+    var d = parse(ds);
+    return data.staff.filter(function (p) {
+      return inRuleGroup(rule, p) && isWorking(d, c, p.id) && !(away[ds] && away[ds][p.id]);
+    });
+  }
+  function listDates(dates) {
+    var shown = dates.slice(0, 3).map(function (x) { return niceDate(x); }).join(', ');
+    return shown + (dates.length > 3 ? ' and ' + (dates.length - 3) + ' more' : '');
+  }
+  function groupLabel(rule) { return rule.category ? String(rule.category).trim() : 'staff'; }
+  /** Checks a request against the cover rules: { block: [messages], warn: [messages] }. */
+  function coverCheck(data, st, r, ignoreId) {
+    var out = { block: [], warn: [] }, rules = activeRules(data);
+    if (!rules.length || !st) return out;
+    var c = ctx(data), days = dayList({ staffId: st.id, start: r.start, end: r.end, half: r.half }, c), away = awayMap(data, c, ignoreId);
+    rules.forEach(function (rule) {
+      if (!inRuleGroup(rule, st)) return;
+      var hits = [], low = null;
+      days.forEach(function (d) {
+        if (!ruleCovers(rule, d.date)) return;
+        if (isMinRule(rule)) {
+          var still = onDuty(data, c, away, rule, d.date).filter(function (p) { return p.id !== st.id; }).length;
+          var min = Number(rule.min) > 0 ? Number(rule.min) : 1;
+          if (still < min) { hits.push(d.date); low = low == null ? still : Math.min(low, still); }
+        } else hits.push(d.date);
+      });
+      if (!hits.length) return;
+      var msg = isMinRule(rule)
+        ? (rule.name || 'Cover rule') + ': only ' + low + ' ' + groupLabel(rule) + ' would be on duty on ' + listDates(hits) + ' (at least ' + (Number(rule.min) > 0 ? Number(rule.min) : 1) + ' needed).'
+        : (rule.name || 'No-leave period') + ': leave isn’t allowed on ' + listDates(hits) + '.';
+      if (rule.message) msg += ' ' + rule.message;
+      (/block/i.test(String(rule.action)) ? out.block : out.warn).push(msg);
+    });
+    return out;
+  }
+  /** Days from `from` to `to` where existing approved/pending leave already breaks a "Minimum on duty" rule. */
+  function coverBreaches(data, from, to) {
+    var out = [], rules = activeRules(data).filter(isMinRule);
+    if (!rules.length) return out;
+    var c = ctx(data), away = awayMap(data, c), d = parse(from), e = parse(to), g = 0;
+    while (d <= e && g++ < 800) {
+      var ds = iso(d);
+      rules.forEach(function (rule) {
+        if (!ruleCovers(rule, ds)) return;
+        var everyone = data.staff.filter(function (p) { return inRuleGroup(rule, p) && isWorking(d, c, p.id); });
+        if (!everyone.length) return;
+        var here = onDuty(data, c, away, rule, ds), min = Number(rule.min) > 0 ? Number(rule.min) : 1;
+        if (here.length < min) out.push({ date: ds, rule: rule, onDuty: here.length, min: min,
+          away: everyone.filter(function (p) { return away[ds] && away[ds][p.id]; }).map(function (p) { return p.name; }) });
+      });
+      d = addDays(d, 1);
+    }
+    return out;
+  }
+
+  /* ---------- "Use it or lose it" ---------- */
+  /** Leave with a use-by date (e.g. 1 Feb) that this person still has to take: [{ type, left, until, fromYear }]. */
+  function useItOrLoseIt(data, staffId, today) {
+    var st = staffById(data, staffId), c = ctx(data), out = [];
+    if (!st || !tracksLeave(st) || st.active === false) return out;
+    var y = lyOf(today, c.S), first = Number(data.settings.FirstLeaveYear) || 0;
+    data.types.forEach(function (t) {
+      if (!t.deducts || !t.useBy || !offered(data, st, t)) return;
+      var b = balances(data, staffId, y)[t.code];
+      if (b.lastYear && today <= b.lastYear.until && b.lastYear.left > 0) out.push({ type: t, left: b.lastYear.left, until: b.lastYear.until, fromYear: y - 1 });
+      var ge = graceEnd(t, y + 1, c.S);
+      if (y >= first && b.available > 0) out.push({ type: t, left: b.available, until: ge || lyRange(y, c.S).end, fromYear: y });
+    });
+    return out;
   }
   /** People in the "Administrator" category manage leave but don't take leave in the planner. */
   function tracksLeave(st) { return !!st && !/^administrators?$/i.test(String(st.level || '').trim()); }
@@ -325,7 +467,7 @@ var LeaveCore = (function () {
   }
 
   /** Returns an error message, or null when the request is fine. */
-  function validate(data, st, r, ignoreId, approving) {
+  function validate(data, st, r, ignoreId, approving, override) {
     var t = type(data, r.type);
     if (!t) return 'Choose a leave type.';
     if (!st) return 'Choose who the leave is for.';
@@ -395,6 +537,10 @@ var LeaveCore = (function () {
           (approving ? ' remain' : ' are available') + (yl.length > 1 ? '' : ' in the ' + lyLabel(failY, c.S) + ' leave year') + '.';
       }
     }
+    if (!override) {
+      var cv = coverCheck(data, st, r, ignoreId);
+      if (cv.block.length) return cv.block[0] + ' If it can’t wait, speak to the Administrator.';
+    }
     return null;
   }
 
@@ -402,7 +548,7 @@ var LeaveCore = (function () {
   function prepareRequest(data, actor, b) {
     var target = b.staffId && b.staffId !== actor.id ? staffById(data, b.staffId) : actor;
     if (!target) throw new Error('That staff member isn’t on the Staff sheet.');
-    if (target.id !== actor.id && !canManage(actor, target)) throw new Error('You can only book leave for people in your team.');
+    if (target.id !== actor.id && !isAdmin(actor)) throw new Error('Only an Administrator can book leave for someone else.');
     var t0 = type(data, String(b.type || ''));
     var r = {
       staffId: target.id, type: String(b.type || ''),
@@ -410,9 +556,11 @@ var LeaveCore = (function () {
       half: (b.half === 'AM' || b.half === 'PM') && isDayUnit(t0) ? b.half : 'None',
       reason: String(b.reason || '').slice(0, 500)
     };
-    var err = validate(data, target, r);
+    var err = validate(data, target, r, undefined, false, isAdmin(actor));
     if (err) throw new Error(err);
     var t = type(data, r.type);
+    var cw = coverCheck(data, target, r);
+    r.warnings = cw.block.concat(cw.warn);
     r.days = countDays(r, ctx(data));
     var bookedByManager = target.id !== actor.id;
     var auto = !t.needsApproval || bookedByManager;
@@ -430,7 +578,7 @@ var LeaveCore = (function () {
     var st = staffById(data, r.staffId);
     if (!canManage(actor, st)) throw new Error('Only an Administrator can approve or decline leave.');
     if (decision !== 'Approved' && decision !== 'Declined') throw new Error('Choose approve or decline.');
-    if (decision === 'Approved') { var err = validate(data, st, r, r.id, true); if (err) throw new Error(err); }
+    if (decision === 'Approved') { var err = validate(data, st, r, r.id, true, true); if (err) throw new Error(err); }
     return { req: r, staff: st, type: type(data, r.type) };
   }
 
@@ -439,7 +587,7 @@ var LeaveCore = (function () {
     if (!r) throw new Error('That request no longer exists.');
     if (r.status !== 'Pending' && r.status !== 'Approved') throw new Error('Only pending or approved leave can be cancelled.');
     var st = staffById(data, r.staffId), mine = r.staffId === actor.id;
-    var ok = canManage(actor, st) || (mine && (r.status === 'Pending' || r.start > todayStr));
+    var ok = isAdmin(actor) || (mine && (r.status === 'Pending' || r.start > todayStr));
     if (!ok) throw new Error(mine ? 'Leave that has already started can only be cancelled by an Administrator.' : 'You can only cancel your own leave.');
     return { req: r, staff: st, type: type(data, r.type) };
   }
@@ -453,7 +601,7 @@ var LeaveCore = (function () {
       settings: data.settings,
       user: clean(user),
       staff: data.staff.filter(function (s) { return s.active !== false; }).map(clean),
-      types: data.types, levels: data.levels, holidays: data.holidays, terms: data.terms || [],
+      types: data.types, levels: data.levels, holidays: data.holidays, terms: data.terms || [], rules: data.rules || [],
       requests: data.requests.map(function (r) {
         var x = clean(r);
         if (r.staffId !== user.id && !canManage(user, byId[r.staffId])) { x.reason = ''; x.note = ''; }
@@ -472,7 +620,9 @@ var LeaveCore = (function () {
     type: type, staffById: staffById, level: level, canManage: canManage, isAdmin: isAdmin, tracksLeave: tracksLeave, offered: offered, yearAllowance: yearAllowance,
     balances: balances, validate: validate, fmtDays: fmtDays, findReq: findReq,
     prepareRequest: prepareRequest, prepareDecision: prepareDecision, prepareCancel: prepareCancel,
-    publicView: publicView
+    publicView: publicView,
+    standInId: standInId, applyStandIn: applyStandIn,
+    ruleDate: ruleDate, ruleCovers: ruleCovers, coverCheck: coverCheck, coverBreaches: coverBreaches, useItOrLoseIt: useItOrLoseIt
   };
 })();
 if (typeof module !== 'undefined') module.exports = LeaveCore;

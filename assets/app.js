@@ -87,13 +87,14 @@
     employees: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2.2"/><path d="M5.5 16c.6-1.9 2-3 3.5-3s2.9 1.1 3.5 3"/><path d="M14.5 9h4M14.5 13h4"/>',
     team: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3 3 0 0 1 0 6M18 14c2 .7 3 2.6 3 6"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
+    dashboard: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
     settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'
   };
   function icon(n) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICON[n] + '</svg>'; }
   function markHTML() { var on = [1, 4, 5]; var s = ''; for (var i = 0; i < 9; i++) s += '<i' + (on.indexOf(i) >= 0 ? ' class="on"' : '') + '></i>'; return '<span class="mark" aria-hidden="true">' + s + '</span>'; }
 
   /* ------------------------------ state ------------------------------ */
-  var VIEWS = ['home', 'wall', 'month', 'year', 'approvals', 'team', 'employees', 'history', 'reports', 'settings'];
+  var VIEWS = ['dashboard', 'home', 'wall', 'month', 'year', 'approvals', 'team', 'employees', 'history', 'reports', 'settings'];
   var hashView = (location.hash || '').replace('#', '');
   /* Per-device choices from My settings: light/dark/auto appearance and the page that opens first. */
   function applyTheme(t) {
@@ -118,6 +119,8 @@
 
   function me() { return S.data.user; }
   function isMgr() { return C.isAdmin(me()); }
+  /** Administrators, plus the stand-in approver while active. */
+  function isApprover() { return isMgr() || !!(me() && me().standIn); }
   function takesLeave(st) { return C.tracksLeave(st || me()); }
   function canManage(st) { return C.canManage(me(), st); }
   function staffById(id) { return C.staffById(S.data, id); }
@@ -175,6 +178,8 @@
     if (d.user) d.user.colour = normHex(d.user.colour);
     (d.types || []).forEach(function (t) { t.colour = normHex(t.colour) || '#64748B'; });
     S.data = d;
+    C.applyStandIn(d, todayISO());
+    if (d.user) { var meRow = (d.staff || []).filter(function (x) { return x.id === d.user.id; })[0]; d.user.standIn = !!(meRow && meRow.standIn); }
     var meSt = (d.staff || []).filter(function (s) { return d.user && s.id === d.user.id; })[0];
     applyAccent(S.pickColour || (meSt ? normHex(colourOf(meSt)) : (d.user && d.user.colour) || ''));
     CTX = C.ctx(d);
@@ -336,8 +341,10 @@
 
   /* ------------------------------ shell ------------------------------ */
   function navItems() {
-    var items = [['home', 'Overview'], ['wall', 'Wallchart'], ['month', 'Calendar'], ['year', 'Year planner']];
-    if (isMgr()) items.push(['approvals', 'Approvals'], ['team', 'Team balances']);
+    var items = isMgr() ? [['dashboard', 'Dashboard'], ['home', 'Overview']] : [['home', 'Overview']];
+    items.push(['wall', 'Wallchart'], ['month', 'Calendar'], ['year', 'Year planner']);
+    if (isApprover()) items.push(['approvals', 'Approvals']);
+    if (isMgr()) items.push(['team', 'Team balances']);
     if (isMgr()) items.push(['employees', 'Employees']);
     if (isMgr()) items.push(['history', 'History']);
     items.push(['reports', 'Reports'], ['settings', 'My settings']);
@@ -345,10 +352,10 @@
   }
   function render() {
     if (!S.data) return renderLogin();
-    if (!isMgr() && (S.view === 'approvals' || S.view === 'team')) S.view = 'home';
-    if ((S.view === 'employees' || S.view === 'history') && !isMgr()) S.view = 'home';
+    if (!isApprover() && S.view === 'approvals') S.view = 'home';
+    if ((S.view === 'employees' || S.view === 'history' || S.view === 'team' || S.view === 'dashboard') && !isMgr()) S.view = 'home';
     var v = VIEW_FN[S.view]();
-    var u = me(), pend = isMgr() ? pendingForMe().length : 0;
+    var u = me(), pend = isApprover() ? pendingForMe().length : 0;
     var nav = navItems().map(function (n) {
       return '<button data-act="nav" data-view="' + n[0] + '"' + (S.view === n[0] ? ' aria-current="page"' : '') + '>' + icon(n[0]) + '<span>' + n[1] + '</span>' +
         (n[0] === 'approvals' && pend ? '<span class="badge">' + pend + '</span>' : '') + '</button>';
@@ -358,13 +365,13 @@
     var links = '<a href="' + esc(guideUrl) + '" target="_blank" rel="noopener">Staff guide: how to use Leave Manager ↗</a>' + (formUrl ? '<a href="' + esc(formUrl) + '" target="_blank" rel="noopener">Prefer a form? Request via Google Forms ↗</a>' : '') +
       (isMgr() && CFG.SHEET_URL ? '<a href="' + esc(CFG.SHEET_URL) + '" target="_blank" rel="noopener">Open the Google Sheet ↗</a>' : '');
     var brand = '<div class="brand">' + markHTML() + '<div><b>Leave Manager</b><small>' + esc(settings().CompanyName || 'My Team') + '</small></div></div>';
-    var tabs = navItems().filter(function (n) { return n[0] !== 'settings' && (n[0] !== 'year' || !isMgr()); });
+    var tabs = navItems().filter(function (n) { return n[0] !== 'settings' && ((n[0] !== 'year' && n[0] !== 'home') || !isMgr()); });
     app.innerHTML =
       '<div class="shell"><aside class="side">' + brand +
       '<button class="btn primary" data-act="new">' + icon('plus').replace('<svg', '<svg width="16" height="16"') + (takesLeave(u) ? 'Request leave' : 'Book leave') + '</button>' +
       '<nav class="nav" aria-label="Main">' + nav + '</nav>' + (links ? '<div class="side-links">' + links + '</div>' : '') +
-      '<div class="me">' + av(u) + '<div class="who"><b>' + esc(u.name) + '</b><span>' + (takesLeave(u) ? esc(catName(u)) + ' · ' + esc(u.role) : 'Administrator') + '</span></div><button data-act="logout">Sign out</button></div></aside>' +
-      '<main class="main"><div class="mhead">' + brand + '<div class="controls"><button class="btn primary small" data-act="new">+ ' + (takesLeave(u) ? 'Request' : 'Book') + '</button><button class="btn small icon-btn" data-act="nav" data-view="settings" aria-label="My settings">' + icon('settings') + '</button><button class="btn small" data-act="logout" aria-label="Sign out">' + esc(initials(u.name)) + ' · Out</button></div></div>' +
+      '<div class="me">' + av(u) + '<div class="who"><b>' + esc(u.name) + '</b><span>' + (takesLeave(u) ? esc(catName(u)) + ' · ' + esc(u.role) : 'Administrator') + '</span></div><button data-act="logout-ask">Sign out</button></div></aside>' +
+      '<main class="main"><div class="mhead">' + brand + '<div class="controls"><button class="btn primary small" data-act="new">+ ' + (takesLeave(u) ? 'Request' : 'Book') + '</button><button class="btn small icon-btn" data-act="nav" data-view="settings" aria-label="My settings">' + icon('settings') + '</button><button class="btn small" data-act="logout-ask" aria-label="Sign out">' + esc(initials(u.name)) + ' · Out</button></div></div>' +
       (!LIVE ? '<div class="demo-note"><span><b>Demo mode.</b> You’re signed in as ' + esc(u.name) + ' (' + esc(u.role) + '). Connect your Google Sheet in config.js to go live.</span><span class="controls"><button class="btn small" data-act="logout">Switch person</button><button class="btn small ghost" data-act="demo-reset">Reset sample data</button></span></div>' : '') +
       '<header class="top"><div class="t"><h1>' + v.title + '</h1>' + (v.sub ? '<p>' + v.sub + '</p>' : '') + '</div><div class="controls">' + (v.controls || '') + '</div></header>' +
       '<div class="view">' + v.body + '</div></main></div>' +
@@ -440,6 +447,211 @@
     };
   };
 
+  /* ------------------------------ Dashboard (Administrator) ------------------------------ */
+  function sickType() { return S.data.types.filter(function (t) { return t.code === 'SL' || /sick/i.test(t.name); })[0]; }
+  function unpaidTypes() { return S.data.types.filter(function (t) { return !t.deducts; }); }
+  /** Approved working days off per month of leave year y, by leave type: [{ m, label, total, parts: [{t, n}] }]. */
+  function monthTotals(y) {
+    var rng = C.lyRange(y, CTX.S), out = [], idx = {};
+    var d = C.parse(rng.start);
+    for (var i = 0; i < 12; i++) {
+      var key = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
+      idx[key] = out.length; out.push({ key: key, label: MONTHS[d.getMonth()].slice(0, 3), total: 0, by: {} });
+      d = new Date(d.getFullYear(), d.getMonth() + 1, 1, 12);
+    }
+    S.data.requests.forEach(function (r) {
+      if (r.status !== 'Approved') return;
+      var st = staffById(r.staffId); if (!st || !C.tracksLeave(st)) return;
+      (DL[r.id] || C.dayList(r, CTX)).forEach(function (x) {
+        var k = idx[x.date.slice(0, 7)]; if (k == null) return;
+        out[k].total += x.amt; out[k].by[r.type] = (out[k].by[r.type] || 0) + x.amt;
+      });
+    });
+    return out;
+  }
+  function monthChart(y) {
+    var data = monthTotals(y), max = Math.max.apply(null, data.map(function (m) { return m.total; }).concat([1]));
+    var nice = Math.max(4, Math.ceil(max / 4) * 4), W = 640, H = 220, L = 34, B = 26, T = 10, bw = (W - L - 8) / 12;
+    var codes = S.data.types.map(function (t) { return t.code; }).filter(function (c) { return data.some(function (m) { return m.by[c]; }); });
+    var svg = '<svg class="mchart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Days of leave taken per month in ' + esc(lyName(y)) + '">';
+    for (var g = 0; g <= 4; g++) {
+      var gy = T + (H - T - B) * (1 - g / 4);
+      svg += '<line x1="' + L + '" x2="' + (W - 4) + '" y1="' + gy + '" y2="' + gy + '" class="grid"/><text x="' + (L - 6) + '" y="' + (gy + 4) + '" class="ax" text-anchor="end">' + (nice * g / 4) + '</text>';
+    }
+    data.forEach(function (m, i) {
+      var x = L + i * bw + bw * 0.18, w = bw * 0.64, y0 = H - B;
+      codes.forEach(function (c) {
+        var n = m.by[c]; if (!n) return;
+        var h = (H - T - B) * n / nice, t = typeOf(c);
+        svg += '<rect x="' + x.toFixed(1) + '" y="' + (y0 - h).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + Math.max(h - 2, 1).toFixed(1) + '" rx="2" fill="' + esc(t.colour) + '"><title>' + esc(m.label + ' · ' + t.name + ': ' + days(n)) + '</title></rect>';
+        y0 -= h;
+      });
+      svg += '<rect x="' + (L + i * bw) + '" y="' + T + '" width="' + bw + '" height="' + (H - T - B) + '" fill="transparent"><title>' + esc(m.label + ': ' + days(m.total) + ' off' +
+        codes.filter(function (c) { return m.by[c]; }).map(function (c) { return '\n' + typeOf(c).name + ': ' + C.fmtDays(m.by[c]); }).join('')) + '</title></rect>';
+      svg += '<text x="' + (L + i * bw + bw / 2) + '" y="' + (H - 8) + '" class="ax" text-anchor="middle">' + m.label + '</text>';
+    });
+    svg += '</svg>';
+    var top = data.slice().sort(function (a, b) { return b.total - a.total; })[0];
+    return '<div class="mchart-wrap">' + svg + '</div><div class="legend" style="margin-top:6px">' + codes.map(function (c) { var t = typeOf(c); return '<span class="chip" style="--c:' + esc(t.colour) + '"><span class="dot"></span>' + esc(t.name) + '</span>'; }).join('') + '</div>' +
+      (top && top.total ? '<p class="muted small" style="margin:8px 0 0">Busiest month: <b>' + esc(MONTHS[C.parse(top.key + '-01').getMonth()]) + '</b> with ' + days(top.total) + ' of approved leave.</p>' : '<p class="muted small">No approved leave yet this year.</p>');
+  }
+  /** Sick-leave spells this leave year, with flags for when a doctor's note is usually required in South Africa. */
+  function sickStats(y) {
+    var t = sickType(); if (!t) return [];
+    var rng = C.lyRange(y, CTX.S);
+    return sortedStaff().map(function (st) {
+      var spells = S.data.requests.filter(function (r) { return r.staffId === st.id && r.type === t.code && r.status === 'Approved' && r.end >= rng.start && r.start <= rng.end; })
+        .sort(function (a, b) { return a.start < b.start ? -1 : 1; });
+      if (!spells.length) return null;
+      var total = 0, edge = 0, long = 0, cluster = false, wd = C.staffDays(CTX, st.id);
+      spells.forEach(function (r, i) {
+        var dl = DL[r.id] || C.dayList(r, CTX);
+        total += dl.reduce(function (s2, x) { return s2 + x.amt; }, 0);
+        if (dl.length > 2) long++;
+        // Next to a day off: the day before the spell or the day after it isn't a working day for this person.
+        var before = C.addDays(C.parse(r.start), -1), after = C.addDays(C.parse(r.end), 1);
+        if (wd.indexOf(before.getDay()) < 0 || wd.indexOf(after.getDay()) < 0 || CTX.hol[C.iso(before)] || CTX.hol[C.iso(after)]) edge++;
+        if (i >= 2 && (C.parse(r.start) - C.parse(spells[i - 2].start)) / 864e5 <= 56) cluster = true;
+      });
+      return { st: st, spells: spells.length, total: total, edge: edge, long: long, cluster: cluster, last: spells[spells.length - 1] };
+    }).filter(Boolean).sort(function (a, b) { return b.total - a.total; });
+  }
+  VIEW_FN.dashboard = function () {
+    var d = S.data, today = todayISO(), y = curLY();
+    var pend = pendingForMe();
+    var awayToday = offOn(today).filter(function (o) { return o.e.some(function (e) { return e.r.status === 'Approved'; }); });
+    // Leave still to take this year, and "use it or lose it".
+    var owed = 0, risk = [];
+    sortedStaff().forEach(function (st) {
+      var m = mainType(st, y); if (m) owed += Math.max(0, m.b.available);
+      var items = C.useItOrLoseIt(d, st.id, today);
+      if (items.length) risk.push({ st: st, items: items, total: items.reduce(function (a, x) { return a + x.left; }, 0), main: m });
+    });
+    risk.sort(function (a, b) { return b.total - a.total; });
+    var horizon = C.iso(C.addDays(C.parse(today), 56));
+    var breaches = C.coverBreaches(d, today, horizon);
+    var hasRules = (d.rules || []).some(function (r) { return r.active !== false; });
+    var tiles = '<div class="kpis">' +
+      '<button class="kpi" data-act="nav" data-view="approvals"><span>Waiting for approval</span><b class="num">' + pend.length + '</b><small>' + (pend.length ? 'Review now →' : 'All caught up') + '</small></button>' +
+      '<div class="kpi"><span>Away today</span><b class="num">' + awayToday.length + '</b><small>' + (awayToday.length ? esc(awayToday.map(function (o) { return firstName(o.st.name); }).join(', ')) : 'Everyone in') + '</small></div>' +
+      '<div class="kpi"><span>Staff leave still to take</span><b class="num">' + C.fmtDays(owed) + '</b><small>days across the team in ' + esc(lyName(y)) + '</small></div>' +
+      '<div class="kpi' + (breaches.length ? ' warn' : '') + '"><span>Cover problems</span><b class="num">' + breaches.length + '</b><small>' + (hasRules ? 'in the next 8 weeks' : 'no cover rules set') + '</small></div></div>';
+
+    var standIn = standInPanel();
+    var waiting = '<section class="panel"><h2>Waiting for approval <small>' + (pend.length ? pend.length + ' request' + (pend.length > 1 ? 's' : '') : 'none') + '</small></h2>' +
+      (pend.length ? '<div class="list">' + pend.slice(0, 8).map(function (r) {
+        var st = staffById(r.staffId), t = typeOf(r.type), w = reqWarnings(r);
+        return '<div class="li qd-row"><span class="click" data-act="open-req" data-id="' + esc(r.id) + '">' + av(st) + '</span><div class="grow click" data-act="open-req" data-id="' + esc(r.id) + '"><b>' + esc(st.name) + ' · ' + esc(fmtRange(r)) + '</b><span>' +
+          esc(t.name) + ' · ' + reqAmount(r) + (w.length ? ' · <span class="warntxt">⚠ cover warning</span>' : '') + '</span></div>' + quickDecide(r) + '</div>';
+      }).join('') + (pend.length > 8 ? '<p class="muted small"><a href="#approvals" data-act="nav" data-view="approvals">See all ' + pend.length + ' →</a></p>' : '') + '</div>'
+        : '<p class="muted">Nothing is waiting. New requests are emailed to you and show up here.</p>') + '</section>';
+    var cover = '<section class="panel"><h2>Cover in the next 8 weeks</h2>' + (!hasRules ? '<p class="muted">No cover rules yet. Add them on the <b>Cover Rules</b> tab of the Google Sheet, e.g. “at least 1 Pastoral Staff on duty every Sunday”.</p>' :
+      breaches.length ? '<div class="list">' + breaches.slice(0, 12).map(function (b) {
+        return '<div class="li click" data-act="day" data-date="' + b.date + '"><span class="covdot" aria-hidden="true">⚠</span><div class="grow"><b>' + esc(fmtLong(b.date)) + ' · ' + esc(b.rule.name) + '</b><span>' +
+          b.onDuty + ' of ' + b.min + ' ' + esc(b.rule.category || 'staff') + ' on duty' + (b.away.length ? ' · away: ' + esc(b.away.join(', ')) : '') + '</span></div></div>';
+      }).join('') + (breaches.length > 12 ? '<p class="muted small">…and ' + (breaches.length - 12) + ' more.</p>' : '') + '</div>'
+      : '<p class="muted">✓ Every cover rule is met for the next 8 weeks, counting approved and pending leave.</p>') + '</section>';
+
+    var useIt = '<section class="panel"><h2>Use it or lose it <small>unused leave is lost after the date shown</small></h2>' + (risk.length ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Person</th><th>Still to take</th><th>By</th></tr></thead><tbody>' +
+      risk.map(function (x) {
+        return '<tr><td>' + av(x.st) + ' ' + esc(x.st.name) + '</td><td>' + x.items.map(function (i) { return '<span class="dot" style="--c:' + esc(i.type.colour) + '"></span> <b class="num">' + C.fmtAmount(i.type, i.left) + '</b> ' + esc(i.type.name); }).join('<br>') + '</td>' +
+          '<td>' + x.items.map(function (i) { return esc(fmt(i.until, true)); }).join('<br>') + '</td></tr>';
+      }).join('') + '</tbody></table></div><p class="muted small" style="margin:10px 0 0">Reminder emails go out automatically on ' + esc(settings().ReminderDates || '1 Nov, 1 Dec, 15 Jan') + '.</p>' : '<p class="muted">Nobody has leave at risk.</p>') + '</section>';
+
+    var sick = sickStats(y), st = sickType();
+    var sickHtml = '<section class="panel"><h2>Sick leave patterns <small>' + esc(lyName(y)) + '</small></h2>' + (!sick.length ? '<p class="muted">No sick leave taken this year.</p>' :
+      '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Person</th><th class="num">Days</th><th class="num">Times</th><th class="num">Next to a day off</th><th>Flags</th></tr></thead><tbody>' +
+      sick.map(function (x) {
+        var flags = [];
+        if (x.long) flags.push('<span class="flag">More than 2 days in a row' + (x.long > 1 ? ' (' + x.long + '×)' : '') + '</span>');
+        if (x.cluster) flags.push('<span class="flag">3 or more times in 8 weeks</span>');
+        if (x.spells >= 3 && x.edge / x.spells >= 0.67) flags.push('<span class="flag soft">Mostly next to weekends</span>');
+        return '<tr><td>' + av(x.st) + ' ' + esc(x.st.name) + '</td><td class="num">' + C.fmtDays(x.total) + (st && C.balances(d, x.st.id, y)[st.code].entitled != null ? ' <span class="muted">/ ' + C.fmtDays(C.balances(d, x.st.id, y)[st.code].entitled) + '</span>' : '') + '</td>' +
+          '<td class="num">' + x.spells + '</td><td class="num">' + x.edge + '</td><td>' + (flags.join(' ') || '<span class="muted">–</span>') + '</td></tr>';
+      }).join('') + '</tbody></table></div><p class="muted small" style="margin:10px 0 0">South African law lets an employer ask for a medical certificate when someone is off sick for more than 2 days in a row, or more than twice in 8 weeks. Flags are a prompt to check, not proof of anything.</p>') + '</section>';
+
+    var months = '<section class="panel"><h2>Busiest months <small>approved working days off, ' + esc(lyName(y)) + '</small></h2>' + monthChart(y) + '</section>';
+    return {
+      title: 'Dashboard',
+      sub: esc(fmtLong(today)) + ' · ' + esc(settings().CompanyName || 'Leave Manager'),
+      controls: '<button class="btn" data-act="nav" data-view="reports">Reports</button>',
+      body: tiles + '<div class="dash">' + '<div class="dash-col">' + waiting + cover + useIt + months + '</div><div class="dash-col">' + standIn + sickHtml + '</div></div>'
+    };
+  };
+
+  /* ---------- Stand-in approver ---------- */
+  function standInPanel() {
+    var set = settings(), id = String(set.StandInID || ''), from = String(set.StandInFrom || '').slice(0, 10), to = String(set.StandInTo || '').slice(0, 10);
+    var who = id ? staffById(id) : null, today = todayISO();
+    var state = !who ? '<p class="muted">Nobody is set. Choose someone to approve leave while you’re away. They get the request emails and an Approvals page, but can’t approve their own leave.</p>' :
+      '<p><b>' + esc(who.name) + '</b> ' + (today < from ? 'will approve leave' : today > to ? 'approved leave' : 'is approving leave') + ' from <b>' + esc(fmt(from, true)) + '</b> to <b>' + esc(fmt(to, true)) + '</b>.' +
+      (today >= from && today <= to ? ' <span class="pill Approved">Active now</span>' : today > to ? ' <span class="pill Cancelled">Ended</span>' : ' <span class="pill Pending">Scheduled</span>') + '</p>';
+    var people = S.data.staff.filter(function (p) { return p.active !== false && !C.isAdmin(p); }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+    return '<section class="panel" id="standin"><h2>Stand-in approver</h2>' + state +
+      '<div class="si-form"><label class="field">Person<select id="si-who"><option value="">Choose…</option>' + people.map(function (p) {
+        return '<option value="' + esc(p.id) + '"' + (p.id === id ? ' selected' : '') + '>' + esc(p.name) + '</option>'; }).join('') + '</select></label>' +
+      '<div class="two"><label class="field">From<input type="date" id="si-from" value="' + esc(from) + '"></label><label class="field">To<input type="date" id="si-to" value="' + esc(to) + '"></label></div>' +
+      '<div class="btns"><button class="btn primary" data-act="si-save">' + (who ? 'Update' : 'Set stand-in') + '</button>' + (who ? '<button class="btn ghost" data-act="si-clear">Remove</button>' : '') + '</div></div></section>';
+  }
+
+  /* ---------- Payroll: unpaid leave per person per month ---------- */
+  function payrollData(y) {
+    var rng = C.lyRange(y, CTX.S), ut = unpaidTypes().map(function (t) { return t.code; });
+    var months = monthTotals(y).map(function (m) { return { key: m.key, label: m.label }; });
+    var rows = sortedStaff().slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).map(function (st) {
+      var per = {}, total = 0, list = [];
+      S.data.requests.forEach(function (r) {
+        if (r.staffId !== st.id || r.status !== 'Approved' || ut.indexOf(r.type) < 0 || r.end < rng.start || r.start > rng.end) return;
+        var n = 0;
+        (DL[r.id] || C.dayList(r, CTX)).forEach(function (x) { if (x.date < rng.start || x.date > rng.end) return; per[x.date.slice(0, 7)] = (per[x.date.slice(0, 7)] || 0) + x.amt; total += x.amt; n += x.amt; });
+        list.push({ r: r, n: n });
+      });
+      return { st: st, per: per, total: total, list: list };
+    });
+    return { months: months, rows: rows, types: unpaidTypes() };
+  }
+  function payrollReport(y) {
+    var p = payrollData(y), any = p.rows.some(function (r) { return r.total; });
+    var head = '<th>Employee</th>' + p.months.map(function (m) { return '<th class="n">' + m.label + '</th>'; }).join('') + '<th class="n">Total</th>';
+    var body = p.rows.map(function (r) {
+      return '<tr><td><b>' + esc(r.st.name) + '</b><small>' + esc(catName(r.st)) + '</small></td>' + p.months.map(function (m) {
+        return '<td class="n' + (r.per[m.key] ? '' : ' rp-na') + '">' + (r.per[m.key] ? '<b>' + C.fmtDays(r.per[m.key]) + '</b>' : '–') + '</td>'; }).join('') +
+        '<td class="n"><b>' + C.fmtDays(r.total) + '</b></td></tr>';
+    }).join('');
+    var tot = p.months.map(function (m) { return p.rows.reduce(function (a, r) { return a + (r.per[m.key] || 0); }, 0); });
+    var detail = [];
+    p.rows.forEach(function (r) { r.list.forEach(function (x) { detail.push({ st: r.st, r: x.r, n: x.n }); }); });
+    detail.sort(function (a, b) { return a.r.start < b.r.start ? -1 : 1; });
+    return '<section class="rp-page rp-wide"' + rpStyle(colourOf(staffById(me().id) || me())) + '>' + rpHead('Payroll: unpaid leave', 'Working days of ' + esc(p.types.map(function (t) { return t.name; }).join(', ') || 'unpaid leave') + ' per month', y) +
+      '<table class="rp-tbl rp-sum"><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody><tfoot><tr><td>Total</td>' +
+      tot.map(function (n) { return '<td class="n">' + (n ? C.fmtDays(n) : '–') + '</td>'; }).join('') + '<td class="n">' + C.fmtDays(tot.reduce(function (a, b) { return a + b; }, 0)) + '</td></tr></tfoot></table>' +
+      '<h2 class="rp-h">Unpaid leave taken</h2>' + (detail.length ? '<table class="rp-tbl"><thead><tr><th>Employee</th><th>Dates</th><th>Leave type</th><th class="n">Working days</th><th>Approved by</th></tr></thead><tbody>' +
+        detail.map(function (x) { var t = typeOf(x.r.type); return '<tr><td>' + esc(x.st.name) + '</td><td>' + esc(fmtRange(x.r)) + '</td><td><span class="rp-dot" style="background:' + esc(t.colour) + '"></span>' + esc(t.name) + '</td><td class="n">' + C.fmtDays(x.n) + '</td><td>' + esc(x.r.decidedBy || '') + '</td></tr>'; }).join('') +
+        '</tbody></table>' : '<p class="rp-empty">No unpaid leave in ' + esc(lyName(y)) + '.</p>') +
+      '<p class="rp-key">Only approved leave is counted, in each person’s working days (public holidays and days they don’t work are left out). Half days count as 0.5.' + (any ? '' : '') + '</p>' +
+      rpFoot('For payroll. Unpaid leave doesn’t use any allowance, so it isn’t shown on balance reports.') + '</section>';
+  }
+  function payrollCsv(y) {
+    var p = payrollData(y), q = function (v) { v = String(v == null ? '' : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    var lines = [['Employee', 'Category'].concat(p.months.map(function (m) { return m.label + ' ' + m.key.slice(0, 4); }), ['Total unpaid days']).map(q).join(',')];
+    p.rows.forEach(function (r) { lines.push([r.st.name, catName(r.st)].concat(p.months.map(function (m) { return r.per[m.key] || 0; }), [r.total]).map(q).join(',')); });
+    lines.push('');
+    lines.push(['Employee', 'First day', 'Last day', 'Leave type', 'Working days', 'Approved by'].map(q).join(','));
+    p.rows.forEach(function (r) { r.list.forEach(function (x) { lines.push([r.st.name, x.r.start, x.r.end, typeOf(x.r.type).name, x.n, x.r.decidedBy || ''].map(q).join(',')); }); });
+    return lines.join('\r\n');
+  }
+  function downloadText(name, text, mime) {
+    if (NATIVE) {
+      if (typeof NATIVE.shareText === 'function') { nativeCall2('shareText', name, text); return; }
+      try { navigator.clipboard.writeText(text); toast('Copied the CSV. Update the Android app to share it as a file.'); } catch (e) { toast('Open Leave Manager in a browser to download this file.', true); }
+      return;
+    }
+    var blob = new Blob(['﻿' + text], { type: mime || 'text/csv;charset=utf-8' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+  function nativeCall2(fn, a, b) { try { return NATIVE[fn](a, b); } catch (e) { return null; } }
+
   VIEW_FN.home = function () {
     var d = S.data, u = me(), y = curLY(), bal = C.balances(d, u.id, y), today = todayISO();
     var hr = new Date().getHours();
@@ -482,7 +694,7 @@
       return '<div class="li click" data-act="open-req" data-id="' + esc(r.id) + '"><span class="dot" style="--c:' + esc(t.colour) + '"></span><div class="grow"><b>' + esc(fmtRange(r)) + '</b><span>' + esc(t.name) + ' · ' + reqAmount(r) + '</span></div>' + pill(r.status) + '</div>';
     }
     var hols = d.holidays.filter(function (h) { return h.date >= today; }).sort(function (a, b) { return a.date < b.date ? -1 : 1; }).slice(0, 4);
-    var pend = isMgr() ? pendingForMe() : [];
+    var pend = isApprover() ? pendingForMe() : [];
     if (!takesLeave(u)) {
       var recent = d.requests.filter(function (r) { return r.status === 'Approved' && r.end >= today; })
         .sort(function (a, b) { return a.start < b.start ? -1 : 1; }).slice(0, 6);
@@ -658,6 +870,7 @@
         '<span>Sent ' + esc(String(r.submitted).slice(0, 10)) + (r.source === 'Form' ? ' via form' : '') + '</span></div>' +
         (r.reason ? '<blockquote>' + esc(r.reason) + '</blockquote>' : '') +
         (names.length ? '<span class="warnline">Also away then: ' + esc(names.join(', ')) + (maxOff && busiest > maxOff ? ' · ' + busiest + ' people out on the busiest day' : '') + '</span>' : '') +
+        (function () { var w = reqWarnings(r); return w.length ? coverHtml(w) : ''; })() +
         '</div></div></div><div class="side-act"><label class="small muted" for="note-' + esc(r.id) + '">Note to ' + esc(firstName(st.name)) + ' (optional)</label>' +
         '<textarea id="note-' + esc(r.id) + '" rows="2"></textarea><div class="btns"><button class="btn bad" data-act="decide" data-d="Declined" data-id="' + esc(r.id) + '">Decline</button>' +
         '<button class="btn ok" data-act="decide" data-d="Approved" data-id="' + esc(r.id) + '">Approve</button></div></div></article>';
@@ -711,10 +924,12 @@
     approve: { label: 'Approved', colour: 'var(--ok)' },
     decline: { label: 'Declined', colour: 'var(--bad)' },
     cancel: { label: 'Cancelled', colour: 'var(--warn)' },
-    problem: { label: 'Form problem', colour: 'var(--bad)' }
+    problem: { label: 'Form problem', colour: 'var(--bad)' },
+    setting: { label: 'Stand-in change', colour: 'var(--muted)' }
   };
   function histKind(action) {
     var a = String(action || '').toLowerCase();
+    if (a.indexOf('stand-in') >= 0) return 'setting';
     if (a.indexOf('not booked') >= 0) return 'problem';
     if (a.indexOf('booked by') >= 0) return 'booked';
     if (a.indexOf('approved') === 0) return 'approve';
@@ -875,6 +1090,18 @@
     return '<footer class="rp-foot"><span>' + esc(note || 'Only working days are counted, except Sabbatical (calendar days). Days a person doesn’t normally work, days the church is closed and public holidays are not deducted.') + '</span>' +
       '<span>Prepared ' + esc(fmtLong(todayISO())) + ' by ' + esc(me().name) + '</span></footer>';
   }
+  /** Requests still waiting for approval, shown near the top of a person's report. */
+  function pendingBlock(st, reqs) {
+    var pend = reqs.filter(function (r) { return r.status === 'Pending'; });
+    if (!pend.length) return '';
+    return '<div class="rp-pending"><h2 class="rp-h" style="margin-top:0">Waiting for approval <small>' + pend.length + ' request' + (pend.length > 1 ? 's' : '') + ' not yet approved</small></h2>' +
+      pend.map(function (r) {
+        var t = typeOf(r.type), w = reqWarnings(r);
+        return '<div class="rp-prow"><div><b>' + esc(fmtRange(r)) + '</b><span><span class="rp-dot" style="background:' + esc(t.colour) + '"></span>' + esc(t.name) + ' · ' + reqAmount(r) +
+          ' · sent ' + esc(fmt(String(r.submitted).slice(0, 10), true)) + '</span>' + (r.reason ? '<span class="rp-note">“' + esc(r.reason) + '”</span>' : '') +
+          (w.length && canManage(st) ? '<span class="rp-warn">⚠ ' + esc(w.join(' ')) + '</span>' : '') + '</div>' + quickDecide(r) + '</div>';
+      }).join('') + '</div>';
+  }
   function personReport(st, y) {
     var bal = C.balances(S.data, st.id, y), rng = C.lyRange(y, CTX.S);
     var reqs = personRequests(st, y);
@@ -904,6 +1131,7 @@
       '<dl class="rp-who"><div><dt>Employee</dt><dd>' + esc(st.name) + '</dd></div><div><dt>Category</dt><dd>' + esc(catName(st)) + '</dd></div>' +
       '<div><dt>Working days</dt><dd>' + esc(workLabel(st)) + '</dd></div><div><dt>Start date</dt><dd>' + (st.start ? esc(fmt(st.start, true)) : '—') + '</dd></div>' +
       '<div><dt>Days off approved</dt><dd>' + days(totalOff) + '</dd></div><div><dt>Requests</dt><dd>' + reqs.length + '</dd></div></dl>' +
+      pendingBlock(st, reqs) +
       '<h2 class="rp-h">Leave balances</h2><table class="rp-tbl"><thead><tr><th>Leave type</th><th class="n">Allowance</th><th class="n">Taken</th><th class="n">Pending</th><th class="n">Remaining</th></tr></thead><tbody>' +
       (sumRows || '<tr><td colspan="5">No leave types are set up for this category.</td></tr>') + '</tbody></table>' +
       '<h2 class="rp-h">Leave requests</h2>' + (reqRows ? '<table class="rp-tbl rp-req"><thead><tr><th>Dates</th><th>Leave type</th><th class="n">Days</th><th>Status</th><th>Decided by</th><th>Note</th></tr></thead><tbody>' + reqRows + '</tbody></table>'
@@ -954,7 +1182,7 @@
     var admin = isMgr(), y = curLY() + S.repYear;
     var kinds = [];
     if (takesLeave(me())) kinds.push(['mine', 'My leave report']);
-    if (admin) kinds.push(['person', 'One employee'], ['summary', 'All staff — summary'], ['full', 'All staff — full detail']);
+    if (admin) kinds.push(['person', 'One employee'], ['summary', 'All staff — summary'], ['full', 'All staff — full detail'], ['payroll', 'Payroll — unpaid leave']);
     if (!kinds.some(function (k) { return k[0] === S.repKind; })) S.repKind = kinds[0][0];
     var staff = sortedStaff().slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
     if (!S.repPerson || !staffById(S.repPerson)) S.repPerson = staff[0] && staff[0].id;
@@ -962,6 +1190,7 @@
     if (S.repKind === 'mine') body = personReport(me(), y);
     else if (S.repKind === 'person') body = staffById(S.repPerson) ? personReport(staffById(S.repPerson), y) : '<p>No staff yet.</p>';
     else if (S.repKind === 'summary') body = summaryReport(y);
+    else if (S.repKind === 'payroll') body = payrollReport(y);
     else body = summaryReport(y) + staff.map(function (st) { return personReport(st, y); }).join('');
     var controls = '<div class="rp-controls">' +
       (kinds.length > 1 ? '<label class="field">Report<select id="rep-kind">' + kinds.map(function (k) { return '<option value="' + k[0] + '"' + (k[0] === S.repKind ? ' selected' : '') + '>' + k[1] + '</option>'; }).join('') + '</select></label>' : '') +
@@ -971,6 +1200,7 @@
       title: 'Reports',
       sub: 'Choose a report, then print it or save it as a PDF from the print window.',
       controls: '<div class="seg"><button data-act="rprev" aria-label="Previous leave year">‹</button><button data-act="rthis">' + esc(lyName(y)) + '</button><button data-act="rnext" aria-label="Next leave year">›</button></div>' +
+        (S.repKind === 'payroll' ? '<button class="btn" data-act="csv">Download CSV</button>' : '') +
         '<button class="btn primary" data-act="print">Print / Save as PDF</button>',
       body: controls + '<div class="report">' + body + '</div>'
     };
@@ -1216,8 +1446,30 @@
       (t && t.allowedDays ? '<span class="muted small">' + esc(t.name) + ' can only be booked on ' + esc(C.daysLabel(C.parseDays(t.allowedDays, []))) + (Number(t.perTerm) > 0 ? ', ' + (Number(t.perTerm) === 1 ? 'once' : t.perTerm + ' times') + ' per school term' : '') + '.</span>' : '') +
       (t && st && Number(t.perTerm) > 0 && C.termOf(S.data, r.start) ? '<span class="muted small">Counts as ' + esc(C.termOf(S.data, r.start).name) + '’s ' + esc(t.name) + '.</span>' : '') + line2 +
       (t && t.needsApproval && st && st.id === me().id ? '<span class="muted small">Goes to the Administrator for approval.</span>' : '');
-    var err = st && t ? C.validate(S.data, st, r) : null;
+    var err = st && t ? C.validate(S.data, st, r, undefined, false, isMgr()) : null;
     setErr(err || '');
+    if (!err && st && t && n) {
+      var cv = C.coverCheck(S.data, st, r);
+      var warns = cv.block.concat(cv.warn);
+      if (warns.length) sum.insertAdjacentHTML('beforeend', coverHtml(warns, isMgr() ? 'As Administrator you can still book it.' : 'You can still send it; the Administrator will see this warning.'));
+    }
+  }
+  /** Approve / Decline buttons for someone who can decide this request (not shown when printing). */
+  function quickDecide(r) {
+    var st = staffById(r.staffId);
+    if (r.status !== 'Pending' || !st || !canManage(st)) return '';
+    return '<span class="qd rp-act"><button class="btn small bad" data-act="decide" data-d="Declined" data-id="' + esc(r.id) + '">Decline</button>' +
+      '<button class="btn small ok" data-act="decide" data-d="Approved" data-id="' + esc(r.id) + '">Approve</button></span>';
+  }
+  function coverHtml(list, tail) {
+    return '<div class="covwarn" role="note"><b>⚠ Cover warning</b>' + list.map(function (m) { return '<span>' + esc(m) + '</span>'; }).join('') +
+      (tail ? '<span class="muted small">' + esc(tail) + '</span>' : '') + '</div>';
+  }
+  function reqWarnings(r) {
+    var st = staffById(r.staffId);
+    if (!st || (r.status !== 'Pending' && r.status !== 'Approved')) return [];
+    var cv = C.coverCheck(S.data, st, r, r.id);
+    return cv.block.concat(cv.warn);
   }
   function setErr(msg) { var e = document.getElementById('f-err'); if (e) e.innerHTML = msg ? '<div class="err" role="alert">' + esc(msg) + '</div>' : ''; }
 
@@ -1226,7 +1478,7 @@
     if (!r) return;
     var st = staffById(r.staffId) || { name: 'Former staff member', id: '' }, t = typeOf(r.type), today = todayISO();
     var mine = r.staffId === me().id, mgr = canManage(st);
-    var canCancel = (r.status === 'Pending' || r.status === 'Approved') && (mgr || (mine && (r.status === 'Pending' || r.start > today)));
+    var canCancel = (r.status === 'Pending' || r.status === 'Approved') && (isMgr() || (mine && (r.status === 'Pending' || r.start > today)));
     var html = '<header><div class="who" style="display:flex;gap:12px;align-items:center">' + av(st, true) + '<div><p class="eyebrow">' + esc(t.name) + '</p><h2>' + esc(st.name) + '</h2></div></div><button class="x" data-act="close" aria-label="Close">×</button></header>' +
       '<dl class="kv"><dt>Status</dt><dd>' + pill(r.status) + '</dd><dt>Dates</dt><dd>' + esc(fmtRange(r)) + '</dd><dt>Time away</dt><dd>' + reqAmount(r) + '</dd>' +
       (r.reason ? '<dt>Note</dt><dd>' + esc(r.reason) + '</dd>' : '') +
@@ -1234,6 +1486,7 @@
       (r.decidedBy ? '<dt>' + (r.cancelledBy ? (r.decidedOn ? 'Approved by' : 'Decided by') : (r.status === 'Cancelled' ? 'Cancelled by' : r.status === 'Declined' ? 'Declined by' : 'Approved by')) + '</dt><dd>' + esc(r.decidedBy) + (r.decidedOn ? ' · ' + esc(r.decidedOn) : '') + '</dd>' : '') +
       (r.cancelledBy ? '<dt>Cancelled by</dt><dd>' + esc(r.cancelledBy) + (r.cancelledOn ? ' · ' + esc(r.cancelledOn) : '') + '</dd>' : '') +
       (r.note ? '<dt>Manager note</dt><dd>' + esc(r.note) + '</dd>' : '') + '</dl>' +
+      (mgr && r.status === 'Pending' ? (function () { var w = reqWarnings(r); return w.length ? coverHtml(w) : ''; })() : '') +
       (mgr && r.status === 'Pending' ? '<label class="field">Note to ' + esc(firstName(st.name)) + ' (optional)<textarea id="note-' + esc(r.id) + '" rows="2"></textarea></label>' : '') +
       '<div class="actions">' + (canCancel ? '<button class="btn bad" data-act="cancel-req" data-id="' + esc(r.id) + '">Cancel this leave</button>' : '') +
       (mgr && r.status === 'Pending' ? '<button class="btn bad" data-act="decide" data-d="Declined" data-id="' + esc(r.id) + '">Decline</button><button class="btn ok" data-act="decide" data-d="Approved" data-id="' + esc(r.id) + '">Approve</button>' : '<button class="btn" data-act="close">Close</button>') + '</div>';
@@ -1303,6 +1556,20 @@
           .catch(function () { busy(el, false); });
         break;
       }
+      case 'csv': downloadText('unpaid-leave-' + lyName(curLY() + S.repYear) + '.csv', payrollCsv(curLY() + S.repYear)); break;
+      case 'si-save': {
+        var siWho = document.getElementById('si-who').value, siFrom = document.getElementById('si-from').value, siTo = document.getElementById('si-to').value;
+        if (!siWho) { toast('Choose who will stand in.', true); break; }
+        if (!siFrom || !siTo) { toast('Choose the first and last day.', true); break; }
+        busy(el, true);
+        call('standin', { staffId: siWho, from: siFrom, to: siTo }, firstName(staffById(siWho).name) + ' will approve leave from ' + fmt(siFrom) + ' to ' + fmt(siTo))
+          .then(render).catch(function () { busy(el, false); });
+        break;
+      }
+      case 'si-clear':
+        busy(el, true);
+        call('standin', { staffId: '' }, 'Stand-in approver removed').then(render).catch(function () { busy(el, false); });
+        break;
       case 'google-native': nativeCall('googleSignIn', GOOGLE_ID); break;
       case 'pwa-install':
         if (installPrompt) { installPrompt.prompt(); installPrompt.userChoice.then(function () { installPrompt = null; render(); }); }
@@ -1312,7 +1579,12 @@
       case 'open-req': requestDetail(el.dataset.id); break;
       case 'day': dayDetail(el.dataset.date); break;
       case 'close': closeModal(); break;
-      case 'logout': logout(); break;
+      case 'logout': closeModal(); logout(); break;
+      case 'logout-ask':
+        openModal('<header><div><p class="eyebrow">Leave Manager</p><h2>Sign out?</h2></div><button class="x" data-act="close" aria-label="Close">×</button></header>' +
+          '<p class="muted" style="margin:0 0 18px">You’ll need your ' + (GOOGLE_ID ? 'Google account or ' : '') + 'email and PIN to sign in again.</p>' +
+          '<div class="actions"><button class="btn" data-act="close">Stay signed in</button><button class="btn primary" data-act="logout">Sign out</button></div>', 'Sign out?');
+        break;
       case 'demo-login':
         Demo.handle('login', { staffId: el.dataset.id }).then(function (res) { S.token = res.token; store.set('demo_token', res.token); setData(res.data); });
         break;
@@ -1424,7 +1696,7 @@
 
   /* ------------------------------ demo backend ------------------------------ */
   var Demo = (function () {
-    var KEY = 'demo_db_v11';
+    var KEY = 'demo_db_v13';
     function seed() {
       var yr = new Date().getFullYear();
       // id, name, category, working days override ('' = category default), role, manager
@@ -1445,7 +1717,13 @@
           start: s[0] === 'S01' ? (yr - 8) + '-01-15' : s[0] === 'S09' ? yr + '-04-01' : (yr - 2 - (i % 3)) + '-02-01', colour: PALETTE[i], active: true };
       });
       var data = {
-        settings: { CompanyName: 'Hillside Community Church', LeaveYearStartMonth: 1, OpenDays: 'Mon, Wed, Thu, Fri, Sat, Sun', TermsIncludeHolidays: 'TRUE', FirstLeaveYear: yr - 1, ProRata: 'TRUE', AllowNegative: 'FALSE', MaxOffPerDay: 3 },
+        settings: { CompanyName: 'Hillside Community Church', LeaveYearStartMonth: 1, OpenDays: 'Mon, Wed, Thu, Fri, Sat, Sun', TermsIncludeHolidays: 'TRUE', FirstLeaveYear: yr - 1, ProRata: 'TRUE', AllowNegative: 'FALSE', MaxOffPerDay: 3,
+          WeeklyEmail: 'Monday', ReminderDates: '1 Nov, 1 Dec, 15 Jan', StandInID: '', StandInFrom: '', StandInTo: '' },
+        rules: [
+          { name: 'Sunday cover', kind: 'Minimum on duty', category: 'Pastoral Staff', days: 'Sun', from: '', to: '', min: 1, action: 'Warn', message: 'At least one pastor must be on duty every Sunday.', active: true },
+          { name: 'Easter services', kind: 'No leave', category: 'Pastoral Staff, Technical Staff', days: '', from: 'Easter-2', to: 'Easter+1', min: 0, action: 'Warn', message: 'Good Friday to Family Day.', active: true },
+          { name: 'Christmas services', kind: 'No leave', category: 'Pastoral Staff, Technical Staff', days: '', from: '24 Dec', to: '26 Dec', min: 0, action: 'Warn', message: '', active: true }
+        ],
         terms: [
           ['Term 4 2025', '2025-10-07', '2025-12-10'], ['Term 1 2026', '2026-01-14', '2026-03-27'], ['Term 2 2026', '2026-04-08', '2026-06-26'],
           ['Term 3 2026', '2026-07-21', '2026-09-23'], ['Term 4 2026', '2026-10-06', '2026-12-11'], ['Term 1 2027', '2027-01-13', '2027-03-19'],
@@ -1504,7 +1782,19 @@
         ['S05', 'SSL', -90, 4, 'Approved', '', ''],
         ['S04', 'SSL', -120, 4, 'Approved', '', ''],
         ['S02', 'PSL', -150, 10, 'Approved', '', ''],
-        ['S09', 'CSL', -59, 0, 'Approved', '', '']
+        ['S09', 'CSL', -59, 0, 'Approved', '', ''],
+        // a Sunday with no pastor on duty (for the Dashboard's cover check)
+        ['S02', 'PSL', 12, 1, 'Approved', '', ''],
+        ['S08', 'PSL', 13, 0, 'Approved', '', ''],
+        ['S01', 'PSL', 13, 0, 'Pending', '', 'Family reunion'],
+        // sick-leave patterns and unpaid leave (Dashboard, Payroll)
+        ['S06', 'SL', -7, 0, 'Approved', '', ''],
+        ['S06', 'SL', -21, 0, 'Approved', '', ''],
+        ['S06', 'SL', -38, 0, 'Approved', '', ''],
+        ['S04', 'SL', -96, 2, 'Approved', '', 'Bronchitis'],
+        ['S07', 'UL', -130, 1, 'Approved', '', 'Extra days for overseas trip'],
+        ['S04', 'UL', -40, 0, 'Approved', '', ''],
+        ['S10', 'UL', -180, 2, 'Approved', '', '']
       ];
       var ctx = C.ctx(data);
       var pieterTeam = ['S04', 'S05', 'S06', 'S07', 'S09', 'S10'];
@@ -1532,6 +1822,7 @@
           var u0 = C.staffById(d, b.staffId);
           return { token: 'demo-' + u0.id, data: C.publicView(d, u0) };
         }
+        C.applyStandIn(d, todayISO());
         var u = d.staff.filter(function (s) { return 'demo-' + s.id === b.token; })[0];
         if (!u) throw new Error('AUTH: Choose who to sign in as.');
         if (action === 'history') {
@@ -1554,6 +1845,13 @@
           var q = C.prepareDecision(d, u, b.id, b.decision);
           q.req.status = b.decision; q.req.decidedBy = u.name; q.req.decidedOn = nowStr(); q.req.note = String(b.note || '');
           log(b.decision, q.req, q.req.note);
+        } else if (action === 'standin') {
+          if (!C.isAdmin(u)) throw new Error('Only an Administrator can choose a stand-in approver.');
+          if (b.staffId && (!b.from || !b.to || b.to < b.from)) throw new Error('Choose the first and last day of the stand-in period.');
+          d.settings.StandInID = b.staffId || ''; d.settings.StandInFrom = b.staffId ? b.from : ''; d.settings.StandInTo = b.staffId ? b.to : '';
+          (d.history || (d.history = [])).push({ when: nowStr(), action: b.staffId ? 'Stand-in approver set' : 'Stand-in approver removed', requestId: '',
+            staff: b.staffId ? C.staffById(d, b.staffId).name : '', type: '', dates: b.staffId ? b.from + ' to ' + b.to : '', days: '', status: '', by: u.name, note: '' });
+          C.applyStandIn(d, todayISO());
         } else if (action === 'prefs') {
           var hx = normHex(b.colour);
           if (!hx) throw new Error('Choose a colour first.');
