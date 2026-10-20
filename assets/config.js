@@ -1,5 +1,5 @@
 /*
- * Team Leave Planner – configuration
+ * Leave Manager – configuration
  * Paste your Apps Script web app URL below (it ends in /exec).
  * Leave it empty to run the app in demo mode with sample data.
  */

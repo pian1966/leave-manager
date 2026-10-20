@@ -1,4 +1,4 @@
-/* Team Leave Planner – front end (no build step, no framework). */
+/* Leave Manager – front end (no build step, no framework). */
 (function () {
   'use strict';
   var CFG = window.LEAVE_CONFIG || {};
@@ -227,7 +227,7 @@
             '<span class="grow"><b>' + esc(s.name) + '</b><br><span>' + (C.tracksLeave(s) ? '' : 'Approves all leave · ') + esc(s.level) + ' · works ' + esc(C.daysLabel(C.parseDays(s.workDays, C.parseDays((Demo.cat(s.level) || {}).workDays, [1, 3, 4, 5])))) + '</span></span></button>';
         }).join('') + '</div></div>';
     }
-    app.innerHTML = '<div class="login"><section class="art"><div class="brand">' + markHTML() + '<div><b>Leave Planner</b><small>Team leave, at a glance</small></div></div>' +
+    app.innerHTML = '<div class="login"><section class="art"><div class="brand">' + markHTML() + '<div><b>Leave Manager</b><small>Team leave, at a glance</small></div></div>' +
       '<div><h1>Who’s in, who’s out, and how many days are left.</h1><p style="margin-top:14px">Request leave, get it approved, and see the whole team on one wallchart. Only your own working days are counted, so days you don’t work and public holidays never come off your balance.</p></div>' +
       '<div class="ministrip" aria-hidden="true">' + strip + '</div></section><section class="form">' + right + '</section></div>';
   }
@@ -252,9 +252,9 @@
     }).join('');
     var formUrl = CFG.FORM_URL || settings().FormURL;
     var guideUrl = CFG.GUIDE_URL || 'https://github.com/pian1966/leave-planner/blob/main/STAFF-GUIDE.md';
-    var links = '<a href="' + esc(guideUrl) + '" target="_blank" rel="noopener">Staff guide: how to use the planner ↗</a>' + (formUrl ? '<a href="' + esc(formUrl) + '" target="_blank" rel="noopener">Prefer a form? Request via Google Forms ↗</a>' : '') +
+    var links = '<a href="' + esc(guideUrl) + '" target="_blank" rel="noopener">Staff guide: how to use Leave Manager ↗</a>' + (formUrl ? '<a href="' + esc(formUrl) + '" target="_blank" rel="noopener">Prefer a form? Request via Google Forms ↗</a>' : '') +
       (isMgr() && CFG.SHEET_URL ? '<a href="' + esc(CFG.SHEET_URL) + '" target="_blank" rel="noopener">Open the Google Sheet ↗</a>' : '');
-    var brand = '<div class="brand">' + markHTML() + '<div><b>Leave Planner</b><small>' + esc(settings().CompanyName || 'My Team') + '</small></div></div>';
+    var brand = '<div class="brand">' + markHTML() + '<div><b>Leave Manager</b><small>' + esc(settings().CompanyName || 'My Team') + '</small></div></div>';
     var tabs = navItems().filter(function (n) { return n[0] !== 'year' || !isMgr(); });
     app.innerHTML =
       '<div class="shell"><aside class="side">' + brand +
@@ -573,7 +573,7 @@
   }
   function rpHead(title, sub, y) {
     var rng = C.lyRange(y, CTX.S);
-    return '<header class="rp-head"><div><div class="rp-org">' + esc(settings().CompanyName || 'Leave Planner') + '</div>' +
+    return '<header class="rp-head"><div><div class="rp-org">' + esc(settings().CompanyName || 'Leave Manager') + '</div>' +
       '<h1 class="rp-title">' + esc(title) + '</h1>' + (sub ? '<div class="rp-sub">' + sub + '</div>' : '') + '</div>' +
       '<div class="rp-meta"><span>Leave year</span><b>' + esc(lyName(y)) + '</b><span>' + esc(fmt(rng.start, true) + ' – ' + fmt(rng.end, true)) + '</span></div></header>';
   }
@@ -989,7 +989,7 @@
       case 'rnext': S.repYear++; render(); break;
       case 'rthis': S.repYear = 0; render(); break;
       case 'print':
-        try { window.print(); } catch (e) { toast('Printing isn’t available here. Open the planner in your browser to print.', true); }
+        try { window.print(); } catch (e) { toast('Printing isn’t available here. Open Leave Manager in your browser to print.', true); }
         break;
       case 'toggle-type': S.hidden[el.dataset.code] = !S.hidden[el.dataset.code]; store.set('hidden', S.hidden); render(); break;
       case 'toggle-pending': S.showPending = !S.showPending; store.set('showPending', S.showPending); render(); break;

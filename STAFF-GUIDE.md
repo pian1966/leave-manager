@@ -1,8 +1,8 @@
-# Leave Planner – Staff Guide
+# Leave Manager – Staff Guide
 
 *Last updated: 19 October 2026*
 
-The Leave Planner is where you request leave, see how many days you have left, and check who else is away. It works on a computer, tablet or phone.
+The Leave Manager is where you request leave, see how many days you have left, and check who else is away. It works on a computer, tablet or phone.
 
 ## Welcome
 

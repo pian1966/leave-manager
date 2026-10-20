@@ -1,4 +1,4 @@
-# Team Leave Planner
+# Leave Manager
 
 A leave management web app for a church team of about 10 people, built only from free tools:
 
@@ -25,12 +25,12 @@ Open `web/index.html` in a browser before you set anything up: with no API URL c
 - **Sabbatical Leave** – Pastoral Staff only: 12.5 calendar days a year build up from each person's start date. After 7 years that's 87.5 calendar days, about 3 months. The saved balance stops growing at 87.5.
 - **Reports** – everyone can print or save as PDF a formal leave report for any leave year (details, balances, every request, signature lines). The Administrator can also print any one employee's report, an all-staff summary, or a full report with a page per person.
 - **Employees (admins only)** – pick anyone to see every date they've had off, grouped by month, with totals per leave type. Filter by leave year, leave type and status (taken, waiting, or everything including declined and cancelled). Click a date to open the request.
-- **Administrator** – give a person the Category and Role `Administrator`. Every leave request is emailed to the Administrator(s), and only they can approve, decline, book leave for others, and see Approvals, Team balances and Employees. People in the Administrator category don't take leave in the planner and don't appear on the wallchart.
+- **Administrator** – give a person the Category and Role `Administrator`. Every leave request is emailed to the Administrator(s), and only they can approve, decline, book leave for others, and see Approvals, Team balances and Employees. People in the Administrator category don't take leave in Leave Manager and don't appear on the wallchart.
 - **Approvals** – managers see pending requests with the balance after approval and who else is away. They get an email with a **Review request** button and can approve from their phone without signing in.
 - **Managers can book leave for their team** (auto-approved), and anyone can cancel their own future leave.
 - **Unpaid Leave** shows on the calendar without using an allowance.
 - **Google Form** for people who prefer it, with an email back if a request can't be booked (e.g. not enough days).
-- **Holidays and school terms update themselves** every month. **Leave Planner → Update public holidays and school terms now** runs it on demand, and **LastCalendarUpdate** in Settings shows what it last did.
+- **Holidays and school terms update themselves** every month. **Leave Manager → Update public holidays and school terms now** runs it on demand, and **LastCalendarUpdate** in Settings shows what it last did.
 - **Google Calendar mirror** (optional) – approved leave appears in a shared calendar.
 - Works on phones, has a dark mode, and needs no build step.
 
@@ -40,7 +40,7 @@ Open `web/index.html` in a browser before you set anything up: with no API URL c
 
 ### 1. Create the Google Sheet and script
 
-1. Go to [sheets.new](https://sheets.new) and name the sheet, e.g. **Leave Planner**.
+1. Go to [sheets.new](https://sheets.new) and name the sheet, e.g. **Leave Manager**.
 2. **Extensions → Apps Script**.
 3. Rename the default `Code.gs` content: delete it and paste in the contents of **`apps-script/Code.gs`**.
 4. Click **+ → Script**, name it `Core`, and paste in **`apps-script/Core.gs`**.
@@ -49,10 +49,10 @@ Open `web/index.html` in a browser before you set anything up: with no API URL c
 
 ### 2. Run setup
 
-1. Go back to the Google Sheet tab and **reload the page**. After a few seconds a **Leave Planner** menu appears next to *Help*.
-2. Click **Leave Planner → 1. Set up workbook and Google Form**.
-3. Google asks for permission. Click **Continue**, choose your account, then **Advanced → Go to Leave Planner (unsafe) → Allow**. ("Unsafe" just means Google hasn't reviewed your own script.)
-4. Click the menu item again if nothing happened after allowing. When it finishes you'll see a "Leave Planner is set up" message and these tabs:
+1. Go back to the Google Sheet tab and **reload the page**. After a few seconds a **Leave Manager** menu appears next to *Help*.
+2. Click **Leave Manager → 1. Set up workbook and Google Form**.
+3. Google asks for permission. Click **Continue**, choose your account, then **Advanced → Go to Leave Manager (unsafe) → Allow**. ("Unsafe" just means Google hasn't reviewed your own script.)
+4. Click the menu item again if nothing happened after allowing. When it finishes you'll see a "Leave Manager is set up" message and these tabs:
 
 | Tab | What to fill in |
 |---|---|
@@ -65,9 +65,9 @@ Open `web/index.html` in a browser before you set anything up: with no API URL c
 | **Settings** | Church name, leave year start month, **OpenDays** (days the church is open), max people away per day, notification email, etc. Each row explains itself. |
 | **Requests** | Filled in by the app and the form. You can edit statuses here directly if you need to. |
 
-5. After editing Staff or Leave Types, use **Leave Planner → Refresh form lists** so the Google Form dropdowns match.
+5. After editing Staff or Leave Types, use **Leave Manager → Refresh form lists** so the Google Form dropdowns match.
 
-> **PINs:** type plain PINs in the Staff sheet. The first time someone signs in, their PIN is replaced with a secure hash. To reset a PIN, type a new plain one over the hash. **Leave Planner → Secure PINs now** hashes everyone immediately.
+> **PINs:** type plain PINs in the Staff sheet. The first time someone signs in, their PIN is replaced with a secure hash. To reset a PIN, type a new plain one over the hash. **Leave Manager → Secure PINs now** hashes everyone immediately.
 
 ### 3. Deploy the back end
 
@@ -95,14 +95,14 @@ Open `web/index.html` in a browser before you set anything up: with no API URL c
 Using the GitHub command line instead:
 ```bash
 cd web
-git init && git add . && git commit -m "Leave planner"
+git init && git add . && git commit -m "Leave Manager"
 gh repo create leave-planner --public --source=. --push
 gh api -X POST repos/{owner}/leave-planner/pages -f "source[branch]=main" -f "source[path]=/"
 ```
 
 ### 5. Tell the team
 
-Send everyone the GitHub Pages link and their PIN. Share the Google Form link (Settings → FormURL, or **Leave Planner → Show my links**) with anyone who prefers a form.
+Send everyone the GitHub Pages link and their PIN. Share the Google Form link (Settings → FormURL, or **Leave Manager → Show my links**) with anyone who prefers a form.
 
 ---
 
@@ -127,7 +127,7 @@ Send everyone the GitHub Pages link and their PIN. Share the Google Form link (S
 | "Can't reach the leave server" | Check `API_URL` in `config.js` ends in `/exec`, and the deployment's access is **Anyone**. |
 | "That email and PIN don't match" | Email must match the Staff sheet exactly (case doesn't matter); the Active box must be ticked. |
 | Changes to Code.gs have no effect | You must deploy a **New version** (see above). |
-| Form submissions don't appear | Run **Leave Planner → Set up** again, or check *Triggers* (clock icon) in Apps Script has `onLeaveFormSubmit`. |
+| Form submissions don't appear | Run **Leave Manager → Set up** again, or check *Triggers* (clock icon) in Apps Script has `onLeaveFormSubmit`. |
 | A person's balance looks wrong | Check their Category, Working Days, Start Date (pro-rata and sabbatical build-up start from it), and any Adjustments rows for that leave year. |
 | A leave type is missing from someone's list | Their category has a blank cell for it on the Categories tab. Put a number in to offer it. |
 
