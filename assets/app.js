@@ -148,8 +148,17 @@
     if (/^[0-9a-f]{6}$/i.test(h)) h = '#' + h;
     return /^#[0-9a-f]{6}$/i.test(h) ? h.toUpperCase() : '';
   }
+  /* Android app bridge: present only inside the Leave Manager Android app. */
+  var NATIVE = (typeof window.LeaveApp === 'object' && window.LeaveApp) || null;
+  function nativeCall(fn, arg) { try { if (NATIVE && typeof NATIVE[fn] === 'function') return arguments.length > 1 ? NATIVE[fn](arg) : NATIVE[fn](); } catch (e) { /* ignore */ } return null; }
+  var APK_URL = CFG.APK_URL || 'https://github.com/pian1966/leave-manager/releases/latest/download/LeaveManager.apk';
+  var isAndroid = /Android/i.test(navigator.userAgent || '');
+  var installPrompt = null;
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); installPrompt = e; });
+
   /* The signed-in person's colour (Staff tab, column J) becomes the app's accent colour. */
   function applyAccent(hex) {
+    nativeCall('setColour', hex || '');
     var root = document.documentElement;
     if (!hex) { root.removeAttribute('data-uc'); root.style.removeProperty('--uc'); root.style.removeProperty('--uc-ink'); return; }
     var r = parseInt(hex.substr(1, 2), 16), g = parseInt(hex.substr(3, 2), 16), b = parseInt(hex.substr(5, 2), 16);
@@ -253,7 +262,8 @@
         '<h2 style="margin-bottom:6px">Sign in</h2><p class="muted" style="margin:0 0 20px">Use your work email and the PIN your leave administrator gave you.</p>' +
         '<label class="field">Work email<input id="l-email" type="email" autocomplete="username" required value="' + esc(store.get('email') || '') + '"></label>' +
         '<label class="field">PIN<input id="l-pin" type="password" inputmode="numeric" autocomplete="current-password" required></label>' +
-        '<div id="l-err"></div><button class="btn primary" style="width:100%;padding:11px" type="submit" id="l-go">Sign in</button></form>';
+        '<div id="l-err"></div><button class="btn primary" style="width:100%;padding:11px" type="submit" id="l-go">Sign in</button></form>' +
+        (isAndroid && !NATIVE ? '<p class="login-app"><a href="' + esc(APK_URL) + '">Get the Leave Manager app for Android</a></p>' : '');
     } else {
       right = '<div class="pick"><p class="eyebrow">Demo mode</p><h2 style="margin:4px 0 6px">Sign in as a team member</h2>' +
         '<p class="muted small" style="margin:0">Sample data for a 10-person church team. Sign in as Linda (the Administrator) to approve requests and see employee summaries. Changes stay in this browser.</p>' +
@@ -323,6 +333,20 @@
   var SWATCHES = ['#2F6FB3', '#1D4ED8', '#0E7490', '#0F766E', '#2A9D8F', '#4D7C0F', '#15803D', '#B45309',
     '#C2410C', '#B91C1C', '#BE185D', '#B0527A', '#9333EA', '#7C3AED', '#4F46E5', '#475569'];
   function startOptions() { return navItems().filter(function (n) { return n[0] !== 'settings'; }); }
+  function appSection() {
+    if (NATIVE) {
+      var ver = nativeCall('version');
+      return '<section class="panel set-block"><h2>Android app</h2><p class="muted">You’re using the Leave Manager Android app' + (ver ? ' (version ' + esc(ver) + ')' : '') +
+        '. It always shows the latest version of Leave Manager, so there’s nothing to update for new features.</p>' +
+        '<div class="btns"><a class="btn" href="' + esc(APK_URL) + '" data-external="1">Download the newest app file</a></div></section>';
+    }
+    return '<section class="panel set-block"><h2>Phone app</h2>' +
+      '<p class="muted">Put Leave Manager on your phone’s home screen, like any other app.</p>' +
+      '<div class="btns">' + (installPrompt ? '<button class="btn primary" data-act="pwa-install">Install on this device</button>' : '') +
+      '<a class="btn' + (installPrompt ? '' : ' primary') + '" href="' + esc(APK_URL) + '">Download the Android app</a></div>' +
+      '<p class="muted set-help"><b>Android:</b> tap <i>Download the Android app</i>, open the file and tap <i>Install</i>. If asked, allow your browser to install apps.<br>' +
+      '<b>iPhone:</b> open this page in Safari, tap the Share button, then <i>Add to Home Screen</i>.</p></section>';
+  }
   VIEW_FN.settings = function () {
     var u = me(), mine = staffById(u.id) || u, cur = S.pickColour || colourOf(mine);
     var theme = store.get('theme') || 'auto', start = store.get('startView') || '';
@@ -354,7 +378,8 @@
         '<div class="radios" id="set-theme">' + seg + '</div></section>' +
 
         '<section class="panel set-block"><h2>Start page</h2><p class="muted">The page that opens when you sign in on this device.</p>' +
-        '<select id="set-start" class="btn">' + opts + '</select></section>'
+        '<select id="set-start" class="btn">' + opts + '</select></section>' +
+        appSection()
     };
   };
 
@@ -1207,6 +1232,7 @@
       case 'hist-refresh': loadHistory(true); render(); break;
       case 'hist-more': S.histLimit += 100; render(); break;
       case 'print':
+        if (NATIVE && typeof NATIVE.print === 'function') { nativeCall('print'); break; }
         try { window.print(); } catch (e) { toast('Printing isn’t available here. Open Leave Manager in your browser to print.', true); }
         break;
       case 'toggle-type': S.hidden[el.dataset.code] = !S.hidden[el.dataset.code]; store.set('hidden', S.hidden); render(); break;
@@ -1220,6 +1246,9 @@
           .catch(function () { busy(el, false); });
         break;
       }
+      case 'pwa-install':
+        if (installPrompt) { installPrompt.prompt(); installPrompt.userChoice.then(function () { installPrompt = null; render(); }); }
+        break;
       case 'new': requestModal(); break;
       case 'book': requestModal({ date: el.dataset.date, staffId: el.dataset.staff }); break;
       case 'open-req': requestDetail(el.dataset.id); break;
@@ -1327,6 +1356,13 @@
     var v = location.hash.replace('#', '');
     if (VIEWS.indexOf(v) >= 0 && v !== S.view && S.data) go(v);
   });
+
+  /* Android back button: close an open window first, then go back to Overview; otherwise let the app close. */
+  window.leaveAppBack = function () {
+    if (modalRoot.innerHTML) { closeModal(); return true; }
+    if (S.data && S.view !== 'home') { go('home'); return true; }
+    return false;
+  };
 
   /* ------------------------------ demo backend ------------------------------ */
   var Demo = (function () {

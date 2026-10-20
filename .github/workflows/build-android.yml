@@ -1,0 +1,97 @@
+name: Build Android app
+
+# Builds the Leave Manager Android app (LeaveManager.apk) and publishes it on the Releases page, where staff
+# download it from: https://github.com/pian1966/leave-manager/releases/latest/download/LeaveManager.apk
+#
+# The app shows the live website, so it only needs rebuilding when something in android/ changes.
+# One-time setup: add the repository secret ANDROID_KEYSTORE (the signing key). Without it the build
+# still runs as a check, but nothing is published.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - '.github/workflows/build-android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-android
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Prepare the signing key
+        id: key
+        env:
+          ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE" ]; then
+            echo "::notice::No ANDROID_KEYSTORE secret yet, so this is a test build only and nothing will be published."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf '%s' "$ANDROID_KEYSTORE" | tr -d ' \r\n' | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build the app
+        env:
+          KEYSTORE_PASSWORD: leave-manager-signing
+        run: |
+          set +e
+          gradle -p android assembleRelease --no-daemon --console=plain > build.log 2>&1
+          code=$?
+          if [ $code -ne 0 ]; then
+            # Show the useful part of the error as an annotation (job logs aren't always viewable).
+            msg=$(grep -E "error:|What went wrong|FAILED|Could not|> " build.log | grep -v "^> Task" | head -25 | sed 's/%/%25/g' | tr '\n' '|' | sed 's/|/%0A/g')
+            echo "::error::Android build failed:%0A${msg}"
+            tail -60 build.log
+            exit $code
+          fi
+          tail -5 build.log
+          mkdir -p out
+          cp android/app/build/outputs/apk/release/*.apk out/LeaveManager.apk
+          ls -la out
+
+      - name: Keep the test build
+        if: steps.key.outputs.signed != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: LeaveManager-test-build
+          path: out/LeaveManager.apk
+          retention-days: 7
+
+      - name: Publish on the Releases page
+        if: steps.key.outputs.signed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ver="1.0.${GITHUB_RUN_NUMBER}"
+          tag="android-v${ver}"
+          gh release create "$tag" out/LeaveManager.apk \
+            --title "Leave Manager for Android ${ver}" \
+            --notes "Install on Android: download **LeaveManager.apk** below, open it and tap Install. If your phone asks, allow your browser to install apps. Installing a newer version keeps you signed in." \
+            --latest
+          # Keep only the 3 newest app releases.
+          gh release list --limit 50 --json tagName --jq '.[].tagName' | grep '^android-v' | tail -n +4 | while read -r old; do
+            gh release delete "$old" --yes --cleanup-tag || true
+          done
+          echo "### Published Leave Manager for Android ${ver}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Download: https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/LeaveManager.apk" >> "$GITHUB_STEP_SUMMARY"
