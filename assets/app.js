@@ -855,7 +855,7 @@
       (targets.length > 1 || !takesLeave(u) ? '<label class="field">For<select id="f-staff">' + targets.map(function (s) { return '<option value="' + esc(s.id) + '"' + (s.id === who ? ' selected' : '') + '>' + esc(s.name) + (s.id === u.id ? ' (you)' : '') + '</option>'; }).join('') + '</select></label>' : '') +
       '<label class="field">Leave type<select id="f-type">' + typeOptions(staffById(who)) + '</select></label>' +
       '<div class="two"><label class="field">First day<input type="date" id="f-start" required value="' + esc(pre.date || '') + '"></label>' +
-      '<label class="field">Last day<input type="date" id="f-end" required value="' + esc(pre.date || '') + '"></label></div>' +
+      '<label class="field">Last day<input type="date" id="f-end" required value="' + esc(pre.date || '') + '"' + (pre.date ? ' min="' + esc(pre.date) + '"' : '') + '></label></div>' +
       '<div class="field" id="f-half-wrap" hidden><span>Length</span><div class="radios">' +
       '<label><input type="radio" name="half" value="None" checked>Full day</label><label><input type="radio" name="half" value="AM">Morning</label><label><input type="radio" name="half" value="PM">Afternoon</label></div></div>' +
       '<label class="field">' + (takesLeave(u) ? 'Note for the Administrator' : 'Note') + ' <span class="muted" style="font-weight:400">(optional)</span><textarea id="f-reason" rows="2" maxlength="500"></textarea></label>' +
@@ -1027,14 +1027,20 @@
   });
   document.addEventListener('input', function (ev) {
     if (ev.target.closest('#reqForm')) {
-      if (ev.target.id === 'f-start') {
-        var end = document.getElementById('f-end');
-        if (!end.value || end.value < ev.target.value) end.value = ev.target.value;
-      }
+      if (ev.target.id === 'f-start') syncLastDay(ev.target);
       updateRequestSummary();
     }
   });
+  /** The last day follows the first day, unless someone has deliberately picked a later last day. */
+  function syncLastDay(startEl) {
+    var end = document.getElementById('f-end'), start = startEl.value, prev = startEl.dataset.prev || '';
+    if (!end) return;
+    if (start && (!end.value || end.value < start || end.value === prev)) end.value = start;
+    end.min = start || '';
+    startEl.dataset.prev = start;
+  }
   document.addEventListener('change', function (ev) {
+    if (ev.target.id === 'f-start') syncLastDay(ev.target);
     if (ev.target.id === 'yr-person') { S.person = ev.target.value; render(); }
     else if (ev.target.id === 'emp-person') { S.emp = ev.target.value; render(); }
     else if (ev.target.id === 'emp-type') { S.empType = ev.target.value; render(); }
@@ -1080,7 +1086,7 @@
 
   /* ------------------------------ demo backend ------------------------------ */
   var Demo = (function () {
-    var KEY = 'demo_db_v9';
+    var KEY = 'demo_db_v10';
     function seed() {
       var yr = new Date().getFullYear();
       // id, name, category, working days override ('' = category default), role, manager
@@ -1094,7 +1100,7 @@
         ['S07', 'Megan Smith', 'Support Staff', '', 'Staff', 'pieter@example.com'],
         ['S08', 'Kagiso Molefe', 'Pastoral Staff', '', 'Staff', 'thandi@example.com'],
         ['S09', 'Nomvula Zulu', 'Cleaning Staff', '', 'Staff', 'pieter@example.com'],
-        ['S10', 'Ruan Botha', 'Support Staff', '', 'Staff', 'pieter@example.com'],
+        ['S10', 'Ruan Botha', 'Technical Staff', '', 'Staff', ''],
         ['S11', 'Linda Pillay', 'Administrator', '', 'Administrator', '']
       ].map(function (s, i) {
         return { id: s[0], name: s[1], email: s[1].split(' ')[0].toLowerCase() + '@example.com', level: s[2], workDays: s[3], role: s[4], manager: s[5],
@@ -1121,6 +1127,7 @@
           { level: 'Pastoral Staff', label: 'Pastoral Staff', workDays: 'Mon, Wed, Thu, Fri, Sat, Sun', ent: { PSL: 24, SL: 7, WO: 4, SAB: 12.5, WA: 21 } },
           { level: 'Support Staff', label: 'Support Staff', workDays: 'Mon, Wed, Thu, Fri', ent: { SSL: 20, SL: 7 } },
           { level: 'Cleaning Staff', label: 'Cleaning Staff', workDays: 'Fri', ent: { CSL: 3, SL: 7 } },
+          { level: 'Technical Staff', label: 'Technical Staff', workDays: 'Mon, Wed, Thu, Fri, Sun', ent: { SSL: 20, SL: 7 } },
           { level: 'Administrator', label: 'Administrator', workDays: 'Mon, Wed, Thu, Fri', ent: {} }
         ],
         staff: staff,

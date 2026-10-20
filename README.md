@@ -20,7 +20,7 @@ Open `web/index.html` in a browser before you set anything up: with no API URL c
 - **Year planner** – a 12-month view per person with their balances and requests for that leave year.
 - **Working days per person** – each staff category has default working days, and any person can have their own (Pastoral Staff work Mon and Wed–Sun, Support Staff Mon and Wed–Fri, Cleaning Staff Fridays only). Only a person's own working days come off their balance; public holidays never do.
 - **No carry-over** – unused leave must be taken by 1 February of the next year, then it's lost.
-- **Allowances by category** – Pastoral Staff, Support Staff and Cleaning Staff each get their own allowance per leave type. A blank cell means that leave type isn't offered to that category.
+- **Allowances by category** – Pastoral, Support, Technical and Cleaning Staff each get their own allowance per leave type. A blank cell means that leave type isn't offered to that category.
 - **Weekend Off** – Pastoral Staff only: one weekend (Friday to Sunday) per school term, so 4 a year. School term dates live on the **School Terms** tab.
 - **Sabbatical Leave** – Pastoral Staff only: 12.5 calendar days a year build up from each person's start date. After 7 years that's 87.5 calendar days, about 3 months. The saved balance stops growing at 87.5.
 - **Reports** – everyone can print or save as PDF a formal leave report for any leave year (details, balances, every request, signature lines). The Administrator can also print any one employee's report, an all-staff summary, or a full report with a page per person.

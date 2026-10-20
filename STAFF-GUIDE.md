@@ -42,7 +42,7 @@ The Overview opens first and shows your own leave at a glance.
 
 1. Click **Request leave** (top of the left panel, or **+ Request** on a phone). You can also click an empty day on your own row of the **Wallchart**.
 2. Choose the **Leave type**. You only see the types your staff category gets.
-3. Pick the **First day** and **Last day**. For one day, pick the same date twice.
+3. Pick the **First day** and **Last day**. The Last day fills in with the same date, so for one day you're done; for longer, change the Last day.
 4. For a single day you can choose **Morning** or **Afternoon** for a half day (not for every leave type).
 5. Add a **note** for the Administrator if you like.
 6. Check the grey box: it shows how many days this uses and what you'll have left. A red message means the request can't be sent yet and says why.
@@ -67,7 +67,7 @@ What you get depends on your staff category. The leave year runs 1 January to 31
 | Working Away from Office | 21 days | – | – | Working days |
 | Unpaid Leave | Any | Any | Any | Doesn't use an allowance |
 
-Usual working days: Pastoral Staff Mon and Wed–Sun; Support Staff Mon and Wed–Fri; Cleaning Staff Fridays. Yours may differ; the Overview shows your own.
+Usual working days: Pastoral Staff Mon and Wed–Sun; Support Staff Mon and Wed–Fri; Technical Staff Mon, Wed–Fri and Sun; Cleaning Staff Fridays. Technical Staff get the same allowances as Support Staff (Support Staff Leave and Sick Leave). Yours may differ; the Overview shows your own.
 
 **No carry-over — use it by 1 February.** Unused Pastoral, Support and Cleaning Staff Leave can still be taken up to and including 1 February of the next year. After that it's lost. Leave you take in January uses last year's days first. Sick Leave, Weekend Off and Working Away start fresh each 1 January.
 
