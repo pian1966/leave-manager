@@ -74,7 +74,8 @@ The person gets an email with your decision and note. Approving a request that b
 
 - **Book:** click **Book leave**, choose the person under **For**, then the leave type and dates. It's approved straight away and the person is emailed. Use this for leave agreed in person, or sick leave someone phones in.
 - **Cancel:** open the leave (on any calendar, or Employees) and click **Cancel this leave**. Staff can only cancel their own leave before it starts; you can cancel any leave.
-- **Change dates or type:** cancel, then book again.
+- **Correct a request** (wrong type, dates, half day or note): open it and click **Change**. Your changes keep it approved (or waiting, if it hadn't been decided yet), the person is emailed, and History records what it was before. This works even after the leave has started or ended.
+- **When staff correct their own leave:** a request that's still waiting just stays waiting. If it was already **approved**, it comes back to you as **waiting for approval**, and the email says *Changed leave request* and lists what changed. Staff can't change leave that has already started.
 
 <p><img src="docs/images/a-book.png" alt="Booking leave for Pieter, with a Christmas cover warning" width="100%"></p>
 

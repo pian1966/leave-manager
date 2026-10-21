@@ -115,7 +115,10 @@ The Administrator gets an email straight away and approves or declines it. You g
 
 **To cancel:** click the request (under **My leave**, or on any calendar), then **Cancel this leave** and confirm. You can cancel a pending request at any time, and approved leave until the day it starts. Once leave has started, ask the Administrator.
 
-**To change dates:** cancel the request and send a new one.
+**To correct a request** (wrong leave type, wrong dates, half day or note): open it and tap **Change**, fix what's wrong, then **Save changes**.
+- While it's still waiting for approval, it simply stays waiting with the corrections.
+- If it was already approved, it goes back to the Administrator to **approve again** (you'll see a note saying so before you save).
+- Once the leave has started, ask the Administrator to correct it.
 
 <p><img src="docs/images/d-detail.png" alt="A request opened to see its details, with the Cancel this leave button" width="100%"></p>
 <p><em>Click any request to see its status and details. Cancel this leave is at the bottom.</em></p>

@@ -1051,11 +1051,13 @@
     decline: { label: 'Declined', colour: 'var(--bad)' },
     cancel: { label: 'Cancelled', colour: 'var(--warn)' },
     problem: { label: 'Form problem', colour: 'var(--bad)' },
-    setting: { label: 'Settings change', colour: 'var(--muted)' }
+    setting: { label: 'Settings change', colour: 'var(--muted)' },
+    change: { label: 'Changed', colour: '#7C3AED' }
   };
   function histKind(action) {
     var a = String(action || '').toLowerCase();
     if (a.indexOf('stand-in') >= 0 || a.indexOf('automatic emails') >= 0) return 'setting';
+    if (a.indexOf('changed') === 0) return 'change';
     if (a.indexOf('not booked') >= 0) return 'problem';
     if (a.indexOf('booked by') >= 0) return 'booked';
     if (a.indexOf('approved') === 0) return 'approve';
@@ -1100,6 +1102,13 @@
     if (k === 'cancel') {
       var was = /was approved/i.test(h.action) ? 'approved ' : /waiting/i.test(h.action) ? 'pending ' : '';
       return (own ? staff + ' cancelled their own ' : who + ' cancelled ' + staff + '’s ') + was + type;
+    }
+    if (k === 'change') return (own ? staff + ' changed their own ' : who + ' changed ' + staff + '’s ') + 'leave, now ' + type +
+      (/again/i.test(h.action) ? ' <span class="muted">(needs approval again)</span>' : '');
+    if (k === 'setting') {
+      if (/automatic emails/i.test(h.action)) return who + ' changed the automatic emails';
+      if (/removed/i.test(h.action)) return who + ' removed the stand-in approver';
+      return who + ' made ' + staff + ' stand-in approver';
     }
     return staff + '’s Google Form request for ' + type + ' couldn’t be booked';
   }
@@ -1497,11 +1506,13 @@
     if (f) f.focus();
   }
   /** While someone must choose their own PIN, that window can't be closed (except by signing out). */
-  function closeModal(force) { if (S.pinRequired && !force) return; modalRoot.innerHTML = ''; }
+  function closeModal(force) { if (S.pinRequired && !force) return; modalRoot.innerHTML = ''; S.editId = null; }
 
   function requestModal(pre) {
     pre = pre || {};
-    var u = me();
+    var u = me(), ed = pre.edit || null;
+    S.editId = ed ? ed.id : null;
+    if (ed) return editModal(ed);
     var targets = sortedStaff().filter(function (s) { return s.id === u.id || canManage(s); });
     if (!targets.length) { toast('There’s nobody whose leave you can book.', true); return; }
     var who = pre.staffId || (takesLeave(u) ? u.id : targets[0].id);
@@ -1518,6 +1529,33 @@
       '<div class="actions"><button type="button" class="btn" data-act="close">Cancel</button><button type="submit" class="btn primary" id="f-go">' + (takesLeave(u) ? 'Send request' : 'Book leave') + '</button></div></form>';
     openModal(html, 'Request leave');
     updateRequestSummary();
+  }
+  /** The request form, filled in with an existing request so it can be corrected. */
+  function editModal(r) {
+    var u = me(), st = staffById(r.staffId), admin = isMgr(), mine = r.staffId === u.id;
+    var willReapprove = !admin && r.status === 'Approved';
+    var html = '<header><div><p class="eyebrow">Change leave' + (mine ? '' : ' · ' + esc(st.name)) + '</p><h2>Correct this request</h2></div><button class="x" data-act="close" aria-label="Close">×</button></header><form id="reqForm" novalidate>' +
+      '<input type="hidden" id="f-staff" value="' + esc(r.staffId) + '">' +
+      '<label class="field">Leave type<select id="f-type">' + typeOptions(st, r.type) + '</select></label>' +
+      '<div class="two"><label class="field">First day<input type="date" id="f-start" required value="' + esc(r.start) + '"></label>' +
+      '<label class="field">Last day<input type="date" id="f-end" required value="' + esc(r.end) + '" min="' + esc(r.start) + '"></label></div>' +
+      '<div class="field" id="f-half-wrap" hidden><span>Length</span><div class="radios">' + [['None', 'Full day'], ['AM', 'Morning'], ['PM', 'Afternoon']].map(function (h) {
+        return '<label><input type="radio" name="half" value="' + h[0] + '"' + ((r.half || 'None') === h[0] ? ' checked' : '') + '>' + h[1] + '</label>'; }).join('') + '</div></div>' +
+      '<label class="field"><span>Note for the Administrator' + (admin ? ' <span class="muted" style="font-weight:400">(optional)</span>' : ' <span class="req" aria-hidden="true">*</span>') + '</span><textarea id="f-reason" rows="2" maxlength="500">' + esc(r.reason || '') + '</textarea></label>' +
+      '<div class="summary" id="f-sum"></div><div id="f-err"></div>' +
+      (willReapprove ? '<p class="covwarn" style="margin-top:0"><b>Needs approval again</b><span>This leave is already approved. After you change it, it goes back to the Administrator to approve.</span></p>' :
+        admin ? '<p class="muted small">' + esc(firstName(st.name)) + ' will be emailed about the change. It stays ' + esc(r.status.toLowerCase()) + '.</p>' : '') +
+      '<div class="actions"><button type="button" class="btn" data-act="close">Cancel</button><button type="submit" class="btn primary" id="f-go">Save changes</button></div></form>';
+    openModal(html, 'Change leave');
+    var startEl = document.getElementById('f-start'); if (startEl) startEl.dataset.prev = r.start;
+    updateRequestSummary();
+  }
+  /** Leave data without the request being changed, so its own days don't count against it. */
+  function dataForForm() {
+    if (!S.editId) return S.data;
+    var d = {}; for (var k in S.data) d[k] = S.data[k];
+    d.requests = S.data.requests.filter(function (x) { return x.id !== S.editId; });
+    return d;
   }
   function typeOptions(st, current) {
     return S.data.types.filter(function (t) { return C.offered(S.data, st, t); }).map(function (t) {
@@ -1566,7 +1604,7 @@
     var line2 = '';
     var useAmt = t && !C.isDayUnit(t) ? (n ? C.amount(r, t, CTX) : 0) : n;
     if (t && t.deducts && st && n && C.offered(S.data, st, t)) {
-      var y = C.lyOf(r.start, CTX.S), b = C.balances(S.data, st.id, y)[t.code];
+      var y = C.lyOf(r.start, CTX.S), b = C.balances(dataForForm(), st.id, y)[t.code];
       if (b.lastYear && r.start <= b.lastYear.until) b = { available: b.available + b.lastYear.left };
       line2 = '<span>' + esc(t.name) + ': ' + C.fmtAmount(t, b.available) + ' available → <b class="' + (b.available - useAmt < 0 ? 'low' : '') + '">' + C.fmtDays(b.available - useAmt) + ' after this</b></span>';
     } else if (t && !t.deducts) line2 = '<span class="muted">' + esc(t.name) + ' doesn’t use any allowance.</span>';
@@ -1575,10 +1613,10 @@
       (t && t.allowedDays ? '<span class="muted small">' + esc(t.name) + ' can only be booked on ' + esc(C.daysLabel(C.parseDays(t.allowedDays, []))) + (Number(t.perTerm) > 0 ? ', ' + (Number(t.perTerm) === 1 ? 'once' : t.perTerm + ' times') + ' per school term' : '') + '.</span>' : '') +
       (t && st && Number(t.perTerm) > 0 && C.termOf(S.data, r.start) ? '<span class="muted small">Counts as ' + esc(C.termOf(S.data, r.start).name) + '’s ' + esc(t.name) + '.</span>' : '') + line2 +
       (t && t.needsApproval && st && st.id === me().id ? '<span class="muted small">Goes to the Administrator for approval.</span>' : '');
-    var err = st && t ? C.validate(S.data, st, r, undefined, false, isMgr()) : null;
+    var err = st && t ? C.validate(S.data, st, r, S.editId || undefined, false, isMgr()) : null;
     setErr(err || '');
     if (!err && st && t && n) {
-      var cv = C.coverCheck(S.data, st, r);
+      var cv = C.coverCheck(S.data, st, r, S.editId || undefined);
       var warns = cv.block.concat(cv.warn);
       if (warns.length) sum.insertAdjacentHTML('beforeend', coverHtml(warns, isMgr() ? 'As Administrator you can still book it.' : 'You can still send it; the Administrator will see this warning.'));
     }
@@ -1618,6 +1656,7 @@
       (mgr && r.status === 'Pending' ? (function () { var w = reqWarnings(r); return w.length ? coverHtml(w) : ''; })() : '') +
       (mgr && r.status === 'Pending' ? '<label class="field">Note to ' + esc(firstName(st.name)) + ' (optional)<textarea id="note-' + esc(r.id) + '" rows="2"></textarea></label>' : '') +
       '<div class="actions">' + (canCancel ? '<button class="btn bad" data-act="cancel-req" data-id="' + esc(r.id) + '">Cancel this leave</button>' : '') +
+      (!C.editBlock(S.data, me(), r, today) ? '<button class="btn" data-act="edit-req" data-id="' + esc(r.id) + '">Change</button>' : '') +
       (mgr && r.status === 'Pending' ? '<button class="btn bad" data-act="decide" data-d="Declined" data-id="' + esc(r.id) + '">Decline</button><button class="btn ok" data-act="decide" data-d="Approved" data-id="' + esc(r.id) + '">Approve</button>' : '<button class="btn" data-act="close">Close</button>') + '</div>';
     openModal(html, 'Leave details');
   }
@@ -1706,6 +1745,7 @@
         if (installPrompt) { installPrompt.prompt(); installPrompt.userChoice.then(function () { installPrompt = null; render(); }); }
         break;
       case 'new': requestModal(); break;
+      case 'edit-req': { var er = C.findReq(S.data, el.dataset.id); if (er) requestModal({ edit: er }); break; }
       case 'book': requestModal({ date: el.dataset.date, staffId: el.dataset.staff }); break;
       case 'open-req': requestDetail(el.dataset.id); break;
       case 'day': dayDetail(el.dataset.date); break;
@@ -1810,9 +1850,17 @@
     if (ev.target.id === 'reqForm') {
       var r = readReqForm(), btn2 = document.getElementById('f-go');
       if (document.getElementById('f-half-wrap').hidden) r.half = 'None';
-      var st = staffById(r.staffId), err = (r.staffId === me().id && String(r.reason || '').trim().length < 3) ? 'Please add a note for the Administrator saying what the leave is for.' : C.validate(S.data, st, r, undefined, false, isMgr());
+      var st = staffById(r.staffId), err = (r.staffId === me().id && !isMgr() && String(r.reason || '').trim().length < 3) ? 'Please add a note for the Administrator saying what the leave is for.' : C.validate(S.data, st, r, S.editId || undefined, false, isMgr());
       if (err) { setErr(err); return; }
       busy(btn2, true);
+      if (S.editId) {
+        var orig = C.findReq(S.data, S.editId), tNew = C.type(S.data, r.type);
+        var again = !isMgr() && orig && orig.status === 'Approved' && tNew && tNew.needsApproval !== false;
+        r.id = S.editId;
+        call('edit', r, again ? 'Changed – sent to the Administrator to approve again' : (isMgr() && r.staffId !== me().id ? 'Changed – ' + firstName(st.name) + ' has been emailed' : 'Changes saved'))
+          .then(function () { S.editId = null; closeModal(); }).catch(function () { busy(btn2, false); });
+        return;
+      }
       var forOther = r.staffId !== me().id, t = C.type(S.data, r.type);
       call('request', r, forOther ? 'Booked for ' + firstName(st.name) : (t.needsApproval ? 'Request sent to the Administrator' : 'Booked'))
         .then(closeModal).catch(function () { busy(btn2, false); });
@@ -1982,6 +2030,12 @@
           var q = C.prepareDecision(d, u, b.id, b.decision);
           q.req.status = b.decision; q.req.decidedBy = u.name; q.req.decidedOn = nowStr(); q.req.note = String(b.note || '');
           log(b.decision, q.req, q.req.note);
+        } else if (action === 'edit') {
+          var pe = C.prepareEdit(d, u, b.id, b, todayISO());
+          var er2 = pe.req, nx = pe.next;
+          er2.type = nx.type; er2.start = nx.start; er2.end = nx.end; er2.half = nx.half; er2.days = nx.days; er2.reason = nx.reason; er2.status = pe.status;
+          if (pe.status === 'Pending') { er2.decidedBy = ''; er2.decidedOn = ''; } else if (C.isAdmin(u)) { er2.decidedBy = u.name; er2.decidedOn = nowStr(); }
+          log('Changed' + (pe.reapprove ? ' (needs approval again)' : ''), er2, 'Was: ' + pe.changes.join('; '));
         } else if (action === 'emails') {
           if (!C.isAdmin(u)) throw new Error('Only an Administrator can change the automatic emails.');
           d.settings.WeeklyEmail = String(b.weekly || ''); d.settings.ReminderDates = String(b.reminders || '');

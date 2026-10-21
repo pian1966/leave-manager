@@ -744,6 +744,9 @@ function route_(b) {
     case 'setpin':
       setOwnPin_(user, b);
       break;
+    case 'edit':
+      edit_(user, b);
+      break;
     default:
       throw new Error('Unknown action: ' + b.action);
   }
@@ -962,7 +965,7 @@ function mailShell_(data, inner) {
     '<p style="color:#5B6B67;font-size:12px;margin-top:24px">' + esc_(data.settings.CompanyName || 'Team') + ' · Leave Manager</p></div>';
 }
 
-function mailNewRequest_(data, r, st, t) {
+function mailNewRequest_(data, r, st, t, kind, extraHtml) {
   var who = approvers_(data, st);
   if (!who.length) return;
   var c = LeaveCore.ctx(data);
@@ -971,7 +974,8 @@ function mailNewRequest_(data, r, st, t) {
   var warn = r.warnings || (function () { var w = LeaveCore.coverCheck(data, st, r, r.id); return w.block.concat(w.warn); })();
   who.forEach(function (ap, i) {
   var review = reviewLink_(r, ap);
-  var html = '<p><b>' + esc_(st.name) + '</b> has requested <b>' + esc_(t.name) + '</b>.</p>' + warningsHtml_(warn) +
+  var html = (kind === 'changed' ? '<p><b>' + esc_(st.name) + '</b> changed their leave, so it needs your approval again:</p>' + (extraHtml || '') + '<p>It’s now <b>' + esc_(t.name) + '</b>.</p>'
+      : '<p><b>' + esc_(st.name) + '</b> has requested <b>' + esc_(t.name) + '</b>.</p>') + warningsHtml_(warn) +
     (ap.standIn ? '<p style="color:#5B6B67">You’re receiving this as the stand-in approver.</p>' : '') +
     '<table style="border-collapse:collapse">' +
     row_('Dates', range_(r)) + row_('Days away', LeaveCore.fmtAmount({ unit: 'Days' }, r.days)) +
@@ -979,7 +983,7 @@ function mailNewRequest_(data, r, st, t) {
     (b && b.entitled != null ? row_('Balance after approval', LeaveCore.fmtAmount(t, b.remaining - amt) + ' of ' + LeaveCore.fmtDays(b.entitled)) : '') +
     (r.reason ? row_('Note', esc_(r.reason)) : '') + '</table>' +
     (review ? '<p style="margin-top:20px"><a href="' + review + '" style="background:#0F6E5C;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">Review request</a></p>' : '');
-  var opt = { to: ap.email, subject: (warn.length ? '⚠ ' : '') + 'Leave request: ' + st.name + ' – ' + t.name + ' (' + range_(r) + ')', htmlBody: mailShell_(data, html), replyTo: st.email };
+  var opt = { to: ap.email, subject: (warn.length ? '⚠ ' : '') + (kind === 'changed' ? 'Changed leave request: ' : 'Leave request: ') + st.name + ' – ' + t.name + ' (' + range_(r) + ')', htmlBody: mailShell_(data, html), replyTo: st.email };
   if (i === 0 && data.settings.NotifyEmail) opt.cc = String(data.settings.NotifyEmail);
   MailApp.sendEmail(opt);
   });
@@ -1344,4 +1348,39 @@ function renameCategory_(e) {
     cells.setValues(vals);
     rng.getSheet().getParent().toast(n + ' staff member' + (n > 1 ? 's' : '') + ' moved from “' + oldName + '” to “' + newName + '” on the Staff tab.', 'Leave Manager', 6);
   }
+}
+
+
+/* ============================ CHANGING A REQUEST ============================ */
+
+/** Changes a request's type, dates, half day or note (same request ID). Staff changes to approved leave need re-approval. */
+function edit_(actor, b) {
+  return withLock_(function () {
+    var data = loadData_();
+    var p = LeaveCore.prepareEdit(data, actor, String(b.id || ''), b, todayStr_());
+    var r = p.req, n = p.next, now = nowStr_();
+    var cells = { 'Type': n.type, 'Start': n.start, 'End': n.end, 'Half Day': n.half, 'Days': n.days, 'Reason': n.reason, 'Status': p.status };
+    if (p.status === 'Pending') { cells['Decided By'] = ''; cells['Decided On'] = ''; }
+    else if (LeaveCore.isAdmin(actor)) { cells['Decided By'] = actor.name; cells['Decided On'] = now; }
+    else if (p.reapprove === false && p.was.status !== 'Approved') { cells['Decided By'] = 'Auto-approved'; cells['Decided On'] = now; }
+    setCells_(SHEET.REQ, r._row, cells);
+    removeCalendar_(data, r);
+    var updated = { id: r.id, _row: r._row, staffId: r.staffId, type: n.type, start: n.start, end: n.end, half: n.half, days: n.days, reason: n.reason, status: p.status, warnings: n.warnings };
+    if (p.status === 'Approved') syncCalendar_(data, updated, p.staff, p.type);
+    logHistory_('Changed' + (p.reapprove ? ' (needs approval again)' : ''), updated, p.staff.name, p.type.name, actor.name, 'Was: ' + p.changes.join('; '));
+    var changeList = '<ul>' + p.changes.map(function (c) { return '<li>' + esc_(c) + '</li>'; }).join('') + '</ul>';
+    if (actor.id === p.staff.id) {
+      // The person changed their own leave: tell the approvers.
+      if (p.status === 'Pending') mailNewRequest_(data, updated, p.staff, p.type, 'changed', changeList);
+      else approvers_(data, p.staff).forEach(function (ap) {
+        MailApp.sendEmail({ to: ap.email, subject: p.staff.name + ' changed their ' + p.type.name + ' (' + range_(updated) + ')',
+          htmlBody: mailShell_(data, '<p><b>' + esc_(p.staff.name) + '</b> changed their leave. No approval is needed for ' + esc_(p.type.name) + '.</p>' + changeList) });
+      });
+    } else if (p.staff.email && p.staff.email.indexOf('@example.com') < 0) {
+      MailApp.sendEmail({ to: p.staff.email, subject: 'Your leave was changed: ' + p.type.name + ' (' + range_(updated) + ')',
+        htmlBody: mailShell_(data, '<p>' + esc_(actor.name) + ' changed your leave:</p>' + changeList +
+          '<p>It’s now <b>' + esc_(p.type.name) + '</b>, ' + range_(updated) + ' (' + LeaveCore.fmtAmount({ unit: 'Days' }, n.days) + '), ' + p.status.toLowerCase() + '.</p>') });
+    }
+    return updated;
+  });
 }

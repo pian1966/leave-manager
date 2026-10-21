@@ -591,6 +591,48 @@ var LeaveCore = (function () {
     return { req: r, staff: st, type: type(data, r.type) };
   }
 
+  /** Can this person change this request? Returns '' if yes, otherwise the reason why not. */
+  function editBlock(data, actor, r, todayStr) {
+    if (!r) return 'That request no longer exists.';
+    if (r.status !== 'Pending' && r.status !== 'Approved') return 'Only leave that’s waiting or approved can be changed.';
+    if (isAdmin(actor)) return '';
+    if (r.staffId !== actor.id) return 'You can only change your own leave.';
+    if (r.status === 'Approved' && r.start <= todayStr) return 'This leave has already started. Ask the Administrator to change it.';
+    return '';
+  }
+  /**
+   * Changes a request's leave type, dates, half day or note.
+   * Staff changing approved leave send it back for approval (unless the new type needs none).
+   * The Administrator's changes keep the request's status.
+   */
+  function prepareEdit(data, actor, id, b, todayStr) {
+    var r = findReq(data, id), why = editBlock(data, actor, r, todayStr);
+    if (why) throw new Error(why);
+    var st = staffById(data, r.staffId), admin = isAdmin(actor), oldT = type(data, r.type);
+    var t0 = type(data, String(b.type || ''));
+    var next = {
+      staffId: r.staffId, type: String(b.type || ''),
+      start: String(b.start || '').slice(0, 10), end: String(b.end || b.start || '').slice(0, 10),
+      half: (b.half === 'AM' || b.half === 'PM') && isDayUnit(t0) ? b.half : 'None',
+      reason: String(b.reason == null ? r.reason : b.reason).slice(0, 500)
+    };
+    if (!admin && next.reason.trim().length < 3) throw new Error(NOTE_NEEDED);
+    var err = validate(data, st, next, r.id, false, admin);
+    if (err) throw new Error(err);
+    var t = type(data, next.type), c = ctx(data);
+    next.days = countDays(next, c);
+    var changes = [];
+    if (next.type !== r.type) changes.push((oldT ? oldT.name : r.type) + ' → ' + t.name);
+    if (next.start !== r.start || next.end !== r.end || (next.half || 'None') !== (r.half || 'None')) changes.push(niceRange(r) + ' → ' + niceRange(next));
+    if (next.reason !== (r.reason || '')) changes.push('note changed');
+    if (!changes.length) throw new Error('Nothing has changed.');
+    var status = admin ? r.status : (t.needsApproval === false ? 'Approved' : 'Pending');
+    var cw = coverCheck(data, st, next, r.id);
+    next.warnings = cw.block.concat(cw.warn);
+    return { req: r, staff: st, type: t, oldType: oldT, next: next, status: status, changes: changes,
+      reapprove: r.status === 'Approved' && status === 'Pending', was: { type: r.type, start: r.start, end: r.end, half: r.half, status: r.status } };
+  }
+
   function prepareCancel(data, actor, id, todayStr) {
     var r = findReq(data, id);
     if (!r) throw new Error('That request no longer exists.');
@@ -632,7 +674,7 @@ var LeaveCore = (function () {
     lyOf: lyOf, lyLabel: lyLabel, lyRange: lyRange, graceEnd: graceEnd, parseMonthDay: parseMonthDay, terms: terms, termOf: termOf, termBookings: termBookings,
     type: type, staffById: staffById, level: level, catKey: catKey, canManage: canManage, isAdmin: isAdmin, tracksLeave: tracksLeave, offered: offered, yearAllowance: yearAllowance,
     balances: balances, validate: validate, fmtDays: fmtDays, findReq: findReq,
-    prepareRequest: prepareRequest, prepareDecision: prepareDecision, prepareCancel: prepareCancel,
+    prepareRequest: prepareRequest, prepareDecision: prepareDecision, prepareCancel: prepareCancel, prepareEdit: prepareEdit, editBlock: editBlock,
     publicView: publicView,
     standInId: standInId, applyStandIn: applyStandIn,
     ruleDate: ruleDate, ruleCovers: ruleCovers, coverCheck: coverCheck, coverBreaches: coverBreaches, useItOrLoseIt: useItOrLoseIt
