@@ -50,7 +50,18 @@
     if (!ly || todayISO() > ly.until) return '';
     return '<br><b class="ly">+ ' + C.fmtDays(ly.left) + ' left from ' + esc(lyName(ly.fromYear)) + ' · use by ' + esc(fmt(ly.until)) + '</b>';
   }
-  function catName(st) { return st && st.level ? st.level : ''; }
+  function catName(st) { if (!st || !st.level) return ''; var lv = S.data && C.level(S.data, st); return lv ? lv.level : st.level; }
+  /** Active staff whose category on the Staff tab doesn't match any row on the Categories tab. */
+  function badCategories() {
+    return S.data.staff.filter(function (st) { return st.active !== false && C.tracksLeave(st) && !C.level(S.data, st); });
+  }
+  function badCatHtml(list) {
+    if (!list.length) return '';
+    var names = S.data.levels.map(function (l) { return l.level; });
+    return '<div class="covwarn" role="alert"><b>⚠ Check the Staff tab</b>' + list.map(function (st) {
+      return '<span><b>' + esc(st.name) + '</b>: the category “' + esc(st.level || '(blank)') + '” isn’t on the Categories tab, so they get no leave allowances.</span>';
+    }).join('') + '<span class="muted small">Choose one of: ' + esc(names.join(', ')) + '. Then reload Leave Manager.</span></div>';
+  }
   function workLabel(st) { return C.daysLabel(C.staffDays(CTX, st.id)); }
   function initials(name) { return String(name).split(/\s+/).filter(Boolean).map(function (w) { return w[0]; }).slice(0, 2).join('').toUpperCase(); }
   function firstName(name) { return String(name).split(' ')[0]; }
@@ -690,7 +701,7 @@
       title: 'Dashboard',
       sub: esc(fmtLong(today)) + ' · ' + esc(settings().CompanyName || 'Leave Manager'),
       controls: '<button class="btn" data-act="nav" data-view="reports">Reports</button>',
-      body: tiles + '<div class="dash">' + '<div class="dash-col">' + waiting + cover + useIt + months + '</div><div class="dash-col">' + standIn + sickHtml + '</div></div>'
+      body: badCatHtml(badCategories()) + tiles + '<div class="dash">' + '<div class="dash-col">' + waiting + cover + useIt + months + '</div><div class="dash-col">' + standIn + sickHtml + '</div></div>'
     };
   };
 
@@ -1403,6 +1414,7 @@
       controls: '<div class="seg"><button data-act="eprev" aria-label="Previous leave year">‹</button><button data-act="ethis">' + esc(lyName(y)) + '</button><button data-act="enext" aria-label="Next leave year">›</button></div>',
       body: '<div class="emp-layout"><nav class="emp-list panel" aria-label="Employees">' + list + '</nav>' +
         '<section class="emp-detail">' + personSel + (st ? '<div class="panel emp-head"><div class="who">' + av(st, true) + '<div><h2>' + esc(st.name) + '</h2>' +
+          (C.tracksLeave(st) && !C.level(S.data, st) ? badCatHtml([st]) : '') +
           '<p class="muted">' + esc(catName(st)) + ' · works ' + esc(workLabel(st)) + ' · ' + esc(st.role) + (st.start ? ' · started ' + esc(fmt(st.start, true)) : '') + (typeof st.pinChosen === 'boolean' ? ' · ' + (st.pinChosen ? 'has chosen their own PIN' : 'still on the PIN you gave them') : '') + '</p>' +
           '<p class="small">' + esc(st.email) + '</p></div></div><div class="emp-bal small">' + balLine + '</div></div>' +
           '<div class="emp-filters"><label class="field">Leave type<select id="emp-type">' + typeOpts + '</select></label>' +

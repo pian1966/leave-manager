@@ -307,6 +307,7 @@ function build_(ss, name, rows) {
 var COLOUR_COLS_ = { 'Staff': 10, 'Leave Types': 3 };
 
 function onEdit(e) {
+  try { renameCategory_(e); } catch (err) { /* never block an edit */ }
   try {
     var sh = e.range.getSheet(), col = COLOUR_COLS_[sh.getName()];
     if (!col || e.range.getLastColumn() < col || e.range.getColumn() > col || e.range.getLastRow() < 2) return;
@@ -1322,4 +1323,23 @@ function setOwnPin_(user, b) {
   if (bad) throw new Error(bad);
   if (pin === current) throw new Error('Choose a PIN that’s different from the one you were given.');
   withLock_(function () { setCells_(SHEET.STAFF, user._row, { 'PIN': 'u:' + hash_(pin).slice(2) }); });
+}
+
+
+/** Renaming a category on the Categories tab renames it for everyone on the Staff tab too. */
+function renameCategory_(e) {
+  var rng = e && e.range;
+  if (!rng || rng.getSheet().getName() !== SHEET.LEVELS || rng.getColumn() !== 1 || rng.getRow() < 2 || rng.getNumRows() !== 1 || rng.getNumColumns() !== 1) return;
+  var oldName = String(e.oldValue == null ? '' : e.oldValue).trim(), newName = String(e.value == null ? '' : e.value).trim();
+  if (!oldName || !newName || LeaveCore.catKey(oldName) === LeaveCore.catKey(newName)) return;
+  var staff = rng.getSheet().getParent().getSheetByName(SHEET.STAFF);
+  if (!staff || staff.getLastRow() < 2) return;
+  var col = HEADERS['Staff'].indexOf('Category') + 1;
+  var cells = staff.getRange(2, col, staff.getLastRow() - 1, 1);
+  var vals = cells.getValues(), n = 0;
+  vals.forEach(function (r) { if (LeaveCore.catKey(r[0]) === LeaveCore.catKey(oldName)) { r[0] = newName; n++; } });
+  if (n) {
+    cells.setValues(vals);
+    rng.getSheet().getParent().toast(n + ' staff member' + (n > 1 ? 's' : '') + ' moved from “' + oldName + '” to “' + newName + '” on the Staff tab.', 'Leave Manager', 6);
+  }
 }

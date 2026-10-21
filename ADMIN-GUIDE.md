@@ -196,6 +196,10 @@ The **Employees** page also shows whether each person has chosen their own PIN y
 
 **Forgotten PIN:** type a new temporary PIN (e.g. 4821) over the old one on the Staff tab and tell them. They sign in with it and choose a new one. People who use **Sign in with Google** don't need a PIN.
 
+**Changing someone's category:** pick the new category from the drop-down in their **Category** cell on the Staff tab, then reload Leave Manager. Their working days and allowances change straight away. Capitals, extra spaces and the style of dash don't matter, but the name must otherwise match a row on the **Categories** tab. If it doesn't, the Dashboard and Employees page show a **⚠ Check the Staff tab** warning naming the person.
+
+**Renaming a category:** change the name on the **Categories** tab. Everyone in that category on the Staff tab is updated to the new name automatically. Also update the name in any **Cover Rules** that mention it.
+
 **Someone leaves:** untick **Active**. Their history is kept, but they can't sign in and don't appear on calendars.
 
 **Colours:** type a hex code (e.g. *#2F6FB3*) in the Colour column, or staff choose their own under My settings.

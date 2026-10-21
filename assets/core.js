@@ -67,7 +67,13 @@ var LeaveCore = (function () {
   function find(list, fn) { for (var i = 0; i < list.length; i++) if (fn(list[i])) return list[i]; return null; }
   function type(data, code) { return find(data.types, function (t) { return t.code === code; }); }
   function staffById(data, id) { return find(data.staff, function (s) { return s.id === id; }); }
-  function level(data, st) { return st ? find(data.levels, function (l) { return String(l.level) === String(st.level); }) : null; }
+  /** Category names are matched loosely: capitals, extra spaces and – / — / - dashes don't matter. */
+  function catKey(v) { return String(v == null ? '' : v).toLowerCase().replace(/[\u2010-\u2015\u2212]/g, '-').replace(/\s*-\s*/g, '-').replace(/\s+/g, ' ').trim(); }
+  function level(data, st) {
+    if (!st) return null;
+    var k = catKey(st.level);
+    return find(data.levels, function (l) { return catKey(l.level) === k; });
+  }
 
   /** Context: church open days, each person's working days, holiday lookup and leave-year start month. */
   function ctx(data) {
@@ -264,8 +270,8 @@ var LeaveCore = (function () {
   function inRuleGroup(rule, st) {
     if (!st || !tracksLeave(st) || st.active === false) return false;
     var cats = ruleCats(rule);
-    var lv = String(st.level || '').trim().toLowerCase();
-    return !cats.length || cats.some(function (c) { return lv === c || (c.indexOf(' ') > 0 && lv.slice(-(c.length + 1)) === ' ' + c); });
+    var lv = catKey(st.level);
+    return !cats.length || cats.map(catKey).some(function (c) { return lv === c || (c.indexOf(' ') > 0 && lv.slice(-(c.length + 1)) === ' ' + c); });
   }
   function activeRules(data) {
     return (data.rules || []).filter(function (r) { return r && r.active !== false && r.kind; });
@@ -352,7 +358,7 @@ var LeaveCore = (function () {
     return out;
   }
   /** People in the "Administrator" category manage leave but don't take leave in the planner. */
-  function tracksLeave(st) { return !!st && !/^administrators?$/i.test(String(st.level || '').trim()); }
+  function tracksLeave(st) { return !!st && !/^administrators?$/.test(catKey(st.level)); }
 
   /** Is this leave type open to this person's category? Types that use an allowance need a number on the Categories tab. */
   function offered(data, st, t) {
@@ -622,7 +628,7 @@ var LeaveCore = (function () {
     dayList: dayList, countDays: countDays, isDayUnit: isDayUnit, isCalendarUnit: isCalendarUnit, unitName: unitName, fmtAmount: fmtAmount, amount: amount,
     easter: easter, saPublicHolidays: saPublicHolidays,
     lyOf: lyOf, lyLabel: lyLabel, lyRange: lyRange, graceEnd: graceEnd, parseMonthDay: parseMonthDay, terms: terms, termOf: termOf, termBookings: termBookings,
-    type: type, staffById: staffById, level: level, canManage: canManage, isAdmin: isAdmin, tracksLeave: tracksLeave, offered: offered, yearAllowance: yearAllowance,
+    type: type, staffById: staffById, level: level, catKey: catKey, canManage: canManage, isAdmin: isAdmin, tracksLeave: tracksLeave, offered: offered, yearAllowance: yearAllowance,
     balances: balances, validate: validate, fmtDays: fmtDays, findReq: findReq,
     prepareRequest: prepareRequest, prepareDecision: prepareDecision, prepareCancel: prepareCancel,
     publicView: publicView,
