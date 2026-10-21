@@ -1674,8 +1674,19 @@
     d.requests = S.data.requests.filter(function (x) { return x.id !== S.editId; });
     return d;
   }
+  /** Order in the leave-type list: their own staff leave first, then Weekend Off, then the rest, with Sick Leave last. */
+  function typeRank(t) {
+    if (t.code === 'SL' || /sick/i.test(t.name)) return 9;
+    if (/^(PSL|SSL|CSL|TSL)$/.test(t.code) || /staff leave/i.test(t.name)) return 0;
+    if (t.code === 'WO' || /weekend/i.test(t.name)) return 1;
+    return 2;
+  }
   function typeOptions(st, current) {
-    return S.data.types.filter(function (t) { return C.offered(S.data, st, t); }).map(function (t) {
+    var list = S.data.types.filter(function (t) { return C.offered(S.data, st, t); })
+      .map(function (t, i) { return { t: t, i: i }; })
+      .sort(function (a, b) { return (typeRank(a.t) - typeRank(b.t)) || (a.i - b.i); })
+      .map(function (x) { return x.t; });
+    return list.map(function (t) {
       return '<option value="' + esc(t.code) + '"' + (t.code === current ? ' selected' : '') + '>' + esc(t.name) + (t.deducts ? '' : ' (doesn’t use an allowance)') + '</option>';
     }).join('');
   }

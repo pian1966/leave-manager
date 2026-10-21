@@ -285,7 +285,7 @@ function formatRules_(sh) {
  * Brings the workbook up to date for new features, once (tracked in Script Properties).
  * Runs automatically on the first app request after an update, and from setup.
  */
-var SCHEMA_VERSION_ = '5';
+var SCHEMA_VERSION_ = '6';
 function upgrade_(force) {
   var P = PropertiesService.getScriptProperties();
   if (!force && P.getProperty('SCHEMA') === SCHEMA_VERSION_) return;
@@ -1163,7 +1163,7 @@ function refreshForm() {
   var form = FormApp.openById(String(id));
   form.getItems().forEach(function (it) {
     if (it.getTitle() === FORM_Q.NAME) it.asListItem().setChoiceValues(data.staff.filter(function (s) { return s.active; }).map(function (s) { return s.name; }));
-    if (it.getTitle() === FORM_Q.TYPE) it.asListItem().setChoiceValues(data.types.map(function (t) { return t.name; }));
+    if (it.getTitle() === FORM_Q.TYPE) it.asListItem().setChoiceValues(formTypeNames_(data));
     if (it.getTitle() === FORM_Q.NOTE) it.asParagraphTextItem().setRequired(true).setHelpText('What is the leave for? e.g. family visit, doctor’s appointment');
   });
 }
@@ -1615,4 +1615,18 @@ function setRuleDates(row, from, to) {
   var rng = sh.getRange(row, 5, 1, 2);
   rng.setNumberFormat('@');
   rng.setValues([[String(from || ''), String(to || '')]]); dirty_();
+}
+
+
+/** Leave types for the Google Form, in the same order as the app: staff leave, Weekend Off, the rest, Sick Leave last. */
+function formTypeNames_(data) {
+  var rank = function (t) {
+    if (t.code === 'SL' || /sick/i.test(t.name)) return 9;
+    if (/^(PSL|SSL|CSL|TSL)$/.test(t.code) || /staff leave/i.test(t.name)) return 0;
+    if (t.code === 'WO' || /weekend/i.test(t.name)) return 1;
+    return 2;
+  };
+  return data.types.map(function (t, i) { return { t: t, i: i }; })
+    .sort(function (a, b) { return (rank(a.t) - rank(b.t)) || (a.i - b.i); })
+    .map(function (x) { return x.t.name; });
 }
