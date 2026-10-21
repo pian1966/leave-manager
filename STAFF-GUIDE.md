@@ -139,6 +139,7 @@ Use the left panel (on a phone, the tabs along the bottom).
 - **Shaded day** — a day that person doesn't work.
 - **Hatched “Closed” column** — the church is closed (Tuesdays).
 - **Yellow day / outlined date** — a public holiday.
+- **⛔ No leave** — the Administrator has blocked these days (e.g. Christmas services or a church camp). Leave can't be requested then, or only with a warning.
 
 Hold your mouse over any leave-type label to see its full name and how it works. Click the leave-type buttons above a calendar to hide or show that type, or **Pending requests** to hide leave that isn't approved yet. You see when colleagues are away, but not their notes or balances.
 

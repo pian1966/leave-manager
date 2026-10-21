@@ -664,7 +664,7 @@ function loadData_() {
     var txt = function (v) { return v instanceof Date ? Utilities.formatDate(v, tz_(), 'yyyy-MM-dd') : String(v == null ? '' : v).trim(); };
     return { name: String(r.Rule || '').trim(), kind: String(r.Type || '').trim(), category: String(r.Category || '').trim(),
       days: txt(r.Days), from: txt(r.From), to: txt(r.To), min: Number(r.Minimum) || 0, action: String(r.Action || 'Warn').trim(),
-      message: String(r.Message || '').trim(), active: r.Active === '' ? true : B(r.Active) };
+      message: String(r.Message || '').trim(), active: r.Active === '' ? true : B(r.Active), id: 'R' + r._row };
   });
   var data = { settings: settings, types: types, levels: levels, staff: staff, holidays: holidays, terms: terms, requests: requests, adjustments: adjustments, rules: rules };
   LeaveCore.applyStandIn(data, todayStr_());
@@ -746,6 +746,12 @@ function route_(b) {
       break;
     case 'edit':
       edit_(user, b);
+      break;
+    case 'rule-save':
+      saveRule_(user, b);
+      break;
+    case 'rule-delete':
+      deleteRule_(user, b);
       break;
     default:
       throw new Error('Unknown action: ' + b.action);
@@ -1382,5 +1388,58 @@ function edit_(actor, b) {
           '<p>It’s now <b>' + esc_(p.type.name) + '</b>, ' + range_(updated) + ' (' + LeaveCore.fmtAmount({ unit: 'Days' }, n.days) + '), ' + p.status.toLowerCase() + '.</p>') });
     }
     return updated;
+  });
+}
+
+
+/* ========================= BLOCKED DAYS (Cover Rules) ========================= */
+
+function rulesSheet_() { return ss_().getSheetByName(SHEET.RULES) || buildRules_(ss_()); }
+function ruleRow_(id) {
+  var row = Number(String(id || '').replace(/^R/, ''));
+  var sh = rulesSheet_();
+  if (!(row >= 2) || row > sh.getLastRow() || String(sh.getRange(row, 1).getValue()).trim() === '') throw new Error('That rule is no longer on the Cover Rules tab. Reload Leave Manager.');
+  return row;
+}
+/** Administrator: add or change a "No leave" period (or switch any rule on/off). */
+function saveRule_(user, b) {
+  if (!LeaveCore.isAdmin(user)) throw new Error('Only an Administrator can change blocked days.');
+  withLock_(function () {
+    var sh = rulesSheet_();
+    if (b.id && b.toggle) {   // just switch on/off
+      var r0 = ruleRow_(b.id);
+      setCells_(SHEET.RULES, r0, { 'Active': !!b.active });
+      logHistory_('Blocked days ' + (b.active ? 'switched on' : 'switched off'), {}, '', '', user.name, String(sh.getRange(r0, 1).getValue()));
+      return;
+    }
+    var name = String(b.name || '').trim(), from = String(b.from || '').trim(), to = String(b.to || from).trim();
+    var action = /^warn$/i.test(String(b.action)) ? 'Warn' : 'Block';
+    if (!name) throw new Error('Give the blocked days a name, e.g. Christmas services.');
+    var y = Number(todayStr_().slice(0, 4));
+    if (!LeaveCore.ruleDate(from, y) || !LeaveCore.ruleDate(to, y)) throw new Error('Choose the first and last day.');
+    if (LeaveCore.isISO(from) && LeaveCore.isISO(to) && to < from) throw new Error('The last day is before the first day.');
+    var values = [name, 'No leave', String(b.category || '').trim(), '', from, to, '', action, String(b.message || '').trim().slice(0, 300), b.active !== false];
+    var row;
+    if (b.id) row = ruleRow_(b.id);
+    else {
+      row = 2;
+      if (sh.getLastRow() >= 2) {
+        var a = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues(), last = 0;
+        a.forEach(function (r, i) { if (String(r[0]).trim() !== '') last = i + 1; });
+        row = last + 2;
+      }
+    }
+    sh.getRange(row, 4, 1, 3).setNumberFormat('@');   // keep "24 Dec" as text so it means every year
+    sh.getRange(row, 1, 1, values.length).setValues([values]);
+    try { sh.getRange(row, 10).insertCheckboxes(); sh.getRange(row, 10).setValue(b.active !== false); } catch (e) { /* not important */ }
+    logHistory_(b.id ? 'Blocked days changed' : 'Blocked days added', {}, '', '', user.name, name + ': ' + from + (to !== from ? ' to ' + to : ''));
+  });
+}
+function deleteRule_(user, b) {
+  if (!LeaveCore.isAdmin(user)) throw new Error('Only an Administrator can change blocked days.');
+  withLock_(function () {
+    var row = ruleRow_(b.id), sh = rulesSheet_(), name = String(sh.getRange(row, 1).getValue());
+    sh.deleteRow(row);
+    logHistory_('Blocked days removed', {}, '', '', user.name, name);
   });
 }

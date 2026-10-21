@@ -322,6 +322,23 @@ var LeaveCore = (function () {
     });
     return out;
   }
+  /** Active "No leave" rules covering this date (for this person, if given). */
+  function noLeaveRules(data, ds, st) {
+    return activeRules(data).filter(function (rule) {
+      return !isMinRule(rule) && ruleCovers(rule, ds) && (!st || inRuleGroup(rule, st));
+    });
+  }
+  /** The next (or current) dates a rule covers, from `today`: { start, end } or null. Ignores the Days column. */
+  function nextOccurrence(rule, today) {
+    var Y = Number(String(today).slice(0, 4));
+    for (var y = Y - 1; y <= Y + 2; y++) {
+      var f = rule.from ? ruleDate(rule.from, y) : '', t = rule.to ? ruleDate(rule.to, y) : f;
+      if (!f) continue;
+      if (t && t < f) t = ruleDate(rule.to, y + 1);
+      if ((t || f) >= today) return { start: f, end: t || f };
+    }
+    return null;
+  }
   /** Days from `from` to `to` where existing approved/pending leave already breaks a "Minimum on duty" rule. */
   function coverBreaches(data, from, to) {
     var out = [], rules = activeRules(data).filter(isMinRule);
@@ -677,7 +694,7 @@ var LeaveCore = (function () {
     prepareRequest: prepareRequest, prepareDecision: prepareDecision, prepareCancel: prepareCancel, prepareEdit: prepareEdit, editBlock: editBlock,
     publicView: publicView,
     standInId: standInId, applyStandIn: applyStandIn,
-    ruleDate: ruleDate, ruleCovers: ruleCovers, coverCheck: coverCheck, coverBreaches: coverBreaches, useItOrLoseIt: useItOrLoseIt
+    ruleDate: ruleDate, ruleCovers: ruleCovers, coverCheck: coverCheck, noLeaveRules: noLeaveRules, nextOccurrence: nextOccurrence, isMinRule: isMinRule, coverBreaches: coverBreaches, useItOrLoseIt: useItOrLoseIt
   };
 })();
 if (typeof module !== 'undefined') module.exports = LeaveCore;

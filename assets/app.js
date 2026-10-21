@@ -702,9 +702,112 @@
       title: 'Dashboard',
       sub: esc(fmtLong(today)) + ' · ' + esc(settings().CompanyName || 'Leave Manager'),
       controls: '<button class="btn" data-act="nav" data-view="reports">Reports</button>',
-      body: badCatHtml(badCategories()) + tiles + '<div class="dash">' + '<div class="dash-col">' + waiting + cover + useIt + months + '</div><div class="dash-col">' + standIn + sickHtml + '</div></div>'
+      body: badCatHtml(badCategories()) + tiles + '<div class="dash">' + '<div class="dash-col">' + waiting + cover + useIt + months + '</div><div class="dash-col">' + blockedPanel() + standIn + sickHtml + '</div></div>'
     };
   };
+
+
+  /* ---------- Blocked days ("No leave" cover rules) ---------- */
+  var MONTH3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  var EASTER_NAMES = { '-7': 'Palm Sunday', '-3': 'Maundy Thursday', '-2': 'Good Friday', '-1': 'Holy Saturday', '0': 'Easter Sunday', '1': 'Family Day (Easter Monday)' };
+  function easterLabel(n) { return EASTER_NAMES[String(n)] || (n < 0 ? (-n) + ' days before Easter' : n + ' days after Easter'); }
+  function specKind(v) { v = String(v || '').trim(); return /^\d{4}-\d{2}-\d{2}$/.test(v) ? 'once' : /^easter/i.test(v) ? 'easter' : 'yearly'; }
+  function easterN(v) { var m = /^easter\s*([+-]\s*\d+)?$/i.exec(String(v || '').trim()); return m && m[1] ? Number(m[1].replace(/\s/g, '')) : 0; }
+  function specText(v) {
+    var k = specKind(v);
+    if (k === 'once') return fmt(v, true);
+    if (k === 'easter') return easterLabel(easterN(v));
+    var md = C.parseMonthDay(v); return md ? md[1] + ' ' + MONTH3[md[0] - 1] : String(v);
+  }
+  function ruleWhen(rule) {
+    var k = specKind(rule.from), same = !rule.to || rule.to === rule.from;
+    var txt = specText(rule.from) + (same ? '' : ' – ' + specText(rule.to));
+    return txt + (k === 'once' ? '' : ', every year');
+  }
+  function ruleWho(rule) { return rule.category ? rule.category : 'All staff'; }
+  function blockedRules() { return (S.data.rules || []).filter(function (r) { return r.kind && !C.isMinRule(r); }); }
+  function blockedPanel() {
+    var list = blockedRules(), today = todayISO();
+    return '<section class="panel" id="blocked"><h2>Blocked days <small>no leave on these days</small></h2>' +
+      (list.length ? '<div class="list">' + list.map(function (r) {
+        var nx = C.nextOccurrence(r, today), on = r.active !== false, warn = /warn/i.test(r.action);
+        return '<div class="li blk-row' + (on ? '' : ' off') + '"><span class="blk-ico" aria-hidden="true">' + (warn ? '⚠' : '⛔') + '</span>' +
+          '<div class="grow"><b>' + esc(r.name || 'Blocked days') + '</b><span>' + esc(ruleWhen(r)) + ' · ' + esc(ruleWho(r)) + ' · ' + (warn ? 'warning only' : 'blocked') +
+          (on && nx ? '<br>Next: ' + esc(fmtRange({ start: nx.start, end: nx.end })) : '') + (on ? '' : '<br><i>Switched off</i>') + '</span></div>' +
+          '<span class="qd"><label class="sw" title="' + (on ? 'Switch off' : 'Switch on') + '"><input type="checkbox" aria-label="' + esc((r.name || 'Blocked days') + ' on or off') + '" data-rule-toggle="' + esc(r.id || '') + '"' + (on ? ' checked' : '') + (r.id ? '' : ' disabled') + '><span></span></label>' +
+          (r.id ? '<button class="btn small" data-act="blk-edit" data-id="' + esc(r.id) + '">Edit</button>' : '') + '</span></div>';
+      }).join('') + '</div>' : '<p class="muted">No blocked days yet. Add Christmas, Easter or special church events so nobody books leave then.</p>') +
+      '<div class="btns" style="margin-top:12px"><button class="btn primary" data-act="blk-new">+ Add blocked days</button></div>' +
+      '<p class="muted small" style="margin:10px 0 0">Staff see blocked days on the calendars. <b>Blocked</b> stops them sending a request; <b>warning only</b> lets it through with a warning to you. You can always book leave yourself.</p></section>';
+  }
+  function dmSelects(prefix, v) {
+    var md = C.parseMonthDay(v) || [12, 25], d = '', m = '';
+    for (var i = 1; i <= 31; i++) d += '<option' + (i === md[1] ? ' selected' : '') + '>' + i + '</option>';
+    MONTH3.forEach(function (x, i) { m += '<option value="' + x + '"' + (i + 1 === md[0] ? ' selected' : '') + '>' + MONTHS[i] + '</option>'; });
+    return '<span class="dm"><select id="' + prefix + 'd" class="btn" aria-label="Day">' + d + '</select><select id="' + prefix + 'm" class="btn" aria-label="Month">' + m + '</select></span>';
+  }
+  function easterSelect(id, n) {
+    var o = '';
+    for (var i = -7; i <= 7; i++) o += '<option value="' + i + '"' + (i === n ? ' selected' : '') + '>' + esc(easterLabel(i)) + '</option>';
+    return '<select id="' + id + '" class="btn">' + o + '</select>';
+  }
+  function blockedModal(rule) {
+    var r = rule || { name: '', from: '24 Dec', to: '26 Dec', category: '', action: 'Block', message: '', active: true };
+    var mode = specKind(r.from), cats = String(r.category || '').split(',').map(function (x) { return C.catKey(x); }).filter(String);
+    var levels = S.data.levels.filter(function (l) { return C.tracksLeave({ level: l.level }); });
+    var html = '<header><div><p class="eyebrow">Blocked days</p><h2>' + (rule ? 'Change blocked days' : 'Add blocked days') + '</h2></div><button class="x" data-act="close" aria-label="Close">×</button></header>' +
+      '<form id="blkForm" novalidate><input type="hidden" id="rb-id" value="' + esc(r.id || '') + '">' +
+      '<label class="field">Name<input id="rb-name" maxlength="60" value="' + esc(r.name) + '" placeholder="e.g. Christmas services, Church camp"></label>' +
+      '<div class="field"><span>When</span><div class="radios" id="rb-mode">' + [['yearly', 'Same dates every year'], ['easter', 'Around Easter (moves each year)'], ['once', 'One year only']].map(function (o) {
+        return '<label><input type="radio" name="rb-mode" value="' + o[0] + '"' + (mode === o[0] ? ' checked' : '') + '>' + o[1] + '</label>'; }).join('') + '</div></div>' +
+      '<div class="rb-pane" data-mode="yearly"' + (mode === 'yearly' ? '' : ' hidden') + '><div class="two"><div class="field"><span>From</span>' + dmSelects('rb-f', mode === 'yearly' ? r.from : '24 Dec') + '</div><div class="field"><span>To</span>' + dmSelects('rb-t', mode === 'yearly' ? (r.to || r.from) : '26 Dec') + '</div></div></div>' +
+      '<div class="rb-pane" data-mode="easter"' + (mode === 'easter' ? '' : ' hidden') + '><div class="two"><label class="field">From' + easterSelect('rb-fe', mode === 'easter' ? easterN(r.from) : -2) + '</label><label class="field">To' + easterSelect('rb-te', mode === 'easter' ? easterN(r.to || r.from) : 1) + '</label></div></div>' +
+      '<div class="rb-pane" data-mode="once"' + (mode === 'once' ? '' : ' hidden') + '><div class="two"><label class="field">From<input type="date" id="rb-fs" value="' + esc(mode === 'once' ? r.from : '') + '"></label><label class="field">To<input type="date" id="rb-ts" value="' + esc(mode === 'once' ? (r.to || r.from) : '') + '"></label></div></div>' +
+      '<div class="field"><span>Who can’t take leave</span><div class="radios"><label><input type="radio" name="rb-who" value="all"' + (cats.length ? '' : ' checked') + '>All staff</label><label><input type="radio" name="rb-who" value="some"' + (cats.length ? ' checked' : '') + '>Only some categories</label></div>' +
+      '<div class="rb-cats"' + (cats.length ? '' : ' hidden') + '>' + levels.map(function (l) {
+        return '<label class="chk"><input type="checkbox" name="rb-cat" value="' + esc(l.level) + '"' + (cats.indexOf(C.catKey(l.level)) >= 0 ? ' checked' : '') + '>' + esc(l.level) + '</label>'; }).join('') + '</div></div>' +
+      '<div class="field"><span>If someone asks for leave then</span><div class="radios"><label><input type="radio" name="rb-act" value="Block"' + (/warn/i.test(r.action) ? '' : ' checked') + '>Block the request</label><label><input type="radio" name="rb-act" value="Warn"' + (/warn/i.test(r.action) ? ' checked' : '') + '>Allow it, with a warning</label></div></div>' +
+      '<label class="field">Message <span class="muted" style="font-weight:400">(optional, shown to staff)</span><input id="rb-msg" maxlength="200" value="' + esc(r.message || '') + '" placeholder="e.g. All hands on deck for the Christmas services"></label>' +
+      '<p class="muted small" id="rb-preview"></p><div id="rb-err"></div>' +
+      '<div class="actions">' + (rule ? '<button type="button" class="btn bad" data-act="blk-del" data-id="' + esc(r.id) + '">Delete</button>' : '') +
+      '<button type="button" class="btn" data-act="close">Cancel</button><button type="submit" class="btn primary" id="rb-go">' + (rule ? 'Save' : 'Add') + '</button></div></form>';
+    openModal(html, 'Blocked days');
+    blkPreview();
+  }
+  function readBlk() {
+    var mode = (modalRoot.querySelector('input[name="rb-mode"]:checked') || {}).value || 'yearly', from, to;
+    var g = function (id) { var el = document.getElementById(id); return el ? el.value : ''; };
+    var esp = function (n) { n = Number(n); return n === 0 ? 'Easter' : 'Easter' + (n > 0 ? '+' : '') + n; };
+    if (mode === 'yearly') { from = g('rb-fd') + ' ' + g('rb-fm'); to = g('rb-td') + ' ' + g('rb-tm'); }
+    else if (mode === 'easter') { from = esp(g('rb-fe')); to = esp(g('rb-te')); }
+    else { from = g('rb-fs'); to = g('rb-ts') || g('rb-fs'); }
+    var some = ((modalRoot.querySelector('input[name="rb-who"]:checked') || {}).value === 'some');
+    var cats = some ? Array.prototype.map.call(modalRoot.querySelectorAll('input[name="rb-cat"]:checked'), function (x) { return x.value; }) : [];
+    return { id: g('rb-id'), name: g('rb-name').trim(), from: from, to: to, mode: mode, some: some, category: cats.join(', '),
+      action: (modalRoot.querySelector('input[name="rb-act"]:checked') || {}).value || 'Block', message: g('rb-msg').trim() };
+  }
+  function blkPreview() {
+    var box = document.getElementById('rb-preview'); if (!box) return;
+    var b = readBlk();
+    Array.prototype.forEach.call(modalRoot.querySelectorAll('.rb-pane'), function (p) { p.hidden = p.dataset.mode !== b.mode; });
+    var cb = modalRoot.querySelector('.rb-cats'); if (cb) cb.hidden = !b.some;
+    if (b.mode === 'easter' && easterN(b.to) < easterN(b.from)) { box.textContent = 'The last day is before the first day.'; return; }
+    var nx = (b.mode !== 'once' || (b.from && b.to)) ? C.nextOccurrence({ from: b.from, to: b.to }, todayISO()) : null;
+    box.innerHTML = nx ? 'Next time: <b>' + esc(fmtRange({ start: nx.start, end: nx.end })) + '</b>' + (b.mode === 'easter' ? ' · Easter moves every year; Leave Manager works out the dates.' : '') : (b.mode === 'once' ? 'Choose the dates.' : '');
+  }
+  function saveBlk() {
+    var b = readBlk(), err = document.getElementById('rb-err');
+    var problem = !b.name ? 'Give it a name, e.g. Christmas services.' : (b.mode === 'once' && (!b.from || !b.to)) ? 'Choose the first and last day.' :
+      (b.mode === 'once' && b.to < b.from) ? 'The last day is before the first day.' : (b.some && !b.category) ? 'Tick at least one category, or choose All staff.' :
+      (b.mode === 'easter' && easterN(b.to) < easterN(b.from)) ? 'The last day is before the first day.' : '';
+    if (problem) { err.innerHTML = '<div class="err" role="alert">' + esc(problem) + '</div>'; return; }
+    var btn = document.getElementById('rb-go'); busy(btn, true);
+    var existing = b.id && (S.data.rules || []).filter(function (r) { return r.id === b.id; })[0];
+    call('rule-save', { id: b.id, name: b.name, from: b.from, to: b.to, category: b.category, action: b.action, message: b.message, active: existing ? existing.active !== false : true },
+      (b.id ? 'Saved: ' : 'Added: ') + b.name).then(function () { closeModal(); }).catch(function () { busy(btn, false); });
+  }
+  /** Blocked-day rules for a date (for everyone, or for one person). */
+  function blockedOn(ds, st) { return S.data.rules ? C.noLeaveRules(S.data, ds, st) : []; }
 
   /* ---------- Stand-in approver ---------- */
   function standInPanel() {
@@ -856,9 +959,10 @@
     var maxOff = Number(settings().MaxOffPerDay) || 0;
     var head = '<tr class="mrow"><th class="p" scope="col" rowspan="2">Team · ' + sortedStaff().length + '</th>' +
       '<th class="mband" scope="colgroup" colspan="' + dates.length + '"><span>' + MONTHS[m] + ' ' + y + '</span></th></tr><tr class="drow">' + dates.map(function (d) {
-      var ds = C.iso(d), closed = !C.isOpen(d, CTX);
-      return '<th scope="col" class="' + (ds === today ? 'today' : '') + (closed ? ' closed' : '') + '" title="' + esc(CTX.hol[ds] || (closed ? 'Church closed' : '')) + '">' + DOW[d.getDay()][0] + '<b>' + d.getDate() + '</b>' +
-        (CTX.hol[ds] ? '<span class="holname">PH</span>' : (closed ? '<span class="holname closedname">Closed</span>' : '')) + '</th>';
+      var ds = C.iso(d), closed = !C.isOpen(d, CTX), blk = blockedOn(ds);
+      var tip = [CTX.hol[ds] || (closed ? 'Church closed' : '')].concat(blk.map(function (r) { return '⛔ No leave: ' + r.name + (r.category ? ' (' + r.category + ')' : ''); })).filter(String).join('\n');
+      return '<th scope="col" class="' + (ds === today ? 'today' : '') + (closed ? ' closed' : '') + (blk.length ? ' blk' : '') + '" title="' + esc(tip) + '">' + DOW[d.getDay()][0] + '<b>' + d.getDate() + '</b>' +
+        (CTX.hol[ds] ? '<span class="holname">PH</span>' : (closed ? '<span class="holname closedname">Closed</span>' : (blk.length ? '<span class="holname blkname">No leave</span>' : ''))) + '</th>';
     }).join('') + '</tr>';
     var rows = sortedStaff().map(function (st) {
       var mine = st.id === me().id, canBook = mine || canManage(st), wdays = C.staffDays(CTX, st.id);
@@ -918,7 +1022,8 @@
       });
       var max = 4;
       cells += '<div class="' + cls + '" data-act="day" data-date="' + ds + '" role="button" tabindex="0" aria-label="' + esc(fmtLong(ds)) + ', ' + chips.length + ' away"><div class="n"><b>' + d.getDate() + '</b></div>' +
-        (CTX.hol[ds] ? '<div class="hn">' + esc(CTX.hol[ds]) + '</div>' : (closed ? '<div class="hn muted">Closed</div>' : '')) + chips.slice(0, max).join('') +
+        (CTX.hol[ds] ? '<div class="hn">' + esc(CTX.hol[ds]) + '</div>' : (closed ? '<div class="hn muted">Closed</div>' : '')) +
+        blockedOn(ds).map(function (r) { return '<div class="hn blkname" title="No leave' + (r.category ? ' for ' + esc(r.category) : '') + '">⛔ ' + esc(r.name) + '</div>'; }).join('') + chips.slice(0, max).join('') +
         (chips.length > max ? '<span class="more">+' + (chips.length - max) + ' more</span>' : '') + '</div>';
     }
     return {
@@ -1057,7 +1162,7 @@
   };
   function histKind(action) {
     var a = String(action || '').toLowerCase();
-    if (a.indexOf('stand-in') >= 0 || a.indexOf('automatic emails') >= 0) return 'setting';
+    if (a.indexOf('stand-in') >= 0 || a.indexOf('automatic emails') >= 0 || a.indexOf('blocked days') >= 0) return 'setting';
     if (a.indexOf('changed') === 0) return 'change';
     if (a.indexOf('not booked') >= 0) return 'problem';
     if (a.indexOf('booked by') >= 0) return 'booked';
@@ -1108,6 +1213,7 @@
       (/again/i.test(h.action) ? ' <span class="muted">(needs approval again)</span>' : '');
     if (k === 'setting') {
       if (/automatic emails/i.test(h.action)) return who + ' changed the automatic emails';
+      if (/blocked days/i.test(h.action)) return who + ' ' + esc(String(h.action).replace(/^Blocked days /i, '')) + ' blocked days' + (h.note ? ': ' + esc(h.note.split(':')[0]) : '');
       if (/removed/i.test(h.action)) return who + ' removed the stand-in approver';
       return who + ' made ' + staff + ' stand-in approver';
     }
@@ -1667,6 +1773,7 @@
   function dayDetail(ds) {
     var off = offOn(ds);
     var html = '<header><div><p class="eyebrow">' + (CTX.hol[ds] ? esc(CTX.hol[ds]) : (C.isOpen(C.parse(ds), CTX) ? 'Church open' : 'Church closed')) + '</p><h2>' + esc(fmtLong(ds)) + '</h2></div><button class="x" data-act="close" aria-label="Close">×</button></header>' +
+      blockedOn(ds).map(function (r) { return '<div class="covwarn" style="margin:0 0 12px"><b>⛔ No leave: ' + esc(r.name) + '</b><span>' + esc(ruleWho(r)) + (r.message ? ' · ' + esc(r.message) : '') + '</span></div>'; }).join('') +
       '<div class="list" style="margin-bottom:18px">' + (off.length ? off.map(function (o) {
         return o.e.map(function (e) {
           var t = typeOf(e.r.type);
@@ -1748,6 +1855,13 @@
         if (installPrompt) { installPrompt.prompt(); installPrompt.userChoice.then(function () { installPrompt = null; render(); }); }
         break;
       case 'refresh': refreshData(true); break;
+      case 'blk-new': blockedModal(null); break;
+      case 'blk-edit': { var br = (S.data.rules || []).filter(function (x) { return x.id === el.dataset.id; })[0]; if (br) blockedModal(br); break; }
+      case 'blk-del':
+        if (!el.dataset.confirm) { el.dataset.confirm = '1'; el.textContent = 'Yes, delete'; el.classList.add('primary'); return; }
+        busy(el, true);
+        call('rule-delete', { id: el.dataset.id }, 'Blocked days deleted').then(function () { closeModal(); }).catch(function () { busy(el, false); });
+        break;
       case 'new': requestModal(); break;
       case 'edit-req': { var er = C.findReq(S.data, el.dataset.id); if (er) requestModal({ edit: er }); break; }
       case 'book': requestModal({ date: el.dataset.date, staffId: el.dataset.staff }); break;
@@ -1816,6 +1930,12 @@
     if (ev.target.id === 'set-colour') { S.pickColour = normHex(ev.target.value); applyAccent(S.pickColour); render(); return; }
     if (ev.target.name === 'theme' && ev.target.closest('#set-theme')) { store.set('theme', ev.target.value); applyTheme(ev.target.value); toast('Appearance saved on this device'); return; }
     if (ev.target.id === 'em-weekly' || ev.target.id === 'em-day' || ev.target.id === 'em-rem') { saveEmails(); return; }
+    if (ev.target.closest && ev.target.closest('#blkForm')) { blkPreview(); return; }
+    if (ev.target.dataset && ev.target.dataset.ruleToggle) {
+      var on = ev.target.checked;
+      call('rule-save', { id: ev.target.dataset.ruleToggle, toggle: true, active: on }, on ? 'Blocked days switched on' : 'Blocked days switched off').catch(function () { render(); });
+      return;
+    }
     if (ev.target.id === 'set-start') { if (ev.target.value) store.set('startView', ev.target.value); else store.del('startView'); toast('Start page saved on this device'); return; }
     if (ev.target.id === 'yr-person') { S.person = ev.target.value; render(); }
     else if (ev.target.id === 'emp-person') { S.emp = ev.target.value; render(); }
@@ -1835,6 +1955,7 @@
   });
   document.addEventListener('submit', function (ev) {
     ev.preventDefault();
+    if (ev.target.id === 'blkForm') { saveBlk(); return; }
     if (ev.target.id === 'pinFirst') { submitPin('pf', S.pinCurrent || (document.getElementById('pf-cur') || {}).value || ''); return; }
     if (ev.target.id === 'pinChange') { submitPin('pc', document.getElementById('pc-cur').value.trim()); return; }
     if (ev.target.id === 'loginForm') {
@@ -1930,7 +2051,7 @@
 
   /* ------------------------------ demo backend ------------------------------ */
   var Demo = (function () {
-    var KEY = 'demo_db_v14';
+    var KEY = 'demo_db_v15';
     function seed() {
       var yr = new Date().getFullYear();
       // id, name, category, working days override ('' = category default), role, manager
@@ -1956,7 +2077,7 @@
         rules: [
           { name: 'Sunday cover', kind: 'Minimum on duty', category: 'Pastoral Staff', days: 'Sun', from: '', to: '', min: 1, action: 'Warn', message: 'At least one pastor must be on duty every Sunday.', active: true },
           { name: 'Easter services', kind: 'No leave', category: 'Pastoral Staff, Part-Time Technical Staff', days: '', from: 'Easter-2', to: 'Easter+1', min: 0, action: 'Warn', message: 'Good Friday to Family Day.', active: true },
-          { name: 'Christmas services', kind: 'No leave', category: 'Pastoral Staff, Part-Time Technical Staff', days: '', from: '24 Dec', to: '26 Dec', min: 0, action: 'Warn', message: '', active: true }
+          { name: 'Christmas services', kind: 'No leave', category: 'Pastoral Staff, Part-Time Technical Staff', days: '', from: '24 Dec', to: '26 Dec', min: 0, action: 'Block', message: 'All hands on deck for the Christmas services.', active: true }
         ],
         terms: [
           ['Term 4 2025', '2025-10-07', '2025-12-10'], ['Term 1 2026', '2026-01-14', '2026-03-27'], ['Term 2 2026', '2026-04-08', '2026-06-26'],
@@ -2057,6 +2178,7 @@
           return { token: 'demo-' + u0.id, data: C.publicView(d, u0) };
         }
         C.applyStandIn(d, todayISO());
+        (d.rules || []).forEach(function (x, i) { if (!x.id) x.id = 'R' + (i + 2); });
         var u = d.staff.filter(function (s) { return 'demo-' + s.id === b.token; })[0];
         if (!u) throw new Error('AUTH: Choose who to sign in as.');
         if (action === 'history') {
@@ -2085,6 +2207,22 @@
           er2.type = nx.type; er2.start = nx.start; er2.end = nx.end; er2.half = nx.half; er2.days = nx.days; er2.reason = nx.reason; er2.status = pe.status;
           if (pe.status === 'Pending') { er2.decidedBy = ''; er2.decidedOn = ''; } else if (C.isAdmin(u)) { er2.decidedBy = u.name; er2.decidedOn = nowStr(); }
           log('Changed' + (pe.reapprove ? ' (needs approval again)' : ''), er2, 'Was: ' + pe.changes.join('; '));
+        } else if (action === 'rule-save') {
+          if (!C.isAdmin(u)) throw new Error('Only an Administrator can change blocked days.');
+          d.rules = d.rules || [];
+          d.rules.forEach(function (x, i) { if (!x.id) x.id = 'R' + (i + 2); });
+          var ex = b.id ? d.rules.filter(function (x) { return x.id === b.id; })[0] : null;
+          if (b.toggle) { if (ex) ex.active = !!b.active; }
+          else {
+            var nr = { name: b.name, kind: 'No leave', category: b.category || '', days: '', from: b.from, to: b.to, min: 0, action: b.action, message: b.message || '', active: b.active !== false };
+            if (ex) Object.assign(ex, nr); else { nr.id = 'R' + (d.rules.length + 2) + '-' + Date.now().toString(36); d.rules.push(nr); }
+          }
+          (d.history || (d.history = [])).push({ when: nowStr(), action: b.toggle ? 'Blocked days switched ' + (b.active ? 'on' : 'off') : (ex ? 'Blocked days changed' : 'Blocked days added'), requestId: '', staff: '', type: '', dates: '', days: '', status: '', by: u.name, note: b.name || (ex && ex.name) || '' });
+        } else if (action === 'rule-delete') {
+          if (!C.isAdmin(u)) throw new Error('Only an Administrator can change blocked days.');
+          var gone = (d.rules || []).filter(function (x) { return x.id === b.id; })[0];
+          d.rules = (d.rules || []).filter(function (x) { return x.id !== b.id; });
+          (d.history || (d.history = [])).push({ when: nowStr(), action: 'Blocked days removed', requestId: '', staff: '', type: '', dates: '', days: '', status: '', by: u.name, note: gone ? gone.name : '' });
         } else if (action === 'emails') {
           if (!C.isAdmin(u)) throw new Error('Only an Administrator can change the automatic emails.');
           d.settings.WeeklyEmail = String(b.weekly || ''); d.settings.ReminderDates = String(b.reminders || '');

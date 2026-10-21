@@ -81,6 +81,23 @@ The person gets an email with your decision and note. Approving a request that b
 
 ## Cover rules: Sundays, Easter and Christmas
 
+### Blocked days (the easy way)
+
+To stop leave on particular days, such as Christmas, Easter, a church camp or a special service, use **Blocked days** on the **Dashboard**:
+
+1. Click **+ Add blocked days** and give it a name, e.g. *Christmas services*.
+2. Choose **When**:
+   - **Same dates every year**, e.g. 24 to 26 December.
+   - **Around Easter**, e.g. Good Friday to Family Day. Easter moves every year, and Leave Manager works out the dates.
+   - **One year only**, e.g. 27 to 29 November 2026.
+3. Choose **who** can't take leave: all staff, or only some categories.
+4. Choose what happens if someone asks: **Block the request**, or **Allow it, with a warning** to you.
+5. Add an optional message for staff, then **Add**.
+
+Each blocked period shows its next dates. Use the switch to turn it off for a year without deleting it, and **Edit** to change or delete it. Staff see blocked days on the calendars (⛔ *No leave*), and a blocked request is stopped with a clear message. You can still book leave on those days yourself. Blocked days are saved as **No leave** rows on the Cover Rules tab, so the app and the sheet always match.
+
+### All cover rules (on the sheet)
+
 Cover rules stop the church being left without the people it needs. They live on the **Cover Rules** tab of the Google Sheet (added automatically).
 
 | Column | What to put |
