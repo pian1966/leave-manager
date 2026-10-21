@@ -227,7 +227,7 @@
 
   /* ------------------------------ API ------------------------------ */
   function api(action, payload) {
-    var body = Object.assign({ action: action, token: S.token }, payload || {});
+    var body = Object.assign({}, payload || {}, { action: action, token: S.token });
     if (!LIVE) return Demo.handle(action, body);
     return fetch(CFG.API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) })
       .then(function (res) {
@@ -794,7 +794,8 @@
     var cb = modalRoot.querySelector('.rb-cats'); if (cb) cb.hidden = !b.some;
     if (b.mode === 'easter' && easterN(b.to) < easterN(b.from)) { box.textContent = 'The last day is before the first day.'; return; }
     var nx = (b.mode !== 'once' || (b.from && b.to)) ? C.nextOccurrence({ from: b.from, to: b.to }, todayISO()) : null;
-    box.innerHTML = nx ? 'Next time: <b>' + esc(fmtRange({ start: nx.start, end: nx.end })) + '</b>' + (b.mode === 'easter' ? ' · Easter moves every year; Leave Manager works out the dates.' : '') : (b.mode === 'once' ? 'Choose the dates.' : '');
+    box.innerHTML = nx ? 'Next time: <b>' + esc(fmtRange({ start: nx.start, end: nx.end })) + '</b>' + (b.mode === 'easter' ? ' · Easter moves every year; Leave Manager works out the dates.' : '') :
+      (b.mode === 'once' ? (b.from && b.to ? 'These dates have already passed, so this no longer blocks anything. You can keep it as a record or delete it.' : 'Choose the dates.') : '');
   }
   function saveBlk() {
     var b = readBlk(), err = document.getElementById('rb-err');
@@ -804,7 +805,7 @@
     if (problem) { err.innerHTML = '<div class="err" role="alert">' + esc(problem) + '</div>'; return; }
     var btn = document.getElementById('rb-go'); busy(btn, true);
     var existing = b.id && (S.data.rules || []).filter(function (r) { return r.id === b.id; })[0];
-    call('rule-save', { id: b.id, name: b.name, from: b.from, to: b.to, category: b.category, action: b.action, message: b.message, active: existing ? existing.active !== false : true },
+    call('rule-save', { id: b.id, name: b.name, from: b.from, to: b.to, category: b.category, ruleAction: b.action, message: b.message, active: existing ? existing.active !== false : true },
       (b.id ? 'Saved: ' : 'Added: ') + b.name).then(function () { closeModal(); }).catch(function () { busy(btn, false); });
   }
   /** Blocked-day rules for a date (for everyone, or for one person). */
@@ -2240,7 +2241,7 @@
           var ex = b.id ? d.rules.filter(function (x) { return x.id === b.id; })[0] : null;
           if (b.toggle) { if (ex) ex.active = !!b.active; }
           else {
-            var nr = { name: b.name, kind: 'No leave', category: b.category || '', days: '', from: b.from, to: b.to, min: 0, action: b.action, message: b.message || '', active: b.active !== false };
+            var nr = { name: b.name, kind: 'No leave', category: b.category || '', days: '', from: b.from, to: b.to, min: 0, action: b.ruleAction || 'Block', message: b.message || '', active: b.active !== false };
             if (ex) Object.assign(ex, nr); else { nr.id = 'R' + (d.rules.length + 2) + '-' + Date.now().toString(36); d.rules.push(nr); }
           }
           (d.history || (d.history = [])).push({ when: nowStr(), action: b.toggle ? 'Blocked days switched ' + (b.active ? 'on' : 'off') : (ex ? 'Blocked days changed' : 'Blocked days added'), requestId: '', staff: '', type: '', dates: '', days: '', status: '', by: u.name, note: b.name || (ex && ex.name) || '' });

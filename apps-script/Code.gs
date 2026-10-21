@@ -1421,7 +1421,7 @@ function saveRule_(user, b) {
       return;
     }
     var name = String(b.name || '').trim(), from = String(b.from || '').trim(), to = String(b.to || from).trim();
-    var action = /^warn$/i.test(String(b.action)) ? 'Warn' : 'Block';
+    var action = /^warn$/i.test(String(b.ruleAction || '')) ? 'Warn' : 'Block';
     if (!name) throw new Error('Give the blocked days a name, e.g. Christmas services.');
     var y = Number(todayStr_().slice(0, 4));
     if (!LeaveCore.ruleDate(from, y) || !LeaveCore.ruleDate(to, y)) throw new Error('Choose the first and last day.');
