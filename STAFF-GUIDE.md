@@ -96,7 +96,7 @@ Usual working days: Pastoral Staff Mon and Wed–Sun; Support Staff Mon and Wed�
 
 **No carry-over — use it by 1 February.** Unused Pastoral, Support, Technical and Cleaning Staff Leave can still be taken up to and including 1 February of the next year. After that it's lost. Leave you take in January uses last year's days first. Sick Leave, Weekend Off and Working Away start fresh each 1 January.
 
-**Weekend Off** is Friday to Sunday, one per school term. A weekend in the school holidays counts towards the term that has just ended.
+**Weekend Off** is always a whole weekend, Friday to Sunday, one per school term. When you choose Weekend Off, just pick any day of the weekend you want: Leave Manager sets the Friday and Sunday for you. A weekend in the school holidays counts towards the term that has just ended.
 
 **Sabbatical** builds up by 12.5 calendar days each year from your start date, to a maximum of 87.5 days (about 3 months after 7 years).
 

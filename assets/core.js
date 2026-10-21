@@ -505,8 +505,12 @@ var LeaveCore = (function () {
       if (!t.halfDay) out.push(t.name + ' can’t be taken as a half day.');
       else if (r.start !== r.end) out.push('Half days can only be booked on a single date.');
     }
+    // Weekend Off is always a whole weekend: Friday to Sunday.
+    if (/weekend/i.test(String(t.unit || '')) && (parse(r.start).getDay() !== 5 || r.end !== iso(addDays(parse(r.start), 2)))) {
+      out.push(t.name + ' is always Friday to Sunday. Choose a Friday as the first day and the Sunday after it as the last day.');
+    }
     var allowed = t.allowedDays ? parseDays(t.allowedDays, null) : null;
-    if (allowed) {
+    if (allowed && !out.length) {
       var d0 = parse(r.start), e0 = parse(r.end), g = 0;
       while (d0 <= e0 && g++ < 800) {
         if (allowed.indexOf(d0.getDay()) < 0) { out.push(t.name + ' can only be booked on ' + daysLabel(allowed) + '.'); break; }

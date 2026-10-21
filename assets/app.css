@@ -656,3 +656,4 @@ button.kpi:hover { border-color: var(--accent); }
 .btn.primary.blocked, .btn.primary.blocked:hover { background: var(--surface-2); color: var(--muted); border-color: var(--line); cursor: not-allowed; opacity: 1; filter: none; }
 .err ul { margin: 6px 0 0; padding-left: 18px; }
 .err li + li { margin-top: 4px; }
+input.locked { background: var(--surface-2); color: var(--muted); cursor: not-allowed; }

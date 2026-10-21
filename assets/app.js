@@ -1695,9 +1695,28 @@
     var half = modalRoot.querySelector('input[name="half"]:checked');
     return { staffId: g('f-staff') || me().id, type: g('f-type'), start: g('f-start'), end: g('f-end') || g('f-start'), half: half ? half.value : 'None', reason: g('f-reason') };
   }
+  function isWeekendType(t) { return !!t && /weekend/i.test(String(t.unit || '')); }
+  /** Weekend Off: the first day snaps to that week's Friday, and the last day is that Sunday (locked). */
+  function snapWeekend() {
+    var tSel = document.getElementById('f-type'), sEl = document.getElementById('f-start'), eEl = document.getElementById('f-end');
+    if (!tSel || !sEl || !eEl) return;
+    var t = C.type(S.data, tSel.value), note = document.getElementById('f-wknote');
+    if (!isWeekendType(t)) {
+      if (eEl.readOnly) { eEl.readOnly = false; eEl.classList.remove('locked'); }
+      if (note) note.remove();
+      return;
+    }
+    var d = C.isISO(sEl.value) ? C.parse(sEl.value) : C.parse(todayISO());
+    var dow = d.getDay(), shift = dow === 5 ? 0 : dow === 6 ? -1 : dow === 0 ? -2 : 5 - dow;   // Sat/Sun → that Friday; Mon–Thu → coming Friday
+    var fri = C.iso(C.addDays(d, shift)), sun = C.iso(C.addDays(C.parse(fri), 2));
+    sEl.value = fri; sEl.dataset.prev = fri; eEl.value = sun; eEl.min = fri;
+    eEl.readOnly = true; eEl.classList.add('locked');
+    if (!note) eEl.closest('.two').insertAdjacentHTML('afterend', '<p class="muted small" id="f-wknote" style="margin:-4px 0 10px">' + esc(t.name) + ' is always Friday to Sunday. Pick any day in the weekend you want.</p>');
+  }
   function updateRequestSummary() {
     var sum = document.getElementById('f-sum');
     if (!sum) return;
+    snapWeekend();
     var r = readReqForm(), t = C.type(S.data, r.type), st = staffById(r.staffId);
     var halfWrap = document.getElementById('f-half-wrap');
     var single = r.start && r.start === r.end && t && t.halfDay && C.isDayUnit(t);
