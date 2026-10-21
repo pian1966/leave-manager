@@ -146,7 +146,7 @@ To see what staff will receive, use the sheet menu **Leave Manager → Preview t
 
 ## Employees, Team balances and History
 
-- **Employees:** pick a person to see every date they've had off, filtered by leave type and status. Click a date to open the request.
+- **Employees:** the list shows each person's main staff leave this year as **days used** and **days left of their allowance** (e.g. *11 used · 13 left of 24*), with a bar showing how much is used. Pick a person to see every date they've had off, filtered by leave type and status. Click a date to open the request.
 - **Team balances:** everyone's balances in one table.
 - **History:** every request, decision, cancellation and stand-in change, newest first. Filter by period, person and action, or search.
 

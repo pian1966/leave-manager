@@ -1364,10 +1364,12 @@
       var all = empDates(p, y, 'all', 'Approved').reduce(function (s, x) { return s + x.amt; }, 0);
       var main = mainType(p, y), label, tip;
       if (main) {
-        label = C.fmtDays(main.b.approved) + '<small>/' + C.fmtDays(main.b.entitled) + '</small>';
+        var pct = main.b.entitled > 0 ? Math.min(100, Math.round(main.b.approved / main.b.entitled * 100)) : 0;
+        label = '<b>' + C.fmtDays(main.b.approved) + ' used</b><small>' + C.fmtDays(main.b.remaining) + ' left of ' + C.fmtDays(main.b.entitled) + '</small>' +
+          '<i class="emp-bar" aria-hidden="true"><i style="width:' + pct + '%"></i></i>';
         tip = C.fmtDays(main.b.approved) + ' of ' + C.fmtDays(main.b.entitled) + ' days of ' + main.t.name + ' taken in ' + lyName(y) +
           ' (' + C.fmtDays(main.b.remaining) + ' left)' + (all > main.b.approved ? '. All leave: ' + days(all) + ' off.' : '');
-      } else { label = C.fmtDays(all); tip = days(all) + ' off in ' + lyName(y); }
+      } else { label = '<b>' + C.fmtDays(all) + ' used</b><small>days off</small>'; tip = days(all) + ' off in ' + lyName(y); }
       return '<button class="emp-item" data-act="emp" data-id="' + esc(p.id) + '"' + (p.id === S.emp ? ' aria-current="true"' : '') + '>' + av(p) +
         '<span class="grow"><b>' + esc(p.name) + '</b><span>' + esc(catName(p)) + '</span></span><span class="num emp-n" title="' + esc(tip) + '">' + label + '</span></button>';
     }).join('');
