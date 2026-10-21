@@ -104,7 +104,7 @@ Cover rules stop the church being left without the people it needs. They live on
 | --- | --- |
 | **Rule** | A short name shown in warnings, e.g. *Sunday cover*. |
 | **Type** | **Minimum on duty**: at least this many people must be working. **No leave**: no leave on these days. |
-| **Category** | Who it's about, e.g. *Pastoral Staff*, or several separated by commas. Blank = all staff. |
+| **Category** | Who it's about. Pick one from the dropdown, or tick several: click the rule's row, then **Leave Manager → Choose categories for a cover rule…**. Blank = all staff. |
 | **Days** | Days of the week, e.g. *Sun*. Blank = every day. |
 | **From / To** | Blank = all year. A date (*2026-12-24*), a date every year (*24 Dec*), or Easter-based: *Easter-2* is Good Friday, *Easter+1* is Family Day. |
 | **Minimum** | For *Minimum on duty*: how many must be working (default 1). |

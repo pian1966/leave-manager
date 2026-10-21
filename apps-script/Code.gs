@@ -57,6 +57,8 @@ function onOpen() {
     .addItem('Update public holidays and school terms now', 'updateCalendarsNow')
     .addItem('Colour the colour codes', 'paintColours')
     .addSeparator()
+    .addItem('Choose categories for a cover rule…', 'chooseRuleCategories')
+    .addSeparator()
     .addItem('Preview the weekly “who’s away” email (sent to you only)', 'previewWeeklyEmail')
     .addItem('Preview the “use it or lose it” emails (sent to you only)', 'previewReminders')
     .addSeparator()
@@ -258,11 +260,15 @@ function formatRules_(sh) {
   sh.setFrozenRows(1);
   sh.getRange('D:F').setNumberFormat('@');
   sh.getRange('B2:B').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(['Minimum on duty', 'No leave'], true).build());
+  var cats = ss_().getSheetByName(SHEET.LEVELS);
+  if (cats) sh.getRange('C2:C').setDataValidation(SpreadsheetApp.newDataValidation()
+    .requireValueInRange(cats.getRange('A2:A'), true).setAllowInvalid(true)
+    .setHelpText('Pick a category, or several: Leave Manager menu → Choose categories for a cover rule… Blank = all staff.').build());
   sh.getRange('H2:H').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(['Warn', 'Block'], true).build());
   sh.getRange('J2:J').insertCheckboxes();
   sh.getRange('A1').setNote('A short name, shown in warnings, e.g. "Sunday cover".');
   sh.getRange('B1').setNote('Minimum on duty: at least this many people of the category must be working on matching days.\nNo leave: no leave for the category on matching days (e.g. Easter, Christmas).');
-  sh.getRange('C1').setNote('Category from the Categories tab, or several separated by commas. Blank = all staff.');
+  sh.getRange('C1').setNote('Who the rule is about. Pick one from the dropdown, or tick several with the Leave Manager menu → Choose categories for a cover rule…  Blank = all staff.');
   sh.getRange('D1').setNote('Days of the week, e.g. "Sun" or "Sat, Sun". Blank = every day.');
   sh.getRange('E1').setNote('Blank = all year. A date (2026-12-24), a date every year (24 Dec), or Easter-based: Easter-2 = Good Friday, Easter+1 = Family Day.');
   sh.getRange('F1').setNote('Last day the rule applies (same formats as From).');
@@ -277,12 +283,13 @@ function formatRules_(sh) {
  * Brings the workbook up to date for new features, once (tracked in Script Properties).
  * Runs automatically on the first app request after an update, and from setup.
  */
-var SCHEMA_VERSION_ = '4';
+var SCHEMA_VERSION_ = '5';
 function upgrade_(force) {
   var P = PropertiesService.getScriptProperties();
   if (!force && P.getProperty('SCHEMA') === SCHEMA_VERSION_) return;
   var ss = ss_();
-  buildRules_(ss);
+  var rulesSh = buildRules_(ss);
+  try { formatRules_(rulesSh); } catch (e) { console.warn('Cover Rules formatting skipped: ' + e); }   // e.g. the Category dropdown
   var set = ss.getSheetByName(SHEET.SET);
   if (set) {
     var have = readTable_(SHEET.SET).map(function (r) { return String(r.Key); });
@@ -1442,4 +1449,44 @@ function deleteRule_(user, b) {
     sh.deleteRow(row);
     logHistory_('Blocked days removed', {}, '', '', user.name, name);
   });
+}
+
+
+/* ================= COVER RULES: tick-box list of categories ================= */
+
+/** Menu: opens a tick-box list of categories for the cover rule on the selected row. */
+function chooseRuleCategories() {
+  var ui = SpreadsheetApp.getUi(), ss = SpreadsheetApp.getActive(), sh = ss.getActiveSheet();
+  var row = ss.getActiveRange() ? ss.getActiveRange().getRow() : 0;
+  if (sh.getName() !== SHEET.RULES || row < 2) {
+    ui.alert('Choose categories', 'Go to the Cover Rules tab and click any cell in the rule’s row, then choose this menu item again.', ui.ButtonSet.OK);
+    return;
+  }
+  var name = String(sh.getRange(row, 1).getValue()).trim() || 'Row ' + row;
+  var current = String(sh.getRange(row, 3).getValue()).split(',').map(function (x) { return LeaveCore.catKey(x); }).filter(String);
+  var cats = readTable_(SHEET.LEVELS).map(function (r) { return String(r.Category).trim(); })
+    .filter(function (c) { return c && LeaveCore.tracksLeave({ level: c }); });
+  var boxes = cats.map(function (c, i) {
+    return '<label><input type="checkbox" name="c" value="' + esc_(c) + '"' + (current.indexOf(LeaveCore.catKey(c)) >= 0 ? ' checked' : '') + '> ' + esc_(c) + '</label>';
+  }).join('');
+  var html = '<style>body{font-family:Arial,sans-serif;font-size:14px;color:#14211F;margin:0;padding:4px 2px}label{display:flex;gap:8px;align-items:center;padding:7px 4px;border-bottom:1px solid #E3E9E7;cursor:pointer}' +
+    'input{width:18px;height:18px;accent-color:#0F6E5C}.all{font-weight:bold}.b{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}' +
+    'button{font:inherit;padding:8px 16px;border-radius:6px;border:1px solid #C9D3D0;background:#fff;cursor:pointer}button.ok{background:#0F6E5C;color:#fff;border-color:#0F6E5C}p{color:#5B6B67;margin:0 0 8px}</style>' +
+    '<p>Who does <b>' + esc_(name) + '</b> apply to?</p>' +
+    '<label class="all"><input type="checkbox" id="all"' + (current.length ? '' : ' checked') + '> All staff</label>' + boxes +
+    '<div class="b"><button onclick="google.script.host.close()">Cancel</button><button class="ok" id="go">Save</button></div>' +
+    '<script>var all=document.getElementById("all"),cs=[].slice.call(document.getElementsByName("c"));' +
+    'all.onchange=function(){if(all.checked)cs.forEach(function(c){c.checked=false})};' +
+    'cs.forEach(function(c){c.onchange=function(){if(c.checked)all.checked=false;if(!cs.some(function(x){return x.checked}))all.checked=true}});' +
+    'document.getElementById("go").onclick=function(){var v=all.checked?[]:cs.filter(function(c){return c.checked}).map(function(c){return c.value});' +
+    'this.disabled=true;google.script.run.withSuccessHandler(function(){google.script.host.close()}).setRuleCategories(' + row + ',v)}</script>';
+  ui.showModalDialog(HtmlService.createHtmlOutput(html).setWidth(360).setHeight(Math.min(520, 190 + cats.length * 38)), 'Choose categories');
+}
+
+/** Called from the tick-box window: writes the chosen categories (comma-separated) to the rule's Category cell. */
+function setRuleCategories(row, list) {
+  var sh = SpreadsheetApp.getActive().getSheetByName(SHEET.RULES);
+  row = Number(row);
+  if (!sh || !(row >= 2)) throw new Error('That rule can’t be found.');
+  sh.getRange(row, 3).setValue((list || []).map(String).join(', '));
 }
