@@ -594,7 +594,11 @@ var LeaveCore = (function () {
 
   /** What one signed-in person is allowed to see. Fields starting with "_" never leave the server. */
   function publicView(data, user) {
-    function clean(o) { var x = {}; for (var k in o) if (k.charAt(0) !== '_' && k !== 'eventId') x[k] = o[k]; return x; }
+    function clean(o) {
+      var x = {};
+      for (var k in o) if (k.charAt(0) !== '_' && k !== 'eventId' && !(k === 'pinChosen' && !isAdmin(user) && o.id !== user.id)) x[k] = o[k];
+      return x;
+    }
     var byId = {};
     data.staff.forEach(function (s) { byId[s.id] = s; });
     return {

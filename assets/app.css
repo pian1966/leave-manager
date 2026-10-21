@@ -597,3 +597,7 @@ button.kpi:hover { border-color: var(--accent); }
 .toggle small { color: var(--muted); font-size: .85rem; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .toggle select.btn { padding: 2px 6px; font-size: .85rem; }
 .set-block .btns { flex-wrap: wrap; }
+.upd-banner { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: var(--r); padding: 10px 14px; margin-bottom: 16px; font-size: .9rem; }
+.upd-banner .controls { display: flex; gap: 6px; }
+.upd-yes { background: var(--accent-soft); border-radius: 8px; padding: 10px 12px; margin: 0 0 12px; }
+.upd-ok { color: var(--ok); font-weight: 700; margin: 0 0 12px; }

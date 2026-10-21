@@ -25,11 +25,13 @@ All leave requests go to the Administrator, who approves or declines them. You g
 2. Type your **work email** and your **PIN**.
 3. Click **Sign in**. You stay signed in for about 6 hours.
 
+**The first time you sign in with your PIN,** you're asked to choose your own PIN (4 to 8 digits). Type it twice and tap **Save my PIN**, then use it from then on. Don't use your bank card PIN, or easy ones like 1234 or 1111. Your PIN is stored scrambled, so nobody can read it, not even the Administrator. To change it later, go to **My settings → Change my PIN**.
+
 **Sign in with Google:** if your email on the staff list is a Google account (Gmail or a Google Workspace address), you can tap **Sign in with Google** instead and skip the PIN. In the Android app, choose your account from the list that pops up. If it says your account isn't on the staff list, ask the Administrator to check your email address in the Staff sheet.
 
 **To sign out:** click **Sign out** at the bottom of the left panel (on a phone, the **Out** button at the top right), then confirm.
 
-**Forgotten your PIN, or it doesn't work?** Ask the Administrator. They can set a new one for you straight away.
+**Forgotten your PIN, or it doesn't work?** Ask the Administrator. They can give you a new one straight away, and you'll be asked to choose your own again when you sign in.
 
 <p><img src="docs/images/d-signin.png" alt="The sign-in page on a computer, with Sign in with Google above the email and PIN boxes" width="100%"></p>
 
@@ -185,7 +187,7 @@ Appearance and Start page are remembered on the device you set them on, so you c
 - If your phone asks, allow Chrome (or your browser) to install apps.
 - If Play Protect says it doesn't recognise the app, tap **More details → Install anyway**. It's our own church app, so it isn't in the Play Store.
 
-Then open **Leave Manager** from your apps and sign in with your email and PIN. The back button closes windows and takes you back to Overview. You can print reports from the app too.
+Then open **Leave Manager** from your apps and sign in with your email and PIN. When a newer version of the app is available, a banner at the top says **Update available**: tap **Update**, open the downloaded file and tap **Update**. You can also check yourself under **My settings → Android app → Check for updates**. The back button closes windows and takes you back to Overview. You can print reports from the app too.
 
 **iPhone:** open Leave Manager in Safari, tap the **Share** button, then **Add to Home Screen**.
 

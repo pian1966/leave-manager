@@ -346,6 +346,7 @@ function formatSheets_(ss) {
   });
   var staff = ss.getSheetByName(SHEET.STAFF);
   staff.getRange('I2:I').setNumberFormat('@');                 // PINs keep leading zeros
+  staff.getRange('I1').setNote('PINs are scrambled so nobody can read them.\nh: = a PIN you gave out (the person is asked to choose their own when they sign in)\nu: = a PIN the person chose themselves\nTo reset a PIN, type a new one here (e.g. 4821) and give it to the person. They’ll be asked to choose their own at their next sign-in.');
   staff.getRange('H2:H').setNumberFormat('yyyy-mm-dd');
   staff.getRange('F2:F').setDataValidation(SpreadsheetApp.newDataValidation()
     .requireValueInList(['Staff', 'Administrator'], true).build());
@@ -633,7 +634,7 @@ function loadData_() {
       workDays: String(r['Working Days'] || ''),
       role: String(r.Role || 'Staff'), manager: String(r['Manager Email'] || '').trim().toLowerCase(),
       start: String(r['Start Date'] || '').slice(0, 10), colour: String(r.Colour || ''),
-      active: r.Active === '' ? true : B(r.Active), _pin: String(r.PIN), _row: r._row
+      active: r.Active === '' ? true : B(r.Active), _pin: String(r.PIN), pinChosen: String(r.PIN).indexOf('u:') === 0, _row: r._row
     };
   });
   var holidays = readTable_(SHEET.HOL).filter(function (r) { return r.Date; }).map(function (r) {
@@ -711,7 +712,10 @@ function route_(b) {
   var user = auth_(b.token, data);
   switch (b.action) {
     case 'bootstrap':
-      return LeaveCore.publicView(data, user);
+      var view = LeaveCore.publicView(data, user);
+      // Signed in with a given-out PIN but closed the app before choosing their own: ask again.
+      if (String(user._pin).indexOf('u:') !== 0 && CacheService.getScriptCache().get('pin_' + b.token)) view.mustChangePin = true;
+      return view;
     case 'history':
       if (!LeaveCore.isAdmin(user)) throw new Error('Only an Administrator can see the History log.');
       return readHistory_();
@@ -733,6 +737,9 @@ function route_(b) {
     case 'emails':
       saveEmailSettings_(user, b);
       break;
+    case 'setpin':
+      setOwnPin_(user, b);
+      break;
     default:
       throw new Error('Unknown action: ' + b.action);
   }
@@ -753,7 +760,11 @@ function login_(b) {
     Utilities.sleep(700);
     throw new Error('That email and PIN don’t match. Ask your leave administrator to check the Staff sheet.');
   }
-  return startSession_(data, st);
+  var res = startSession_(data, st);
+  // PINs given out by the Administrator (plain or "h:") must be replaced by one the person chooses ("u:").
+  res.mustChangePin = String(st._pin).indexOf('u:') !== 0;
+  if (res.mustChangePin) CacheService.getScriptCache().put('pin_' + res.token, '1', 21600);
+  return res;
 }
 
 function startSession_(data, st) {
@@ -802,6 +813,7 @@ function hash_(pin) {
 function checkPin_(st, pin) {
   var stored = st._pin;
   if (!stored || !pin) return false;
+  if (stored.indexOf('u:') === 0) return stored === 'u:' + hash_(pin).slice(2);
   if (stored.indexOf('h:') === 0) return stored === hash_(pin);
   if (stored === pin) { setCells_(SHEET.STAFF, st._row, { 'PIN': hash_(pin) }); return true; } // upgrade to a hash on first use
   return false;
@@ -1288,4 +1300,24 @@ function saveEmailSettings_(user, b) {
   if (weekly && !LeaveCore.parseDays(weekly, []).length) throw new Error('Choose a day of the week for the weekly email.');
   withLock_(function () { setSetting_('WeeklyEmail', weekly); setSetting_('ReminderDates', rem); });
   logHistory_('Automatic emails changed', {}, '', '', user.name, 'Weekly email: ' + (weekly || 'off') + ' · Reminders: ' + (rem || 'off'));
+}
+
+
+/* ================================ OWN PIN ================================ */
+
+/** Rules for a PIN people choose themselves: 4–8 digits, not too easy to guess. Returns a message, or ''. */
+function pinProblem_(pin) {
+  if (!/^\d{4,8}$/.test(pin)) return 'Your PIN must be 4 to 8 digits.';
+  if (/^(\d)\1+$/.test(pin)) return 'Don’t use the same digit over and over.';
+  if ('0123456789'.indexOf(pin) >= 0 || '9876543210'.indexOf(pin) >= 0) return 'Don’t use digits in order, like 1234.';
+  return '';
+}
+/** Anyone signed in with a PIN can choose their own. It's stored scrambled ("u:"), so nobody can read it. */
+function setOwnPin_(user, b) {
+  var current = String(b.current || '').trim(), pin = String(b.pin || '').trim();
+  if (!checkPin_(user, current)) { Utilities.sleep(700); throw new Error('Your current PIN isn’t right.'); }
+  var bad = pinProblem_(pin);
+  if (bad) throw new Error(bad);
+  if (pin === current) throw new Error('Choose a PIN that’s different from the one you were given.');
+  withLock_(function () { setCells_(SHEET.STAFF, user._row, { 'PIN': 'u:' + hash_(pin).slice(2) }); });
 }

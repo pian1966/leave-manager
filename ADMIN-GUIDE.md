@@ -188,7 +188,13 @@ Open it from **Open the Google Sheet** in the app's left-hand panel.
 
 Their leave is pro-rated automatically if they start part-way through the year.
 
-**Forgotten PIN:** type a new PIN over the old one on the Staff tab. It's secured automatically the first time they use it.
+**PINs:** the PIN you type on the Staff tab is a temporary one. The first time someone signs in with it, they must choose their own PIN. All PINs are stored scrambled, so nobody can read them, including you:
+- *h:…* in the PIN column means a PIN you gave out (they'll be asked to choose their own).
+- *u:…* means they've chosen their own.
+
+The **Employees** page also shows whether each person has chosen their own PIN yet.
+
+**Forgotten PIN:** type a new temporary PIN (e.g. 4821) over the old one on the Staff tab and tell them. They sign in with it and choose a new one. People who use **Sign in with Google** don't need a PIN.
 
 **Someone leaves:** untick **Active**. Their history is kept, but they can't sign in and don't appear on calendars.
 
@@ -196,7 +202,7 @@ Their leave is pro-rated automatically if they start part-way through the year.
 
 ## The Android app and Sign in with Google
 
-- **Android app link for staff:** <https://github.com/pian1966/leave-manager/releases/latest/download/LeaveManager.apk>. The app shows the live site, so updates appear without reinstalling. Occasionally a new app version adds phone features; installing it over the old one keeps everyone signed in.
+- **Android app link for staff:** <https://github.com/pian1966/leave-manager/releases/latest/download/LeaveManager.apk>. The app shows the live site, so updates appear without reinstalling. Occasionally a new app version adds phone features. The app checks for this itself and shows an **Update available** banner; installing over the old version keeps everyone signed in.
 - **iPhone:** Safari → Share → *Add to Home Screen*.
 - **Sign in with Google** works for anyone whose email on the Staff tab is a Google account. Everyone can still use email and PIN.
 

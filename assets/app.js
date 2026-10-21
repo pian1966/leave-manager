@@ -239,7 +239,7 @@
     });
   }
   function logout(msg) {
-    S.token = null; S.data = null; applyAccent('');
+    S.token = null; S.data = null; S.pinRequired = false; applyAccent('');
     store.del(LIVE ? 'token' : 'demo_token');
     closeModal();
     render();
@@ -373,6 +373,8 @@
       '<div class="me">' + av(u) + '<div class="who"><b>' + esc(u.name) + '</b><span>' + (takesLeave(u) ? esc(catName(u)) + ' · ' + esc(u.role) : 'Administrator') + '</span></div><button data-act="logout-ask">Sign out</button></div></aside>' +
       '<main class="main"><div class="mhead">' + brand + '<div class="controls"><button class="btn primary small" data-act="new">+ ' + (takesLeave(u) ? 'Request' : 'Book') + '</button><button class="btn small icon-btn" data-act="nav" data-view="settings" aria-label="My settings">' + icon('settings') + '</button><button class="btn small" data-act="logout-ask" aria-label="Sign out">' + esc(initials(u.name)) + ' · Out</button></div></div>' +
       (!LIVE ? '<div class="demo-note"><span><b>Demo mode.</b> You’re signed in as ' + esc(u.name) + ' (' + esc(u.role) + '). Connect your Google Sheet in config.js to go live.</span><span class="controls"><button class="btn small" data-act="logout">Switch person</button><button class="btn small ghost" data-act="demo-reset">Reset sample data</button></span></div>' : '') +
+      (updateAvailable() && !S.updLater && S.view !== 'settings' ? '<div class="upd-banner" role="status"><span><b>Update available:</b> version ' + esc(S.appLatest.ver) + ' of the Leave Manager app.</span>' +
+        '<span class="controls"><a class="btn small primary" href="' + esc(S.appLatest.url) + '">Update</a><button class="btn small ghost" data-act="upd-later">Later</button></span></div>' : '') +
       '<header class="top"><div class="t"><h1>' + v.title + '</h1>' + (v.sub ? '<p>' + v.sub + '</p>' : '') + '</div><div class="controls">' + (v.controls || '') + '</div></header>' +
       '<div class="view">' + v.body + '</div></main></div>' +
       '<nav class="tabbar" style="--n:' + tabs.length + '" aria-label="Main">' + tabs.map(function (n) {
@@ -397,6 +399,50 @@
   var SWATCHES = ['#2F6FB3', '#1D4ED8', '#0E7490', '#0F766E', '#2A9D8F', '#4D7C0F', '#15803D', '#B45309',
     '#C2410C', '#B91C1C', '#BE185D', '#B0527A', '#9333EA', '#7C3AED', '#4F46E5', '#475569'];
   function startOptions() { return navItems().filter(function (n) { return n[0] !== 'settings'; }); }
+  /* ---------- Choosing your own PIN ---------- */
+  function pinProblem(pin) {
+    if (!/^\d{4,8}$/.test(pin)) return 'Your PIN must be 4 to 8 digits.';
+    if (/^(\d)\1+$/.test(pin)) return 'Don’t use the same digit over and over.';
+    if ('0123456789'.indexOf(pin) >= 0 || '9876543210'.indexOf(pin) >= 0) return 'Don’t use digits in order, like 1234.';
+    return '';
+  }
+  function pinFields(prefix) {
+    return '<label class="field">New PIN <span class="muted" style="font-weight:400">(4 to 8 digits)</span><input id="' + prefix + '-new" type="password" inputmode="numeric" autocomplete="new-password" maxlength="8"></label>' +
+      '<label class="field">Type it again<input id="' + prefix + '-again" type="password" inputmode="numeric" autocomplete="new-password" maxlength="8"></label>';
+  }
+  /** Shown straight after signing in with a PIN the Administrator gave out. */
+  function pinPrompt(current) {
+    S.pinRequired = true; S.pinCurrent = current;
+    openModal('<header><div><p class="eyebrow">Welcome, ' + esc(firstName(me().name)) + '</p><h2>Choose your own PIN</h2></div></header>' +
+      '<form id="pinFirst" novalidate><p class="muted" style="margin:0 0 14px">You signed in with the PIN the Administrator gave you. Choose a new one that only you know. Please don’t use your bank card PIN.</p>' +
+      (current ? '' : '<label class="field">The PIN you were given<input id="pf-cur" type="password" inputmode="numeric" autocomplete="current-password" maxlength="8"></label>') +
+      pinFields('pf') + '<div id="pf-err"></div>' +
+      '<div class="actions"><button type="button" class="btn ghost" data-act="logout">Sign out</button><button type="submit" class="btn primary" id="pf-go">Save my PIN</button></div></form>', 'Choose your own PIN');
+  }
+  function pinSection() {
+    if (!LIVE) return '';
+    return '<section class="panel set-block"><h2>Change my PIN</h2><p class="muted">Your PIN is stored scrambled, so nobody can read it, not even the Administrator. If you forget it, the Administrator can give you a new one.</p>' +
+      '<form id="pinChange" novalidate><label class="field">Current PIN<input id="pc-cur" type="password" inputmode="numeric" autocomplete="current-password" maxlength="8"></label>' +
+      pinFields('pc') + '<div id="pc-err"></div><div class="btns"><button type="submit" class="btn primary" id="pc-go">Change PIN</button></div></form></section>';
+  }
+  function submitPin(prefix, current) {
+    var nw = document.getElementById(prefix + '-new').value.trim(), again = document.getElementById(prefix + '-again').value.trim();
+    var box = document.getElementById(prefix + '-err'), btn = document.getElementById(prefix + '-go');
+    var problem = !current ? 'Type your current PIN.' : pinProblem(nw) || (nw !== again ? 'The two PINs don’t match.' : '') || (nw === current ? 'Choose a PIN that’s different from your current one.' : '');
+    if (problem) { box.innerHTML = '<div class="err" role="alert">' + esc(problem) + '</div>'; return; }
+    busy(btn, true);
+    api('setpin', { current: current, pin: nw }).then(function () {
+      S.pinRequired = false; S.pinCurrent = null; closeModal(true);
+      toast('Your new PIN is saved. Use it next time you sign in.');
+      if (prefix === 'pc') render();
+    }).catch(function (err) {
+      busy(btn, false);
+      var m = String(err && err.message || err);
+      if (m.indexOf('AUTH') === 0) { logout(m.replace(/^AUTH:?\s*/, '')); return; }
+      box.innerHTML = '<div class="err" role="alert">' + esc(m === 'Failed to fetch' ? 'Can’t reach the leave server. Check your connection.' : m) + '</div>';
+    });
+  }
+
   /** Links to the user manuals (they open in the browser, also from the Android app). */
   function helpSection() {
     var staffUrl = CFG.GUIDE_URL || 'https://github.com/pian1966/leave-manager/blob/main/STAFF-GUIDE.md';
@@ -424,12 +470,52 @@
     var msg = (w.checked ? 'Weekly email on (' + dsel.value + 's)' : 'Weekly email off') + ' · ' + (r.checked ? 'reminders on' : 'reminders off');
     call('emails', body, msg).then(render).catch(render);
   }
+  /* ---------- Android app: is there a newer version? ---------- */
+  var RELEASES_API = CFG.RELEASES_API || 'https://api.github.com/repos/pian1966/leave-manager/releases/latest';
+  function verParts(v) { return String(v || '').replace(/^[^\d]*/, '').split('.').map(function (x) { return parseInt(x, 10) || 0; }); }
+  function isNewer(a, b) {   // is version a newer than b?
+    var x = verParts(a), y = verParts(b);
+    for (var i = 0; i < Math.max(x.length, y.length); i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); }
+    return false;
+  }
+  /** Asks GitHub for the newest app version (at most once a day unless `force`). Only inside the Android app. */
+  function checkAppUpdate(force) {
+    if (!NATIVE || typeof NATIVE.version !== 'function') return Promise.resolve(null);
+    var mine = nativeCall('version'), last = store.get('updCheck') || {};
+    if (!force && last.at && Date.now() - last.at < 864e5) { S.appLatest = last.latest || null; render(); return Promise.resolve(S.appLatest); }
+    S.updChecking = true; if (S.view === 'settings') render();
+    return fetch(RELEASES_API, { headers: { Accept: 'application/vnd.github+json' } }).then(function (res) {
+      if (!res.ok) throw new Error('GitHub returned ' + res.status);
+      return res.json();
+    }).then(function (j) {
+      var apk = (j.assets || []).filter(function (a) { return /\.apk$/i.test(a.name); })[0];
+      S.appLatest = { ver: String(j.tag_name || '').replace(/^android-v/i, ''), url: apk ? apk.browser_download_url : APK_URL, date: String(j.published_at || '').slice(0, 10) };
+      store.set('updCheck', { at: Date.now(), latest: S.appLatest });
+      S.updChecking = false; S.updError = null;
+      if (force) toast(isNewer(S.appLatest.ver, mine) ? 'Version ' + S.appLatest.ver + ' is available' : 'You have the newest version (' + mine + ')');
+      render();
+      return S.appLatest;
+    }).catch(function () {
+      S.updChecking = false; S.updError = 'Couldn’t check for updates. Check your internet connection.';
+      if (force) toast(S.updError, true);
+      render();
+      return null;
+    });
+  }
+  function updateAvailable() {
+    return !!(NATIVE && S.appLatest && S.appLatest.ver && isNewer(S.appLatest.ver, nativeCall('version')));
+  }
   function appSection() {
     if (NATIVE) {
-      var ver = nativeCall('version');
-      return '<section class="panel set-block"><h2>Android app</h2><p class="muted">You’re using the Leave Manager Android app' + (ver ? ' (version ' + esc(ver) + ')' : '') +
-        '. It always shows the latest version of Leave Manager, so there’s nothing to update for new features.</p>' +
-        '<div class="btns"><a class="btn" href="' + esc(APK_URL) + '" data-external="1">Download the newest app file</a></div></section>';
+      var ver = nativeCall('version'), newer = updateAvailable();
+      var status = S.updChecking ? '<p class="muted">Checking for a newer version…</p>' :
+        newer ? '<p class="upd-yes"><b>Version ' + esc(S.appLatest.ver) + ' is available.</b> Download it, open the file and tap <i>Update</i>. You’ll stay signed in.</p>' :
+        S.appLatest ? '<p class="upd-ok">✓ You have the newest version.</p>' :
+        S.updError ? '<p class="muted">' + esc(S.updError) + '</p>' : '';
+      return '<section class="panel set-block"><h2>Android app</h2><p class="muted">You’re using the Leave Manager Android app' + (ver ? ', version <b>' + esc(ver) + '</b>' : '') +
+        '. New features in Leave Manager appear straight away; an app update is only needed now and then.</p>' + status +
+        '<div class="btns">' + (newer ? '<a class="btn primary" href="' + esc(S.appLatest.url) + '">Download version ' + esc(S.appLatest.ver) + '</a>' : '') +
+        '<button class="btn" data-act="upd-check"' + (S.updChecking ? ' disabled' : '') + '>Check for updates</button></div></section>';
     }
     return '<section class="panel set-block"><h2>Phone app</h2>' +
       '<p class="muted">Put Leave Manager on your phone’s home screen, like any other app.</p>' +
@@ -470,7 +556,7 @@
 
         '<section class="panel set-block"><h2>Start page</h2><p class="muted">The page that opens when you sign in on this device.</p>' +
         '<select id="set-start" class="btn">' + opts + '</select></section>' +
-        emailSection() + helpSection() +
+        pinSection() + emailSection() + helpSection() +
         appSection()
     };
   };
@@ -1317,7 +1403,7 @@
       controls: '<div class="seg"><button data-act="eprev" aria-label="Previous leave year">‹</button><button data-act="ethis">' + esc(lyName(y)) + '</button><button data-act="enext" aria-label="Next leave year">›</button></div>',
       body: '<div class="emp-layout"><nav class="emp-list panel" aria-label="Employees">' + list + '</nav>' +
         '<section class="emp-detail">' + personSel + (st ? '<div class="panel emp-head"><div class="who">' + av(st, true) + '<div><h2>' + esc(st.name) + '</h2>' +
-          '<p class="muted">' + esc(catName(st)) + ' · works ' + esc(workLabel(st)) + ' · ' + esc(st.role) + (st.start ? ' · started ' + esc(fmt(st.start, true)) : '') + '' + '</p>' +
+          '<p class="muted">' + esc(catName(st)) + ' · works ' + esc(workLabel(st)) + ' · ' + esc(st.role) + (st.start ? ' · started ' + esc(fmt(st.start, true)) : '') + (typeof st.pinChosen === 'boolean' ? ' · ' + (st.pinChosen ? 'has chosen their own PIN' : 'still on the PIN you gave them') : '') + '</p>' +
           '<p class="small">' + esc(st.email) + '</p></div></div><div class="emp-bal small">' + balLine + '</div></div>' +
           '<div class="emp-filters"><label class="field">Leave type<select id="emp-type">' + typeOpts + '</select></label>' +
           '<label class="field">Show<select id="emp-status">' + statusOpts + '</select></label></div>' +
@@ -1398,7 +1484,8 @@
     var f = modalRoot.querySelector('select, input, textarea, button:not(.x)');
     if (f) f.focus();
   }
-  function closeModal() { modalRoot.innerHTML = ''; }
+  /** While someone must choose their own PIN, that window can't be closed (except by signing out). */
+  function closeModal(force) { if (S.pinRequired && !force) return; modalRoot.innerHTML = ''; }
 
   function requestModal(pre) {
     pre = pre || {};
@@ -1600,6 +1687,8 @@
         call('standin', { staffId: '' }, 'Stand-in approver removed').then(render).catch(function () { busy(el, false); });
         break;
       case 'google-native': nativeCall('googleSignIn', GOOGLE_ID); break;
+      case 'upd-check': checkAppUpdate(true); break;
+      case 'upd-later': S.updLater = true; render(); break;
       case 'pwa-install':
         if (installPrompt) { installPrompt.prompt(); installPrompt.userChoice.then(function () { installPrompt = null; render(); }); }
         break;
@@ -1689,6 +1778,8 @@
   });
   document.addEventListener('submit', function (ev) {
     ev.preventDefault();
+    if (ev.target.id === 'pinFirst') { submitPin('pf', S.pinCurrent || (document.getElementById('pf-cur') || {}).value || ''); return; }
+    if (ev.target.id === 'pinChange') { submitPin('pc', document.getElementById('pc-cur').value.trim()); return; }
     if (ev.target.id === 'loginForm') {
       var email = document.getElementById('l-email').value.trim(), pin = document.getElementById('l-pin').value.trim();
       var btn = document.getElementById('l-go'), errBox = document.getElementById('l-err');
@@ -1696,6 +1787,8 @@
       btn.disabled = true; btn.textContent = 'Signing in…';
       api('login', { email: email, pin: pin }).then(function (res) {
         S.token = res.token; store.set('token', res.token); store.set('email', email); setData(res.data);
+        if (res.mustChangePin) pinPrompt(pin);
+        checkAppUpdate(false);
       }).catch(function (err) {
         btn.disabled = false; btn.textContent = 'Sign in';
         errBox.innerHTML = '<div class="err" role="alert">' + esc(err.message === 'Failed to fetch' ? 'Can’t reach the leave server. Check the API_URL in config.js.' : err.message) + '</div>';
@@ -1719,6 +1812,7 @@
 
   /* Android back button: close an open window first, then go back to Overview; otherwise let the app close. */
   window.leaveAppBack = function () {
+    if (S.pinRequired) return true;
     if (modalRoot.innerHTML) { closeModal(); return true; }
     if (S.data && S.view !== 'home') { go('home'); return true; }
     return false;
@@ -1911,7 +2005,7 @@
 
   /* ------------------------------ boot ------------------------------ */
   if (S.token) {
-    api('bootstrap').then(setData).catch(function (err) {
+    api('bootstrap').then(function (d) { setData(d); if (d && d.mustChangePin) pinPrompt(null); checkAppUpdate(false); }).catch(function (err) {
       var m = String(err && err.message || err);
       S.token = null; store.del(LIVE ? 'token' : 'demo_token');
       render();
