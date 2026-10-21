@@ -43,8 +43,8 @@ var NEW_SETTINGS_ = [
 /** Example cover rules for a new Cover Rules tab. */
 var EXAMPLE_RULES_ = [
   ['Sunday cover', 'Minimum on duty', 'Pastoral Staff', 'Sun', '', '', 1, 'Warn', 'At least one pastor must be on duty every Sunday.', true],
-  ['Easter services', 'No leave', 'Pastoral Staff, Technical Staff', '', 'Easter-2', 'Easter+1', '', 'Warn', 'Good Friday to Family Day.', false],
-  ['Christmas services', 'No leave', 'Pastoral Staff, Technical Staff', '', '24 Dec', '26 Dec', '', 'Warn', '', false]
+  ['Easter services', 'No leave', 'Pastoral Staff, Part-Time Technical Staff', '', 'Easter-2', 'Easter+1', '', 'Warn', 'Good Friday to Family Day.', false],
+  ['Christmas services', 'No leave', 'Pastoral Staff, Part-Time Technical Staff', '', '24 Dec', '26 Dec', '', 'Warn', '', false]
 ];
 
 /* ============================== MENU & SETUP ============================== */
@@ -128,7 +128,7 @@ function setup() {
     ['Pastoral Staff', 'Mon, Wed, Thu, Fri, Sat, Sun', 24, '', '', 7, 4, 12.5, 21, ''],
     ['Support Staff', 'Mon, Wed, Thu, Fri', '', 20, '', 7, '', '', '', ''],
     ['Cleaning Staff', 'Fri', '', '', 3, 7, '', '', '', ''],
-    ['Technical Staff', 'Mon, Wed, Thu, Fri, Sun', '', '', '', 7, '', '', '', 20],   // like Support Staff, plus Sundays
+    ['Part-Time Technical Staff', 'Mon, Wed, Thu, Fri, Sun', '', '', '', 7, '', '', '', 20],   // like Support Staff, plus Sundays
     ['Administrator', 'Mon, Wed, Thu, Fri', '', '', '', '', '', '', '', '']   // approves all leave; doesn't take leave in Leave Manager
   ]);
   build_(ss, SHEET.STAFF, staff);
@@ -218,10 +218,12 @@ function migrateToAdministrator_(ss) {
     var head = cats.getRange(1, 1, 1, cats.getLastColumn()).getValues()[0].map(String);
     var tcol = head.indexOf('TSL');
     if (tcol < 0) { tcol = head.length; cats.getRange(1, tcol + 1).setValue('TSL'); head.push('TSL'); }
-    var techAt = names.indexOf('technical staff');
+    // Any category ending in "technical staff" counts (e.g. "Part-Time Technical Staff"), so it isn't added twice.
+    var techAt = -1;
+    names.forEach(function (n, i) { if (techAt < 0 && /technical staff$/.test(n)) techAt = i; });
     if (techAt < 0) {
       var tech = new Array(head.length).fill('');
-      tech[0] = 'Technical Staff'; tech[1] = 'Mon, Wed, Thu, Fri, Sun';
+      tech[0] = 'Part-Time Technical Staff'; tech[1] = 'Mon, Wed, Thu, Fri, Sun';
       tech[tcol] = 20;
       if (head.indexOf('SL') >= 0) tech[head.indexOf('SL')] = 7;
       cats.getRange(nextFreeRow(cats), 1, 1, tech.length).setValues([tech]);

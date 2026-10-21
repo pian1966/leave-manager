@@ -264,7 +264,8 @@ var LeaveCore = (function () {
   function inRuleGroup(rule, st) {
     if (!st || !tracksLeave(st) || st.active === false) return false;
     var cats = ruleCats(rule);
-    return !cats.length || cats.indexOf(String(st.level || '').trim().toLowerCase()) >= 0;
+    var lv = String(st.level || '').trim().toLowerCase();
+    return !cats.length || cats.some(function (c) { return lv === c || (c.indexOf(' ') > 0 && lv.slice(-(c.length + 1)) === ' ' + c); });
   }
   function activeRules(data) {
     return (data.rules || []).filter(function (r) { return r && r.active !== false && r.kind; });

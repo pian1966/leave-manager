@@ -1820,7 +1820,7 @@
 
   /* ------------------------------ demo backend ------------------------------ */
   var Demo = (function () {
-    var KEY = 'demo_db_v13';
+    var KEY = 'demo_db_v14';
     function seed() {
       var yr = new Date().getFullYear();
       // id, name, category, working days override ('' = category default), role, manager
@@ -1834,7 +1834,7 @@
         ['S07', 'Megan Smith', 'Support Staff', '', 'Staff', 'pieter@example.com'],
         ['S08', 'Kagiso Molefe', 'Pastoral Staff', '', 'Staff', 'thandi@example.com'],
         ['S09', 'Nomvula Zulu', 'Cleaning Staff', '', 'Staff', 'pieter@example.com'],
-        ['S10', 'Ruan Botha', 'Technical Staff', '', 'Staff', ''],
+        ['S10', 'Ruan Botha', 'Part-Time Technical Staff', '', 'Staff', ''],
         ['S11', 'Linda Pillay', 'Administrator', '', 'Administrator', '']
       ].map(function (s, i) {
         return { id: s[0], name: s[1], email: s[1].split(' ')[0].toLowerCase() + '@example.com', level: s[2], workDays: s[3], role: s[4], manager: s[5],
@@ -1845,8 +1845,8 @@
           WeeklyEmail: 'Monday', ReminderDates: '1 Nov, 1 Dec, 15 Jan', StandInID: '', StandInFrom: '', StandInTo: '' },
         rules: [
           { name: 'Sunday cover', kind: 'Minimum on duty', category: 'Pastoral Staff', days: 'Sun', from: '', to: '', min: 1, action: 'Warn', message: 'At least one pastor must be on duty every Sunday.', active: true },
-          { name: 'Easter services', kind: 'No leave', category: 'Pastoral Staff, Technical Staff', days: '', from: 'Easter-2', to: 'Easter+1', min: 0, action: 'Warn', message: 'Good Friday to Family Day.', active: true },
-          { name: 'Christmas services', kind: 'No leave', category: 'Pastoral Staff, Technical Staff', days: '', from: '24 Dec', to: '26 Dec', min: 0, action: 'Warn', message: '', active: true }
+          { name: 'Easter services', kind: 'No leave', category: 'Pastoral Staff, Part-Time Technical Staff', days: '', from: 'Easter-2', to: 'Easter+1', min: 0, action: 'Warn', message: 'Good Friday to Family Day.', active: true },
+          { name: 'Christmas services', kind: 'No leave', category: 'Pastoral Staff, Part-Time Technical Staff', days: '', from: '24 Dec', to: '26 Dec', min: 0, action: 'Warn', message: '', active: true }
         ],
         terms: [
           ['Term 4 2025', '2025-10-07', '2025-12-10'], ['Term 1 2026', '2026-01-14', '2026-03-27'], ['Term 2 2026', '2026-04-08', '2026-06-26'],
@@ -1868,7 +1868,7 @@
           { level: 'Pastoral Staff', label: 'Pastoral Staff', workDays: 'Mon, Wed, Thu, Fri, Sat, Sun', ent: { PSL: 24, SL: 7, WO: 4, SAB: 12.5, WA: 21 } },
           { level: 'Support Staff', label: 'Support Staff', workDays: 'Mon, Wed, Thu, Fri', ent: { SSL: 20, SL: 7 } },
           { level: 'Cleaning Staff', label: 'Cleaning Staff', workDays: 'Fri', ent: { CSL: 3, SL: 7 } },
-          { level: 'Technical Staff', label: 'Technical Staff', workDays: 'Mon, Wed, Thu, Fri, Sun', ent: { TSL: 20, SL: 7 } },
+          { level: 'Part-Time Technical Staff', label: 'Part-Time Technical Staff', workDays: 'Mon, Wed, Thu, Fri, Sun', ent: { TSL: 20, SL: 7 } },
           { level: 'Administrator', label: 'Administrator', workDays: 'Mon, Wed, Thu, Fri', ent: {} }
         ],
         staff: staff,

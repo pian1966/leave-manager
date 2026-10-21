@@ -80,7 +80,7 @@ The Overview opens first and shows your own leave at a glance.
 
 What you get depends on your staff category. The leave year runs 1 January to 31 December.
 
-| Leave type | Pastoral Staff | Support Staff | Technical Staff | Cleaning Staff | How it's counted |
+| Leave type | Pastoral Staff | Support Staff | Part-Time Technical Staff | Cleaning Staff | How it's counted |
 | --- | --- | --- | --- | --- | --- |
 | Pastoral Staff Leave | 24 days | – | – | – | Working days |
 | Support Staff Leave | – | 20 days | – | – | Working days |
@@ -92,7 +92,7 @@ What you get depends on your staff category. The leave year runs 1 January to 31
 | Working Away from Office | 21 days | – | – | – | Working days |
 | Unpaid Leave | Any | Any | Any | Any | Doesn't use an allowance |
 
-Usual working days: Pastoral Staff Mon and Wed–Sun; Support Staff Mon and Wed–Fri; Technical Staff Mon, Wed–Fri and Sun; Cleaning Staff Fridays. Yours may differ; the Overview shows your own.
+Usual working days: Pastoral Staff Mon and Wed–Sun; Support Staff Mon and Wed–Fri; Part-Time Technical Staff Mon, Wed–Fri and Sun; Cleaning Staff Fridays. Yours may differ; the Overview shows your own.
 
 **No carry-over — use it by 1 February.** Unused Pastoral, Support, Technical and Cleaning Staff Leave can still be taken up to and including 1 February of the next year. After that it's lost. Leave you take in January uses last year's days first. Sick Leave, Weekend Off and Working Away start fresh each 1 January.
 
