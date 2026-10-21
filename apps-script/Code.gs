@@ -58,6 +58,7 @@ function onOpen() {
     .addItem('Colour the colour codes', 'paintColours')
     .addSeparator()
     .addItem('Choose categories for a cover rule…', 'chooseRuleCategories')
+    .addItem('Choose dates for a cover rule…', 'chooseRuleDates')
     .addSeparator()
     .addItem('Preview the weekly “who’s away” email (sent to you only)', 'previewWeeklyEmail')
     .addItem('Preview the “use it or lose it” emails (sent to you only)', 'previewReminders')
@@ -270,7 +271,7 @@ function formatRules_(sh) {
   sh.getRange('B1').setNote('Minimum on duty: at least this many people of the category must be working on matching days.\nNo leave: no leave for the category on matching days (e.g. Easter, Christmas).');
   sh.getRange('C1').setNote('Who the rule is about. Pick one from the dropdown, or tick several with the Leave Manager menu → Choose categories for a cover rule…  Blank = all staff.');
   sh.getRange('D1').setNote('Days of the week, e.g. "Sun" or "Sat, Sun". Blank = every day.');
-  sh.getRange('E1').setNote('Blank = all year. A date (2026-12-24), a date every year (24 Dec), or Easter-based: Easter-2 = Good Friday, Easter+1 = Family Day.');
+  sh.getRange('E1').setNote('Easiest: click the rule’s row, then Leave Manager → Choose dates for a cover rule… (date pickers).\nOr type: blank = all year; a date (2026-12-24); a date every year (24 Dec); or Easter-based: Easter-2 = Good Friday, Easter+1 = Family Day.');
   sh.getRange('F1').setNote('Last day the rule applies (same formats as From).');
   sh.getRange('G1').setNote('For "Minimum on duty": how many must be working. Default 1.');
   sh.getRange('H1').setNote('Warn: the request can be sent, with a warning for the Administrator.\nBlock: staff can’t send it. The Administrator can always override.');
@@ -1489,4 +1490,65 @@ function setRuleCategories(row, list) {
   row = Number(row);
   if (!sh || !(row >= 2)) throw new Error('That rule can’t be found.');
   sh.getRange(row, 3).setValue((list || []).map(String).join(', '));
+}
+
+
+/* ================= COVER RULES: date pickers ================= */
+
+/** Menu: date pickers for the From / To of the cover rule on the selected row. */
+function chooseRuleDates() {
+  var ui = SpreadsheetApp.getUi(), ss = SpreadsheetApp.getActive(), sh = ss.getActiveSheet();
+  var row = ss.getActiveRange() ? ss.getActiveRange().getRow() : 0;
+  if (sh.getName() !== SHEET.RULES || row < 2) {
+    ui.alert('Choose dates', 'Go to the Cover Rules tab and click any cell in the rule’s row, then choose this menu item again.', ui.ButtonSet.OK);
+    return;
+  }
+  var txt = function (v) { return v instanceof Date ? Utilities.formatDate(v, tz_(), 'yyyy-MM-dd') : String(v == null ? '' : v).trim(); };
+  var name = String(sh.getRange(row, 1).getValue()).trim() || 'Row ' + row;
+  var from = txt(sh.getRange(row, 5).getValue()), to = txt(sh.getRange(row, 6).getValue()) || from;
+  var y = Number(todayStr_().slice(0, 4));
+  var kind = function (v) { return !v ? 'all' : LeaveCore.isISO(v) ? 'once' : /^easter/i.test(v) ? 'easter' : 'yearly'; };
+  var mode = kind(from);
+  var en = function (v) { var m = /^easter\s*([+-]\s*\d+)?$/i.exec(v || ''); return m && m[1] ? Number(m[1].replace(/\s/g, '')) : 0; };
+  var asDate = function (v, def) { return v ? (LeaveCore.ruleDate(v, y) || def) : def; };
+  var names = { '-7': 'Palm Sunday', '-3': 'Maundy Thursday', '-2': 'Good Friday', '-1': 'Holy Saturday', '0': 'Easter Sunday', '1': 'Family Day (Easter Monday)' };
+  var eopts = function (sel) { var o = ''; for (var i = -7; i <= 7; i++) o += '<option value="' + i + '"' + (i === sel ? ' selected' : '') + '>' + (names[String(i)] || (i < 0 ? -i + ' days before Easter' : i + ' days after Easter')) + '</option>'; return o; };
+  var radio = function (v, label) { return '<label class="r"><input type="radio" name="m" value="' + v + '"' + (mode === v ? ' checked' : '') + '> ' + label + '</label>'; };
+  var html = '<style>body{font-family:Arial,sans-serif;font-size:14px;color:#14211F;margin:0;padding:4px 2px}p{color:#5B6B67;margin:0 0 10px}' +
+    '.r{display:flex;gap:8px;align-items:center;padding:5px 0;cursor:pointer}.pane{margin:10px 0 0 26px;display:none;gap:10px}.pane.on{display:flex}' +
+    '.pane label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#5B6B67;flex:1}input[type=date],select{font:inherit;padding:6px;border:1px solid #C9D3D0;border-radius:6px}' +
+    '.b{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}button{font:inherit;padding:8px 16px;border-radius:6px;border:1px solid #C9D3D0;background:#fff;cursor:pointer}' +
+    'button.ok{background:#0F6E5C;color:#fff;border-color:#0F6E5C}#e{color:#B42318;min-height:18px;margin-top:8px}.h{font-size:12px;color:#5B6B67;margin:6px 0 0 26px}</style>' +
+    '<p>When does <b>' + esc_(name) + '</b> apply?</p>' +
+    radio('all', 'All year (only the Days column matters, e.g. every Sunday)') +
+    radio('yearly', 'Same dates every year') +
+    '<div class="pane" data-m="yearly"><label>From<input type="date" id="yf" value="' + (mode === 'yearly' ? asDate(from, y + '-12-24') : y + '-12-24') + '"></label><label>To<input type="date" id="yt" value="' + (mode === 'yearly' ? asDate(to, y + '-12-26') : y + '-12-26') + '"></label></div>' +
+    '<div class="h" data-m="yearly">Only the day and month are kept, so it repeats every year.</div>' +
+    radio('easter', 'Around Easter (moves each year)') +
+    '<div class="pane" data-m="easter"><label>From<select id="ef">' + eopts(mode === 'easter' ? en(from) : -2) + '</select></label><label>To<select id="et">' + eopts(mode === 'easter' ? en(to) : 1) + '</select></label></div>' +
+    radio('once', 'One year only') +
+    '<div class="pane" data-m="once"><label>From<input type="date" id="of" value="' + (mode === 'once' ? from : '') + '"></label><label>To<input type="date" id="ot" value="' + (mode === 'once' ? to : '') + '"></label></div>' +
+    '<div id="e"></div><div class="b"><button onclick="google.script.host.close()">Cancel</button><button class="ok" id="go">Save</button></div>' +
+    '<script>var M=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];' +
+    'function mode(){return (document.querySelector("input[name=m]:checked")||{}).value||"all"}' +
+    'function show(){var m=mode();[].forEach.call(document.querySelectorAll("[data-m]"),function(p){p.classList.toggle("on",p.dataset.m===m);if(p.className.indexOf("h")===0)p.style.display=p.dataset.m===m?"block":"none"})}' +
+    '[].forEach.call(document.getElementsByName("m"),function(r){r.onchange=show});show();' +
+    'function dm(v){var p=v.split("-");return Number(p[2])+" "+M[Number(p[1])-1]}' +
+    'function es(n){n=Number(n);return n===0?"Easter":"Easter"+(n>0?"+":"")+n}' +
+    'document.getElementById("go").onclick=function(){var m=mode(),f="",t="",e=document.getElementById("e"),g=function(i){return document.getElementById(i).value};' +
+    'if(m==="yearly"){if(!g("yf")||!g("yt")){e.textContent="Choose both dates.";return}f=dm(g("yf"));t=dm(g("yt"))}' +
+    'else if(m==="easter"){if(Number(g("et"))<Number(g("ef"))){e.textContent="The last day is before the first day.";return}f=es(g("ef"));t=es(g("et"))}' +
+    'else if(m==="once"){if(!g("of")){e.textContent="Choose the first day.";return}f=g("of");t=g("ot")||f;if(t<f){e.textContent="The last day is before the first day.";return}}' +
+    'this.disabled=true;google.script.run.withSuccessHandler(function(){google.script.host.close()}).withFailureHandler(function(x){e.textContent=x.message}).setRuleDates(' + row + ',f,t)}</script>';
+  ui.showModalDialog(HtmlService.createHtmlOutput(html).setWidth(420).setHeight(440), 'Choose dates');
+}
+
+/** Called from the date window: writes From / To as text, so "24 Dec" keeps meaning every year. */
+function setRuleDates(row, from, to) {
+  var sh = SpreadsheetApp.getActive().getSheetByName(SHEET.RULES);
+  row = Number(row);
+  if (!sh || !(row >= 2)) throw new Error('That rule can’t be found.');
+  var rng = sh.getRange(row, 5, 1, 2);
+  rng.setNumberFormat('@');
+  rng.setValues([[String(from || ''), String(to || '')]]);
 }
