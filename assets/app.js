@@ -1512,7 +1512,8 @@
       '<label class="field">Last day<input type="date" id="f-end" required value="' + esc(pre.date || '') + '"' + (pre.date ? ' min="' + esc(pre.date) + '"' : '') + '></label></div>' +
       '<div class="field" id="f-half-wrap" hidden><span>Length</span><div class="radios">' +
       '<label><input type="radio" name="half" value="None" checked>Full day</label><label><input type="radio" name="half" value="AM">Morning</label><label><input type="radio" name="half" value="PM">Afternoon</label></div></div>' +
-      '<label class="field">' + (takesLeave(u) ? 'Note for the Administrator' : 'Note') + ' <span class="muted" style="font-weight:400">(optional)</span><textarea id="f-reason" rows="2" maxlength="500"></textarea></label>' +
+      (takesLeave(u) ? '<label class="field"><span>Note for the Administrator <span class="req" aria-hidden="true">*</span></span><textarea id="f-reason" rows="2" maxlength="500" required aria-required="true" placeholder="What is the leave for? e.g. family visit, doctor’s appointment"></textarea></label>'
+        : '<label class="field">Note <span class="muted" style="font-weight:400">(optional)</span><textarea id="f-reason" rows="2" maxlength="500"></textarea></label>') +
       '<div class="summary" id="f-sum"></div><div id="f-err"></div>' +
       '<div class="actions"><button type="button" class="btn" data-act="close">Cancel</button><button type="submit" class="btn primary" id="f-go">' + (takesLeave(u) ? 'Send request' : 'Book leave') + '</button></div></form>';
     openModal(html, 'Request leave');
@@ -1809,7 +1810,7 @@
     if (ev.target.id === 'reqForm') {
       var r = readReqForm(), btn2 = document.getElementById('f-go');
       if (document.getElementById('f-half-wrap').hidden) r.half = 'None';
-      var st = staffById(r.staffId), err = C.validate(S.data, st, r);
+      var st = staffById(r.staffId), err = (r.staffId === me().id && String(r.reason || '').trim().length < 3) ? 'Please add a note for the Administrator saying what the leave is for.' : C.validate(S.data, st, r, undefined, false, isMgr());
       if (err) { setErr(err); return; }
       busy(btn2, true);
       var forOther = r.staffId !== me().id, t = C.type(S.data, r.type);

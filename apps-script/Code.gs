@@ -277,7 +277,7 @@ function formatRules_(sh) {
  * Brings the workbook up to date for new features, once (tracked in Script Properties).
  * Runs automatically on the first app request after an update, and from setup.
  */
-var SCHEMA_VERSION_ = '3';
+var SCHEMA_VERSION_ = '4';
 function upgrade_(force) {
   var P = PropertiesService.getScriptProperties();
   if (!force && P.getProperty('SCHEMA') === SCHEMA_VERSION_) return;
@@ -289,6 +289,7 @@ function upgrade_(force) {
     NEW_SETTINGS_.forEach(function (row) { if (have.indexOf(row[0]) < 0) set.appendRow(row); });
   }
   installDailyTrigger_();
+  try { if (getSetting_('FormId')) refreshForm(); } catch (e) { console.warn('Form refresh skipped: ' + e); }   // e.g. the note becomes compulsory
   P.setProperty('SCHEMA', SCHEMA_VERSION_);
 }
 
@@ -1072,7 +1073,7 @@ function createForm_() {
   form.addDateItem().setTitle(FORM_Q.END).setRequired(true).setHelpText('Same as the first day for a single day.');
   form.addMultipleChoiceItem().setTitle(FORM_Q.HALF).setChoiceValues(['No – full day(s)', 'Morning only', 'Afternoon only'])
     .setHelpText('Only for single-day requests.');
-  form.addParagraphTextItem().setTitle(FORM_Q.NOTE);
+  form.addParagraphTextItem().setTitle(FORM_Q.NOTE).setRequired(true).setHelpText('What is the leave for? e.g. family visit, doctor’s appointment');
   setSetting_('FormId', form.getId());
   setSetting_('FormURL', form.getPublishedUrl());
   ScriptApp.getProjectTriggers().forEach(function (tr) { if (tr.getHandlerFunction() === 'onLeaveFormSubmit') ScriptApp.deleteTrigger(tr); });
@@ -1089,6 +1090,7 @@ function refreshForm() {
   form.getItems().forEach(function (it) {
     if (it.getTitle() === FORM_Q.NAME) it.asListItem().setChoiceValues(data.staff.filter(function (s) { return s.active; }).map(function (s) { return s.name; }));
     if (it.getTitle() === FORM_Q.TYPE) it.asListItem().setChoiceValues(data.types.map(function (t) { return t.name; }));
+    if (it.getTitle() === FORM_Q.NOTE) it.asParagraphTextItem().setRequired(true).setHelpText('What is the leave for? e.g. family visit, doctor’s appointment');
   });
 }
 

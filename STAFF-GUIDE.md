@@ -60,7 +60,7 @@ The Overview opens first and shows your own leave at a glance.
 2. Choose the **Leave type**. You only see the types your staff category gets.
 3. Pick the **First day** and **Last day**. The Last day fills in with the same date, so for one day you're done; for longer, change the Last day.
 4. For a single day you can choose **Morning** or **Afternoon** for a half day (not for every leave type).
-5. Add a **note** for the Administrator if you like.
+5. Add a **note** for the Administrator saying what the leave is for (e.g. *family visit*, *doctor's appointment*). The note is required; the request can't be sent without it.
 6. Check the grey box: it shows how many days this uses and what you'll have left. A red message means the request can't be sent yet and says why.
 7. Click **Send request**.
 
@@ -74,7 +74,7 @@ The Overview opens first and shows your own leave at a glance.
 
 **What counts as a day off:** only *your own* working days. Days you don't normally work, days the church is closed (Tuesdays) and public holidays are never taken off your balance. Sabbatical is the exception: it counts every calendar day.
 
-**Prefer a form?** Use **Request via Google Forms** in the left panel. Fill it in with the same email you sign in with. If the request can't be booked (for example, not enough days left), you'll get an email explaining why.
+**Prefer a form?** Use **Request via Google Forms** in the left panel. Fill it in with the same email you sign in with. The note is required there too. If the request can't be booked (for example, not enough days left), you'll get an email explaining why.
 
 ## Your leave allowances
 

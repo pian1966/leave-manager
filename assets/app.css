@@ -601,3 +601,4 @@ button.kpi:hover { border-color: var(--accent); }
 .upd-banner .controls { display: flex; gap: 6px; }
 .upd-yes { background: var(--accent-soft); border-radius: 8px; padding: 10px 12px; margin: 0 0 12px; }
 .upd-ok { color: var(--ok); font-weight: 700; margin: 0 0 12px; }
+.req { color: var(--bad); font-weight: 700; }

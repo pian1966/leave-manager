@@ -551,6 +551,7 @@ var LeaveCore = (function () {
     return null;
   }
 
+  var NOTE_NEEDED = 'Please add a note for the Administrator saying what the leave is for.';
   /** Builds a new request (validated) and decides whether it is auto-approved. */
   function prepareRequest(data, actor, b) {
     var target = b.staffId && b.staffId !== actor.id ? staffById(data, b.staffId) : actor;
@@ -563,6 +564,7 @@ var LeaveCore = (function () {
       half: (b.half === 'AM' || b.half === 'PM') && isDayUnit(t0) ? b.half : 'None',
       reason: String(b.reason || '').slice(0, 500)
     };
+    if (target.id === actor.id && String(r.reason).trim().length < 3) throw new Error(NOTE_NEEDED);
     var err = validate(data, target, r, undefined, false, isAdmin(actor));
     if (err) throw new Error(err);
     var t = type(data, r.type);
