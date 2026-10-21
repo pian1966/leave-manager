@@ -1522,10 +1522,10 @@ function chooseRuleDates() {
     '<p>When does <b>' + esc_(name) + '</b> apply?</p>' +
     radio('all', 'All year (only the Days column matters, e.g. every Sunday)') +
     radio('yearly', 'Same dates every year') +
-    '<div class="pane" data-m="yearly"><label>From<input type="date" id="yf" value="' + (mode === 'yearly' ? asDate(from, y + '-12-24') : y + '-12-24') + '"></label><label>To<input type="date" id="yt" value="' + (mode === 'yearly' ? asDate(to, y + '-12-26') : y + '-12-26') + '"></label></div>' +
+    '<div class="pane" data-m="yearly"><label>From<input type="date" id="yf" value="' + (mode === 'yearly' ? asDate(from, y + '-12-24') : y + '-12-24') + '"></label><label>To<input type="date" id="yt" value="' + (mode === 'yearly' ? asDate(to, y + '-12-24') : y + '-12-24') + '"></label></div>' +
     '<div class="h" data-m="yearly">Only the day and month are kept, so it repeats every year.</div>' +
     radio('easter', 'Around Easter (moves each year)') +
-    '<div class="pane" data-m="easter"><label>From<select id="ef">' + eopts(mode === 'easter' ? en(from) : -2) + '</select></label><label>To<select id="et">' + eopts(mode === 'easter' ? en(to) : 1) + '</select></label></div>' +
+    '<div class="pane" data-m="easter"><label>From<select id="ef">' + eopts(mode === 'easter' ? en(from) : -2) + '</select></label><label>To<select id="et">' + eopts(mode === 'easter' ? en(to) : -2) + '</select></label></div>' +
     radio('once', 'One year only') +
     '<div class="pane" data-m="once"><label>From<input type="date" id="of" value="' + (mode === 'once' ? from : '') + '"></label><label>To<input type="date" id="ot" value="' + (mode === 'once' ? to : '') + '"></label></div>' +
     '<div id="e"></div><div class="b"><button onclick="google.script.host.close()">Cancel</button><button class="ok" id="go">Save</button></div>' +
@@ -1533,6 +1533,10 @@ function chooseRuleDates() {
     'function mode(){return (document.querySelector("input[name=m]:checked")||{}).value||"all"}' +
     'function show(){var m=mode();[].forEach.call(document.querySelectorAll("[data-m]"),function(p){p.classList.toggle("on",p.dataset.m===m);if(p.className.indexOf("h")===0)p.style.display=p.dataset.m===m?"block":"none"})}' +
     '[].forEach.call(document.getElementsByName("m"),function(r){r.onchange=show});show();' +
+    // To follows From: copy From into To unless To was already a later date.
+    'function fol(f,t,num,dm){var F=document.getElementById(f),T=document.getElementById(t),p=F.value;F.addEventListener("change",function(){var v=F.value,b=num?Number(T.value)<Number(v):(T.value&&T.value<v);' +
+    'if(dm){if(T.value===p||T.value.slice(5)===p.slice(5))T.value=v}else if(T.value===""||T.value===p||b)T.value=v;if(!num&&!dm)T.min=v;p=v})}' +
+    'fol("yf","yt",false,true);fol("ef","et",true);fol("of","ot");' +
     'function dm(v){var p=v.split("-");return Number(p[2])+" "+M[Number(p[1])-1]}' +
     'function es(n){n=Number(n);return n===0?"Easter":"Easter"+(n>0?"+":"")+n}' +
     'document.getElementById("go").onclick=function(){var m=mode(),f="",t="",e=document.getElementById("e"),g=function(i){return document.getElementById(i).value};' +

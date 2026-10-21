@@ -744,15 +744,16 @@
     var md = C.parseMonthDay(v) || [12, 25], d = '', m = '';
     for (var i = 1; i <= 31; i++) d += '<option' + (i === md[1] ? ' selected' : '') + '>' + i + '</option>';
     MONTH3.forEach(function (x, i) { m += '<option value="' + x + '"' + (i + 1 === md[0] ? ' selected' : '') + '>' + MONTHS[i] + '</option>'; });
-    return '<span class="dm"><select id="' + prefix + 'd" class="btn" aria-label="Day">' + d + '</select><select id="' + prefix + 'm" class="btn" aria-label="Month">' + m + '</select></span>';
+    var fol = prefix === 'rb-f' ? ' data-follow-dm="rb-t"' : '';
+    return '<span class="dm"><select id="' + prefix + 'd" class="btn" aria-label="Day"' + fol + '>' + d + '</select><select id="' + prefix + 'm" class="btn" aria-label="Month"' + fol + '>' + m + '</select></span>';
   }
-  function easterSelect(id, n) {
+  function easterSelect(id, n, follow) {
     var o = '';
     for (var i = -7; i <= 7; i++) o += '<option value="' + i + '"' + (i === n ? ' selected' : '') + '>' + esc(easterLabel(i)) + '</option>';
-    return '<select id="' + id + '" class="btn">' + o + '</select>';
+    return '<select id="' + id + '" class="btn"' + (follow ? ' data-follow="' + follow + '" data-num="1"' : '') + '>' + o + '</select>';
   }
   function blockedModal(rule) {
-    var r = rule || { name: '', from: '24 Dec', to: '26 Dec', category: '', action: 'Block', message: '', active: true };
+    var r = rule || { name: '', from: '24 Dec', to: '24 Dec', category: '', action: 'Block', message: '', active: true };
     var mode = specKind(r.from), cats = String(r.category || '').split(',').map(function (x) { return C.catKey(x); }).filter(String);
     var levels = S.data.levels.filter(function (l) { return C.tracksLeave({ level: l.level }); });
     var html = '<header><div><p class="eyebrow">Blocked days</p><h2>' + (rule ? 'Change blocked days' : 'Add blocked days') + '</h2></div><button class="x" data-act="close" aria-label="Close">×</button></header>' +
@@ -760,9 +761,9 @@
       '<label class="field">Name<input id="rb-name" maxlength="60" value="' + esc(r.name) + '" placeholder="e.g. Christmas services, Church camp"></label>' +
       '<div class="field"><span>When</span><div class="radios" id="rb-mode">' + [['yearly', 'Same dates every year'], ['easter', 'Around Easter (moves each year)'], ['once', 'One year only']].map(function (o) {
         return '<label><input type="radio" name="rb-mode" value="' + o[0] + '"' + (mode === o[0] ? ' checked' : '') + '>' + o[1] + '</label>'; }).join('') + '</div></div>' +
-      '<div class="rb-pane" data-mode="yearly"' + (mode === 'yearly' ? '' : ' hidden') + '><div class="two"><div class="field"><span>From</span>' + dmSelects('rb-f', mode === 'yearly' ? r.from : '24 Dec') + '</div><div class="field"><span>To</span>' + dmSelects('rb-t', mode === 'yearly' ? (r.to || r.from) : '26 Dec') + '</div></div></div>' +
-      '<div class="rb-pane" data-mode="easter"' + (mode === 'easter' ? '' : ' hidden') + '><div class="two"><label class="field">From' + easterSelect('rb-fe', mode === 'easter' ? easterN(r.from) : -2) + '</label><label class="field">To' + easterSelect('rb-te', mode === 'easter' ? easterN(r.to || r.from) : 1) + '</label></div></div>' +
-      '<div class="rb-pane" data-mode="once"' + (mode === 'once' ? '' : ' hidden') + '><div class="two"><label class="field">From<input type="date" id="rb-fs" value="' + esc(mode === 'once' ? r.from : '') + '"></label><label class="field">To<input type="date" id="rb-ts" value="' + esc(mode === 'once' ? (r.to || r.from) : '') + '"></label></div></div>' +
+      '<div class="rb-pane" data-mode="yearly"' + (mode === 'yearly' ? '' : ' hidden') + '><div class="two"><div class="field"><span>From</span>' + dmSelects('rb-f', mode === 'yearly' ? r.from : '24 Dec') + '</div><div class="field"><span>To</span>' + dmSelects('rb-t', mode === 'yearly' ? (r.to || r.from) : '24 Dec') + '</div></div></div>' +
+      '<div class="rb-pane" data-mode="easter"' + (mode === 'easter' ? '' : ' hidden') + '><div class="two"><label class="field">From' + easterSelect('rb-fe', mode === 'easter' ? easterN(r.from) : -2, 'rb-te') + '</label><label class="field">To' + easterSelect('rb-te', mode === 'easter' ? easterN(r.to || r.from) : -2) + '</label></div></div>' +
+      '<div class="rb-pane" data-mode="once"' + (mode === 'once' ? '' : ' hidden') + '><div class="two"><label class="field">From<input type="date" id="rb-fs" data-follow="rb-ts" value="' + esc(mode === 'once' ? r.from : '') + '"></label><label class="field">To<input type="date" id="rb-ts" value="' + esc(mode === 'once' ? (r.to || r.from) : '') + '"></label></div></div>' +
       '<div class="field"><span>Who can’t take leave</span><div class="radios"><label><input type="radio" name="rb-who" value="all"' + (cats.length ? '' : ' checked') + '>All staff</label><label><input type="radio" name="rb-who" value="some"' + (cats.length ? ' checked' : '') + '>Only some categories</label></div>' +
       '<div class="rb-cats"' + (cats.length ? '' : ' hidden') + '>' + levels.map(function (l) {
         return '<label class="chk"><input type="checkbox" name="rb-cat" value="' + esc(l.level) + '"' + (cats.indexOf(C.catKey(l.level)) >= 0 ? ' checked' : '') + '>' + esc(l.level) + '</label>'; }).join('') + '</div></div>' +
@@ -820,7 +821,7 @@
     return '<section class="panel" id="standin"><h2>Stand-in approver</h2>' + state +
       '<div class="si-form"><label class="field">Person<select id="si-who"><option value="">Choose…</option>' + people.map(function (p) {
         return '<option value="' + esc(p.id) + '"' + (p.id === id ? ' selected' : '') + '>' + esc(p.name) + '</option>'; }).join('') + '</select></label>' +
-      '<div class="two"><label class="field">From<input type="date" id="si-from" value="' + esc(from) + '"></label><label class="field">To<input type="date" id="si-to" value="' + esc(to) + '"></label></div>' +
+      '<div class="two"><label class="field">From<input type="date" id="si-from" data-follow="si-to" value="' + esc(from) + '"></label><label class="field">To<input type="date" id="si-to" value="' + esc(to) + '"></label></div>' +
       '<div class="btns"><button class="btn primary" data-act="si-save">' + (who ? 'Update' : 'Set stand-in') + '</button>' + (who ? '<button class="btn ghost" data-act="si-clear">Remove</button>' : '') + '</div></div></section>';
   }
 
@@ -1902,6 +1903,7 @@
   });
   var histTimer;
   document.addEventListener('input', function (ev) {
+    if (ev.target.dataset && ev.target.dataset.follow && ev.target.type === 'date') followFrom(ev.target);
     if (ev.target.id === 'set-colour') { applyAccent(normHex(ev.target.value)); return; }
     if (ev.target.id === 'hist-q') {
       S.histF.q = ev.target.value;
@@ -1917,6 +1919,28 @@
       updateRequestSummary();
     }
   });
+  /* "To follows From" everywhere: picking a From date copies it into To, unless To was already set to a later date. */
+  function initialValue(el) {
+    if (el.dataset.prev != null) return el.dataset.prev;
+    if (el.tagName === 'SELECT') { var o = Array.prototype.filter.call(el.options, function (x) { return x.defaultSelected; })[0]; return o ? o.value : el.value; }
+    return el.defaultValue;
+  }
+  function followFrom(fromEl) {
+    var to = document.getElementById(fromEl.dataset.follow); if (!to) return;
+    var num = !!fromEl.dataset.num, v = fromEl.value, prev = initialValue(fromEl);
+    var before = num ? Number(to.value) < Number(v) : (to.value && v && to.value < v);
+    if (v !== '' && (to.value === '' || to.value === prev || before)) to.value = v;
+    if (!num && to.type === 'date') to.min = v || '';
+    fromEl.dataset.prev = v;
+  }
+  function followDayMonth(el) {   // same dates every year: day + month selects
+    var p = el.dataset.followDm, fd = el.id.replace(/[dm]$/, 'd'), fm = el.id.replace(/[dm]$/, 'm');
+    var fD = document.getElementById(fd), fM = document.getElementById(fm), tD = document.getElementById(p + 'd'), tM = document.getElementById(p + 'm');
+    if (!fD || !fM || !tD || !tM) return;
+    var prev = (fD.dataset.prev != null ? fD.dataset.prev : initialValue(fD)) + ' ' + (fM.dataset.prev != null ? fM.dataset.prev : initialValue(fM));
+    if (tD.value + ' ' + tM.value === prev) { tD.value = fD.value; tM.value = fM.value; }
+    fD.dataset.prev = fD.value; fM.dataset.prev = fM.value;
+  }
   /** The last day follows the first day, unless someone has deliberately picked a later last day. */
   function syncLastDay(startEl) {
     var end = document.getElementById('f-end'), start = startEl.value, prev = startEl.dataset.prev || '';
@@ -1927,6 +1951,8 @@
   }
   document.addEventListener('change', function (ev) {
     if (ev.target.id === 'f-start') syncLastDay(ev.target);
+    if (ev.target.dataset && ev.target.dataset.follow) followFrom(ev.target);
+    if (ev.target.dataset && ev.target.dataset.followDm) followDayMonth(ev.target);
     if (ev.target.id === 'set-colour') { S.pickColour = normHex(ev.target.value); applyAccent(S.pickColour); render(); return; }
     if (ev.target.name === 'theme' && ev.target.closest('#set-theme')) { store.set('theme', ev.target.value); applyTheme(ev.target.value); toast('Appearance saved on this device'); return; }
     if (ev.target.id === 'em-weekly' || ev.target.id === 'em-day' || ev.target.id === 'em-rem') { saveEmails(); return; }
