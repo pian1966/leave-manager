@@ -141,6 +141,7 @@ function setup() {
   build_(ss, SHEET.HIST, []);
   buildRules_(ss);
 
+  dirty_();
   var problems = migrateToAdministrator_(ss);
   try { upgrade_(true); } catch (e) { problems.push('Upgrading: ' + (e && e.message || e)); }
   formatSheets_(ss);
@@ -299,6 +300,7 @@ function upgrade_(force) {
   installDailyTrigger_();
   try { if (getSetting_('FormId')) refreshForm(); } catch (e) { console.warn('Form refresh skipped: ' + e); }   // e.g. the note becomes compulsory
   P.setProperty('SCHEMA', SCHEMA_VERSION_);
+  dirty_();
 }
 
 function build_(ss, name, rows) {
@@ -316,6 +318,7 @@ function build_(ss, name, rows) {
 var COLOUR_COLS_ = { 'Staff': 10, 'Leave Types': 3 };
 
 function onEdit(e) {
+  dirty_();
   try { renameCategory_(e); } catch (err) { /* never block an edit */ }
   try {
     var sh = e.range.getSheet(), col = COLOUR_COLS_[sh.getName()];
@@ -556,6 +559,7 @@ function updateCalendars() {
   });
   if (ts.getLastRow() > 2) ts.getRange(2, 1, ts.getLastRow() - 1, 3).sort(2);
 
+  dirty_();
   var msg = log.length ? log.join('; ') : 'Everything was already up to date';
   setSetting_('LastCalendarUpdate', nowStr_() + ' – ' + msg);
   return msg;
@@ -620,6 +624,37 @@ function readTable_(name) {
   return out;
 }
 
+/* ---------- Speed: remember the sheet for a couple of minutes ----------
+   Opening or refreshing the app reuses a recent copy instead of reading every tab again.
+   Any change (by the app, a form, or someone editing the sheet) clears it straight away.
+   Changes themselves always work on a fresh read, so nothing is written to the wrong row. */
+var DATA_TTL_ = 120;          // seconds
+var LAST_DATA_ = null;        // the data after a change, so it needn't be read again
+function dirty_() { try { CacheService.getScriptCache().remove('dc_n'); } catch (e) { /* ignore */ } }
+function putCache_(data) {
+  try {
+    var json = JSON.stringify(data), size = 90000, parts = {}, n = Math.ceil(json.length / size);
+    if (n > 25) return;   // too big to be worth caching
+    for (var i = 0; i < n; i++) parts['dc_' + i] = json.slice(i * size, (i + 1) * size);
+    parts.dc_n = String(n);
+    CacheService.getScriptCache().putAll(parts, DATA_TTL_);
+  } catch (e) { /* caching is only a speed-up */ }
+}
+function cachedData_() {
+  try {
+    var c = CacheService.getScriptCache(), n = Number(c.get('dc_n'));
+    if (n > 0) {
+      var keys = []; for (var i = 0; i < n; i++) keys.push('dc_' + i);
+      var got = c.getAll(keys), json = '';
+      for (var j = 0; j < n; j++) { if (got['dc_' + j] == null) { json = null; break; } json += got['dc_' + j]; }
+      if (json) { var d = JSON.parse(json); LeaveCore.applyStandIn(d, todayStr_()); return d; }
+    }
+  } catch (e) { /* fall back to reading the sheet */ }
+  var data = loadData_();
+  putCache_(data);
+  return data;
+}
+
 function loadData_() {
   var settings = {};
   readTable_(SHEET.SET).forEach(function (r) { if (r.Key) settings[r.Key] = r.Value; });
@@ -679,7 +714,16 @@ function loadData_() {
   return data;
 }
 
+/** The current row of a staff member on the Staff tab (looked up fresh, never from the remembered copy). */
+function staffRow_(id) {
+  var sh = ss_().getSheetByName(SHEET.STAFF);
+  if (!sh || sh.getLastRow() < 2) throw new Error('The Staff tab is empty.');
+  var ids = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
+  for (var i = 0; i < ids.length; i++) if (String(ids[i][0]).trim() === String(id)) return i + 2;
+  throw new Error('You’re no longer on the Staff tab. Ask the Administrator.');
+}
 function setCells_(sheetName, row, values) {
+  dirty_();
   var sh = ss_().getSheetByName(sheetName);
   var head = HEADERS[sheetName];
   Object.keys(values).forEach(function (k) {
@@ -692,6 +736,7 @@ function getSetting_(key) {
   return row ? row.Value : '';
 }
 function setSetting_(key, value) {
+  dirty_();
   var row = readTable_(SHEET.SET).filter(function (r) { return r.Key === key; })[0];
   if (row) setCells_(SHEET.SET, row._row, { 'Value': value });
   else ss_().getSheetByName(SHEET.SET).appendRow([key, value, '']);
@@ -720,8 +765,9 @@ function doGet(e) {
 
 function route_(b) {
   if (b.action === 'login') return login_(b);
-  var data = loadData_();
+  var data = cachedData_();
   var user = auth_(b.token, data);
+  LAST_DATA_ = null;
   switch (b.action) {
     case 'bootstrap':
       var view = LeaveCore.publicView(data, user);
@@ -764,11 +810,14 @@ function route_(b) {
     default:
       throw new Error('Unknown action: ' + b.action);
   }
-  return LeaveCore.publicView(loadData_(), user);
+  var after = LAST_DATA_ || loadData_();
+  putCache_(after);
+  var me = LeaveCore.staffById(after, user.id) || user;
+  return LeaveCore.publicView(after, me);
 }
 
 function login_(b) {
-  var data = loadData_();
+  var data = cachedData_();
   if (b.google) {
     var gEmail = googleEmail_(String(b.google));
     var gs = data.staff.filter(function (s) { return s.email === gEmail && s.active; })[0];
@@ -836,7 +885,7 @@ function checkPin_(st, pin) {
   if (!stored || !pin) return false;
   if (stored.indexOf('u:') === 0) return stored === 'u:' + hash_(pin).slice(2);
   if (stored.indexOf('h:') === 0) return stored === hash_(pin);
-  if (stored === pin) { setCells_(SHEET.STAFF, st._row, { 'PIN': hash_(pin) }); return true; } // upgrade to a hash on first use
+  if (stored === pin) { setCells_(SHEET.STAFF, staffRow_(st.id), { 'PIN': hash_(pin) }); return true; } // upgrade to a hash on first use
   return false;
 }
 
@@ -857,9 +906,10 @@ function savePrefs_(user, b) {
   if (!/^#[0-9a-f]{6}$/i.test(hex)) throw new Error('That isn’t a colour code. Pick one of the colours shown.');
   hex = hex.toUpperCase();
   withLock_(function () {
-    setCells_(SHEET.STAFF, user._row, { 'Colour': hex });
+    var row = staffRow_(user.id);
+    setCells_(SHEET.STAFF, row, { 'Colour': hex });
     var sh = ss_().getSheetByName(SHEET.STAFF);
-    paintRange_(sh.getRange(user._row, COLOUR_COLS_['Staff'], 1, 1));
+    paintRange_(sh.getRange(row, COLOUR_COLS_['Staff'], 1, 1));
   });
 }
 
@@ -882,6 +932,10 @@ function createRequest_(actor, b, source) {
     sh.appendRow([r.id, now, r.staffId, p.staff.name, r.type, r.start, r.end, r.half, r.days, r.reason,
       r.status, r.decidedBy, r.status === 'Approved' ? now : '', '', source, '', '', '']);
     r._row = sh.getLastRow();
+    dirty_();
+    r.submitted = now; r.source = source; r.decidedOn = r.status === 'Approved' ? now : ''; r.note = ''; r.cancelledBy = ''; r.cancelledOn = '';
+    data.requests.push(r);
+    LAST_DATA_ = data;
     var byOther = p.staff.id !== actor.id;
     logHistory_(byOther ? 'Booked by Administrator' : (r.status === 'Approved' ? 'Requested (no approval needed)' : 'Requested') +
       (source === 'Form' ? ' via Google Form' : ''), r, p.staff.name, p.type.name, actor.name, r.reason);
@@ -901,7 +955,8 @@ function decide_(actor, id, decision, note) {
     var p = LeaveCore.prepareDecision(data, actor, id, decision);
     var r = p.req;
     setCells_(SHEET.REQ, r._row, { 'Status': decision, 'Decided By': actor.name, 'Decided On': nowStr_(), 'Manager Note': String(note || '').slice(0, 500) });
-    r.status = decision; r.note = String(note || '');
+    r.status = decision; r.note = String(note || ''); r.decidedBy = actor.name; r.decidedOn = nowStr_();
+    LAST_DATA_ = data;
     logHistory_(decision, r, p.staff.name, p.type.name, actor.name, r.note);
     if (decision === 'Approved') syncCalendar_(data, r, p.staff, p.type);
     mailDecision_(data, r, p.staff, p.type, actor.name);
@@ -915,7 +970,8 @@ function cancel_(actor, id) {
     var p = LeaveCore.prepareCancel(data, actor, id, todayStr_());
     var r = p.req, wasApproved = r.status === 'Approved';
     setCells_(SHEET.REQ, r._row, { 'Status': 'Cancelled', 'Cancelled By': actor.name, 'Cancelled On': nowStr_() });
-    r.status = 'Cancelled';
+    r.status = 'Cancelled'; r.cancelledBy = actor.name; r.cancelledOn = nowStr_();
+    LAST_DATA_ = data;
     logHistory_('Cancelled (was ' + (wasApproved ? 'approved' : 'waiting for approval') + ')', r, p.staff.name, p.type.name, actor.name, '');
     removeCalendar_(data, r);
     if (wasApproved && actor.id === p.staff.id) {
@@ -1342,7 +1398,7 @@ function setOwnPin_(user, b) {
   var bad = pinProblem_(pin);
   if (bad) throw new Error(bad);
   if (pin === current) throw new Error('Choose a PIN that’s different from the one you were given.');
-  withLock_(function () { setCells_(SHEET.STAFF, user._row, { 'PIN': 'u:' + hash_(pin).slice(2) }); });
+  withLock_(function () { setCells_(SHEET.STAFF, staffRow_(user.id), { 'PIN': 'u:' + hash_(pin).slice(2) }); });
 }
 
 
@@ -1379,6 +1435,9 @@ function edit_(actor, b) {
     else if (p.reapprove === false && p.was.status !== 'Approved') { cells['Decided By'] = 'Auto-approved'; cells['Decided On'] = now; }
     setCells_(SHEET.REQ, r._row, cells);
     removeCalendar_(data, r);
+    r.type = n.type; r.start = n.start; r.end = n.end; r.half = n.half; r.days = n.days; r.reason = n.reason; r.status = p.status;
+    if ('Decided By' in cells) { r.decidedBy = cells['Decided By']; r.decidedOn = cells['Decided On']; }
+    LAST_DATA_ = data;
     var updated = { id: r.id, _row: r._row, staffId: r.staffId, type: n.type, start: n.start, end: n.end, half: n.half, days: n.days, reason: n.reason, status: p.status, warnings: n.warnings };
     if (p.status === 'Approved') syncCalendar_(data, updated, p.staff, p.type);
     logHistory_('Changed' + (p.reapprove ? ' (needs approval again)' : ''), updated, p.staff.name, p.type.name, actor.name, 'Was: ' + p.changes.join('; '));
@@ -1437,6 +1496,7 @@ function saveRule_(user, b) {
         row = last + 2;
       }
     }
+    dirty_();
     sh.getRange(row, 4, 1, 3).setNumberFormat('@');   // keep "24 Dec" as text so it means every year
     sh.getRange(row, 1, 1, values.length).setValues([values]);
     try { sh.getRange(row, 10).insertCheckboxes(); sh.getRange(row, 10).setValue(b.active !== false); } catch (e) { /* not important */ }
@@ -1447,7 +1507,7 @@ function deleteRule_(user, b) {
   if (!LeaveCore.isAdmin(user)) throw new Error('Only an Administrator can change blocked days.');
   withLock_(function () {
     var row = ruleRow_(b.id), sh = rulesSheet_(), name = String(sh.getRange(row, 1).getValue());
-    sh.deleteRow(row);
+    sh.deleteRow(row); dirty_();
     logHistory_('Blocked days removed', {}, '', '', user.name, name);
   });
 }
@@ -1489,7 +1549,7 @@ function setRuleCategories(row, list) {
   var sh = SpreadsheetApp.getActive().getSheetByName(SHEET.RULES);
   row = Number(row);
   if (!sh || !(row >= 2)) throw new Error('That rule can’t be found.');
-  sh.getRange(row, 3).setValue((list || []).map(String).join(', '));
+  sh.getRange(row, 3).setValue((list || []).map(String).join(', ')); dirty_();
 }
 
 
@@ -1554,5 +1614,5 @@ function setRuleDates(row, from, to) {
   if (!sh || !(row >= 2)) throw new Error('That rule can’t be found.');
   var rng = sh.getRange(row, 5, 1, 2);
   rng.setNumberFormat('@');
-  rng.setValues([[String(from || ''), String(to || '')]]);
+  rng.setValues([[String(from || ''), String(to || '')]]); dirty_();
 }

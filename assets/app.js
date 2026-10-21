@@ -85,7 +85,7 @@
     bits.push(t.needsApproval === false ? 'No approval needed' : 'Needs Administrator approval');
     return t.name + (t.code && t.code !== t.name ? ' (' + t.code + ')' : '') + '\n' + bits.join(' · ');
   }
-  function pill(status) { return '<span class="pill ' + esc(status) + '">' + esc(status) + '</span>'; }
+  function pill(status, r) { return r && r.saving ? '<span class="pill Pending saving">Sending…</span>' : '<span class="pill ' + esc(status) + '">' + esc(status) + '</span>'; }
 
   var ICON = {
     home: '<path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/>',
@@ -249,6 +249,13 @@
       else toast(m, true);
       throw err;
     });
+  }
+  /** Show a change on screen straight away; returns a function that puts things back if the server says no. */
+  function optimistic(mutate) {
+    var before = S.data, d = JSON.parse(JSON.stringify(S.data));
+    mutate(d);
+    setData(d);
+    return function undo() { if (S.data) setData(before); };
   }
   function logout(msg) {
     S.token = null; S.data = null; S.pinRequired = false; applyAccent('');
@@ -923,7 +930,7 @@
     var past = mine.filter(function (r) { return upcoming.indexOf(r) < 0; }).sort(function (a, b) { return a.start > b.start ? -1 : 1; }).slice(0, 5);
     function reqRow(r) {
       var t = typeOf(r.type);
-      return '<div class="li click" data-act="open-req" data-id="' + esc(r.id) + '"><span class="dot" style="--c:' + esc(t.colour) + '"></span><div class="grow"><b>' + esc(fmtRange(r)) + '</b><span>' + esc(t.name) + ' · ' + reqAmount(r) + '</span></div>' + pill(r.status) + '</div>';
+      return '<div class="li click" data-act="open-req" data-id="' + esc(r.id) + '"><span class="dot" style="--c:' + esc(t.colour) + '"></span><div class="grow"><b>' + esc(fmtRange(r)) + '</b><span>' + esc(t.name) + ' · ' + reqAmount(r) + '</span></div>' + pill(r.status, r) + '</div>';
     }
     var hols = d.holidays.filter(function (h) { return h.date >= today; }).sort(function (a, b) { return a.date < b.date ? -1 : 1; }).slice(0, 4);
     var pend = isApprover() ? pendingForMe() : [];
@@ -934,7 +941,7 @@
       upcoming = recent; past = [];
       reqRow = function (r) {
         var t = typeOf(r.type), st = staffById(r.staffId) || { name: '?' };
-        return '<div class="li click" data-act="open-req" data-id="' + esc(r.id) + '">' + av(st) + '<div class="grow"><b>' + esc(st.name) + '</b><span>' + esc(t.name) + ' · ' + esc(fmtRange(r)) + '</span></div>' + pill(r.status) + '</div>';
+        return '<div class="li click" data-act="open-req" data-id="' + esc(r.id) + '">' + av(st) + '<div class="grow"><b>' + esc(st.name) + '</b><span>' + esc(t.name) + ' · ' + esc(fmtRange(r)) + '</span></div>' + pill(r.status, r) + '</div>';
       };
     }
 
@@ -1082,7 +1089,7 @@
         (mineOrManaged ? '<section class="panel"><h2>Balances <small>' + esc(lyName(y)) + '</small></h2><div class="list">' + balRows + '</div></section>' : '') +
         '<section class="panel"><h2>Requests <small>' + reqs.length + '</small></h2><div class="list">' + (reqs.length ? reqs.map(function (r) {
           var t = typeOf(r.type);
-          return '<div class="li click" data-act="open-req" data-id="' + esc(r.id) + '"><span class="dot" style="--c:' + esc(t.colour) + '"></span><div class="grow"><b>' + esc(fmtRange(r)) + '</b><span>' + esc(t.name) + ' · ' + reqAmount(r) + '</span></div>' + pill(r.status) + '</div>';
+          return '<div class="li click" data-act="open-req" data-id="' + esc(r.id) + '"><span class="dot" style="--c:' + esc(t.colour) + '"></span><div class="grow"><b>' + esc(fmtRange(r)) + '</b><span>' + esc(t.name) + ' · ' + reqAmount(r) + '</span></div>' + pill(r.status, r) + '</div>';
         }).join('') : '<p class="empty">No leave in this leave year.</p>') + '</div></section></aside></div>'
     };
   };
@@ -1116,7 +1123,7 @@
       body: '<div class="appr">' + (cards || '<div class="panel muted">No requests are waiting. New ones show up here and are emailed to you.</div>') + '</div>' +
         (recent.length ? '<section class="panel" style="margin-top:20px"><h2>Recently decided</h2><div class="list">' + recent.map(function (r) {
           var st = staffById(r.staffId) || { name: '?' }, t = typeOf(r.type);
-          return '<div class="li click" data-act="open-req" data-id="' + esc(r.id) + '">' + av(st) + '<div class="grow"><b>' + esc(st.name) + ' · ' + esc(fmtRange(r)) + '</b><span>' + esc(t.name) + ' · ' + esc(r.decidedBy) + '</span></div>' + pill(r.status) + '</div>';
+          return '<div class="li click" data-act="open-req" data-id="' + esc(r.id) + '">' + av(st) + '<div class="grow"><b>' + esc(st.name) + ' · ' + esc(fmtRange(r)) + '</b><span>' + esc(t.name) + ' · ' + esc(r.decidedBy) + '</span></div>' + pill(r.status, r) + '</div>';
         }).join('') + '</div></section>' : '')
     };
   };
@@ -1754,8 +1761,9 @@
     var r = S.data.requests.filter(function (x) { return x.id === id; })[0];
     if (!r) return;
     var st = staffById(r.staffId) || { name: 'Former staff member', id: '' }, t = typeOf(r.type), today = todayISO();
-    var mine = r.staffId === me().id, mgr = canManage(st);
-    var canCancel = (r.status === 'Pending' || r.status === 'Approved') && (isMgr() || (mine && (r.status === 'Pending' || r.start > today)));
+    var mine = r.staffId === me().id, mgr = canManage(st) && !r.saving;
+    if (r.saving) mine = false;
+    var canCancel = !r.saving && (r.status === 'Pending' || r.status === 'Approved') && (isMgr() || (mine && (r.status === 'Pending' || r.start > today)));
     var html = '<header><div class="who" style="display:flex;gap:12px;align-items:center">' + av(st, true) + '<div><p class="eyebrow">' + esc(t.name) + '</p><h2>' + esc(st.name) + '</h2></div></div><button class="x" data-act="close" aria-label="Close">×</button></header>' +
       '<dl class="kv"><dt>Status</dt><dd>' + pill(r.status) + '</dd><dt>Dates</dt><dd>' + esc(fmtRange(r)) + '</dd><dt>Time away</dt><dd>' + reqAmount(r) + '</dd>' +
       (r.reason ? '<dt>Note</dt><dd>' + esc(r.reason) + '</dd>' : '') +
@@ -1766,7 +1774,7 @@
       (mgr && r.status === 'Pending' ? (function () { var w = reqWarnings(r); return w.length ? coverHtml(w) : ''; })() : '') +
       (mgr && r.status === 'Pending' ? '<label class="field">Note to ' + esc(firstName(st.name)) + ' (optional)<textarea id="note-' + esc(r.id) + '" rows="2"></textarea></label>' : '') +
       '<div class="actions">' + (canCancel ? '<button class="btn bad" data-act="cancel-req" data-id="' + esc(r.id) + '">Cancel this leave</button>' : '') +
-      (!C.editBlock(S.data, me(), r, today) ? '<button class="btn" data-act="edit-req" data-id="' + esc(r.id) + '">Change</button>' : '') +
+      (!r.saving && !C.editBlock(S.data, me(), r, today) ? '<button class="btn" data-act="edit-req" data-id="' + esc(r.id) + '">Change</button>' : '') +
       (mgr && r.status === 'Pending' ? '<button class="btn bad" data-act="decide" data-d="Declined" data-id="' + esc(r.id) + '">Decline</button><button class="btn ok" data-act="decide" data-d="Approved" data-id="' + esc(r.id) + '">Approve</button>' : '<button class="btn" data-act="close">Close</button>') + '</div>';
     openModal(html, 'Leave details');
   }
@@ -1885,9 +1893,14 @@
       case 'decide': {
         var note = document.getElementById('note-' + el.dataset.id);
         var d = el.dataset.d;
-        busy(el, true);
-        call('decide', { id: el.dataset.id, decision: d, note: note ? note.value : '' }, d === 'Approved' ? 'Approved – they’ve been emailed' : 'Declined – they’ve been emailed')
-          .then(closeModal).catch(function () { busy(el, false); });
+        var decId = el.dataset.id, noteVal = note ? note.value : '';
+        var undoD = optimistic(function (dd) {
+          dd.requests.forEach(function (x) { if (x.id === decId) { x.status = d; x.decidedBy = me().name; x.decidedOn = C.iso(new Date()); x.note = noteVal; x.saving = true; } });
+        });
+        closeModal();
+        toast(d === 'Approved' ? 'Approving…' : 'Declining…');
+        call('decide', { id: decId, decision: d, note: noteVal }, d === 'Approved' ? 'Approved – they’ve been emailed' : 'Declined – they’ve been emailed')
+          .catch(function () { undoD(); });
         break;
       }
       case 'cancel-req':
@@ -2013,8 +2026,25 @@
         return;
       }
       var forOther = r.staffId !== me().id, t = C.type(S.data, r.type);
+      // Show it at once; the server finishes in the background.
+      var undo = optimistic(function (d) {
+        d.requests.push({ id: 'saving-' + Date.now(), staffId: r.staffId, type: r.type, start: r.start, end: r.end, half: r.half || 'None', reason: r.reason || '',
+          status: (forOther || t.needsApproval === false) ? 'Approved' : 'Pending', submitted: C.iso(new Date()), source: 'App', saving: true,
+          decidedBy: forOther ? me().name : '', days: C.countDays(r, CTX) });
+      });
+      closeModal();
+      toast('Sending…');
       call('request', r, forOther ? 'Booked for ' + firstName(st.name) : (t.needsApproval ? 'Request sent to the Administrator' : 'Booked'))
-        .then(closeModal).catch(function () { busy(btn2, false); });
+        .catch(function (err) {
+          undo();
+          // Bring the form back with what they typed, and the reason it didn't go through.
+          requestModal({ date: r.start, staffId: r.staffId });
+          var set = function (id, v) { var el = document.getElementById(id); if (el) el.value = v; };
+          set('f-type', r.type); set('f-start', r.start); set('f-end', r.end); set('f-reason', r.reason || '');
+          var h = modalRoot.querySelector('input[name="half"][value="' + (r.half || 'None') + '"]'); if (h) h.checked = true;
+          updateRequestSummary();
+          setErr(String(err && err.message || err).replace(/^AUTH:?\s*/, ''));
+        });
     }
   });
   window.addEventListener('hashchange', function () {

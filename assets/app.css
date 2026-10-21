@@ -651,3 +651,4 @@ button.kpi:hover { border-color: var(--accent); }
   .wall thead tr.mrow th.mband .seg button { padding: 4px 8px; }
   .wall thead tr.mrow th.mband span.mb-name span { position: static; padding: 0; }
 }
+.pill.saving { animation: pulse 1.2s ease-in-out infinite; } @keyframes pulse { 50% { opacity: .5; } }
