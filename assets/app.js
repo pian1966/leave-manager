@@ -960,7 +960,7 @@
     for (var i = 1; i <= n; i++) dates.push(new Date(y, m, i, 12));
     var maxOff = Number(settings().MaxOffPerDay) || 0;
     var head = '<tr class="mrow"><th class="p" scope="col" rowspan="2">Team · ' + sortedStaff().length + '</th>' +
-      '<th class="mband" scope="colgroup" colspan="' + dates.length + '"><span>' + MONTHS[m] + ' ' + y + '</span></th></tr><tr class="drow">' + dates.map(function (d) {
+      '<th class="mband" scope="colgroup" colspan="' + dates.length + '"><span class="mb-in"><span class="mb-name"><span class="mb-full">' + MONTHS[m] + ' ' + y + '</span><span class="mb-short">' + MONTHS[m].slice(0, 3) + ' ' + y + '</span></span>' + monthControls() + '</span></th></tr><tr class="drow">' + dates.map(function (d) {
       var ds = C.iso(d), closed = !C.isOpen(d, CTX), blk = blockedOn(ds);
       var tip = [CTX.hol[ds] || (closed ? 'Church closed' : '')].concat(blk.map(function (r) { return '⛔ No leave: ' + r.name + (r.category ? ' (' + r.category + ')' : ''); })).filter(String).join('\n');
       return '<th scope="col" class="' + (ds === today ? 'today' : '') + (closed ? ' closed' : '') + (blk.length ? ' blk' : '') + '" title="' + esc(tip) + '">' + DOW[d.getDay()][0] + '<b>' + d.getDate() + '</b>' +
@@ -998,7 +998,6 @@
     return {
       title: MONTHS[m] + ' <span class="muted" style="font-weight:500">' + y + '</span>',
       sub: 'Shaded days are days that person doesn’t work. Click an empty working day to book it. Striped blocks are waiting for approval.',
-      controls: monthControls(),
       body: legend() + '<div class="wall-wrap"><table class="wall"><thead>' + head + '</thead><tbody>' + rows + '</tbody><tfoot>' + foot + '</tfoot></table></div>'
     };
   };

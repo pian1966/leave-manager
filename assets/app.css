@@ -639,3 +639,15 @@ button.kpi:hover { border-color: var(--accent); }
 .wall th.blk { background: color-mix(in srgb, var(--bad) 10%, transparent); }
 .holname.blkname, .hn.blkname { color: var(--bad); }
 .hn.blkname { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Wallchart: ‹ Today › sits beside the month name in the month band */
+.wall thead tr.mrow th.mband .mb-in { display: inline-flex; align-items: center; gap: 14px; }
+.wall thead tr.mrow th.mband .seg { font-family: var(--f-body); font-size: .85rem; font-weight: 700; }
+@media (max-width: 820px) { .wall thead tr.mrow th.mband .mb-in { position: sticky; left: 144px; padding-left: 4px; } .wall thead tr.mrow th.mband span.mb-name { position: static; padding-left: 0; } }
+.wall .mb-short { display: none; }
+@media (max-width: 820px) {
+  .wall thead tr.mrow th.mband .mb-in { gap: 10px; }
+  .wall .mb-full { display: none; }
+  .wall .mb-short { display: inline; }
+  .wall thead tr.mrow th.mband .seg button { padding: 4px 8px; }
+  .wall thead tr.mrow th.mband span.mb-name span { position: static; padding: 0; }
+}
