@@ -664,7 +664,7 @@ function loadData_() {
       code: String(r.Code).trim(), name: String(r.Name), colour: String(r.Colour || '#64748B'),
       deducts: B(r['Deducts Balance']), halfDay: B(r['Half Days']), proRata: B(r['Pro Rata']), needsApproval: B(r['Needs Approval']),
       unit: String(r['Counted In'] || 'Days'), allowedDays: String(r['Allowed Days'] || ''), accumulates: B(r.Accumulates),
-      carryMax: Number(r['Carry Over Max'] || 0), perTerm: Number(r['Per Term Max'] || 0), maxBalance: Number(r['Max Balance'] || 0),
+      carryMax: Number(r['Carry Over Max'] || 0), perTerm: Number(r['Per Term Max'] || 0) || (/weekend/i.test(String(r['Counted In'] || '')) ? 1 : 0), maxBalance: Number(r['Max Balance'] || 0),
       useBy: r['Use By (next year)'] instanceof Date ? Utilities.formatDate(r['Use By (next year)'], tz_(), 'MM-dd') : String(r['Use By (next year)'] || '')
     };
   });

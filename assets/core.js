@@ -491,6 +491,12 @@ var LeaveCore = (function () {
   }
 
   /** Returns an error message, or null when the request is fine. */
+  /** Most bookings of a type per school term. Weekend Off is always limited to 1, even if the sheet cell is blank. */
+  function termMax(t) {
+    var n = Number(t && t.perTerm) || 0;
+    if (!n && t && /weekend/i.test(String(t.unit || ''))) n = 1;
+    return n;
+  }
   /** Every problem with a request, as a list of messages (empty = fine). */
   function validateAll(data, st, r, ignoreId, approving, override) {
     var out = [], one = function (m) { return [m]; };
@@ -517,15 +523,16 @@ var LeaveCore = (function () {
         d0 = addDays(d0, 1);
       }
     }
-    if (Number(t.perTerm) > 0) {
+    var perTerm = termMax(t);
+    if (perTerm > 0) {
       var term = termOf(data, r.start);
       if (!term) out.push(t.name + ' is limited per school term, but ' + niceDate(r.start) + ' isn’t in any term on the School Terms tab. Ask an admin to add the term dates.');
       else {
       if (r.end > term.until) out.push(t.name + ' can’t run from one school term into the next.');
       var used = termBookings(data, st.id, t.code, term, ignoreId);
-      if (used.length >= Number(t.perTerm)) {
-        out.push(st.name.split(' ')[0] + ' has already booked ' + (Number(t.perTerm) === 1 ? 'the ' : Number(t.perTerm) + ' of the ') + t.name + ' for ' + term.name +
-          ' (' + niceRange(used[0]) + '). Only ' + t.perTerm + ' per term is allowed.');
+      if (used.length >= perTerm) {
+        out.push(st.name.split(' ')[0] + ' has already booked ' + (perTerm === 1 ? 'the ' : perTerm + ' of the ') + t.name + ' for ' + term.name +
+          ' (' + niceRange(used[0]) + '). Only ' + perTerm + ' per school term is allowed.');
       }
       }
     }
@@ -703,7 +710,7 @@ var LeaveCore = (function () {
     easter: easter, saPublicHolidays: saPublicHolidays,
     lyOf: lyOf, lyLabel: lyLabel, lyRange: lyRange, graceEnd: graceEnd, parseMonthDay: parseMonthDay, terms: terms, termOf: termOf, termBookings: termBookings,
     type: type, staffById: staffById, level: level, catKey: catKey, canManage: canManage, isAdmin: isAdmin, tracksLeave: tracksLeave, offered: offered, yearAllowance: yearAllowance,
-    balances: balances, validate: validate, validateAll: validateAll, fmtDays: fmtDays, findReq: findReq,
+    balances: balances, validate: validate, validateAll: validateAll, termMax: termMax, fmtDays: fmtDays, findReq: findReq,
     prepareRequest: prepareRequest, prepareDecision: prepareDecision, prepareCancel: prepareCancel, prepareEdit: prepareEdit, editBlock: editBlock,
     publicView: publicView,
     standInId: standInId, applyStandIn: applyStandIn,
