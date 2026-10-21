@@ -1755,7 +1755,16 @@
     var cv = C.coverCheck(S.data, st, r, r.id);
     return cv.block.concat(cv.warn);
   }
-  function setErr(msg) { var e = document.getElementById('f-err'); if (e) e.innerHTML = msg ? '<div class="err" role="alert">' + esc(msg) + '</div>' : ''; }
+  /** Shows a problem under the request form, and greys out the send button until it's fixed. */
+  function setErr(msg) {
+    var e = document.getElementById('f-err'); if (e) e.innerHTML = msg ? '<div class="err" role="alert">' + esc(msg) + '</div>' : '';
+    var go = document.getElementById('f-go');
+    if (go) {
+      go.disabled = !!msg;
+      go.classList.toggle('blocked', !!msg);
+      if (msg) go.title = 'Fix the problem shown above first'; else go.removeAttribute('title');
+    }
+  }
 
   function requestDetail(id) {
     var r = S.data.requests.filter(function (x) { return x.id === id; })[0];
