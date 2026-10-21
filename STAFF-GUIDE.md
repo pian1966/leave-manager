@@ -190,7 +190,7 @@ Appearance and Start page are remembered on the device you set them on, so you c
 - If your phone asks, allow Chrome (or your browser) to install apps.
 - If Play Protect says it doesn't recognise the app, tap **More details → Install anyway**. It's our own church app, so it isn't in the Play Store.
 
-Then open **Leave Manager** from your apps and sign in with your email and PIN. When a newer version of the app is available, a banner at the top says **Update available**: tap **Update**, open the downloaded file and tap **Update**. You can also check yourself under **My settings → Android app → Check for updates**. The back button closes windows and takes you back to Overview. You can print reports from the app too.
+Then open **Leave Manager** from your apps and sign in with your email and PIN. To get the latest leave (for example after the Administrator approves something), tap **⟳** at the top, or pull the page down from the top. The app also refreshes by itself when you come back to it after a few minutes. When a newer version of the app is available, a banner at the top says **Update available**: tap **Update**, open the downloaded file and tap **Update**. You can also check yourself under **My settings → Android app → Check for updates**. The back button closes windows and takes you back to Overview. You can print reports from the app too.
 
 **iPhone:** open Leave Manager in Safari, tap the **Share** button, then **Add to Home Screen**.
 
@@ -205,7 +205,7 @@ Then open **Leave Manager** from your apps and sign in with your email and PIN. 
 | “Already booked the Weekend Off for this term” | You get one per school term. Choose a weekend in the next term. |
 | A leave type is missing from the list | Your staff category doesn't get that type. |
 | “Can't reach the leave server” | Check your internet connection and try again. If it keeps happening, tell the Administrator. |
-| The page looks out of date | Refresh the page (on a computer, Ctrl+Shift+R). |
+| The page looks out of date | On a phone or in the Android app, tap **⟳** at the top or pull the page down. On a computer, press F5 (or Ctrl+Shift+R). |
 
 Any other questions about your leave or allowance: speak to the Administrator.
 

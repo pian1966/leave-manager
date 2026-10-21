@@ -99,6 +99,7 @@
     team: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3 3 0 0 1 0 6M18 14c2 .7 3 2.6 3 6"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
     dashboard: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+    refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>',
     settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'
   };
   function icon(n) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICON[n] + '</svg>'; }
@@ -382,7 +383,7 @@
       '<button class="btn primary" data-act="new">' + icon('plus').replace('<svg', '<svg width="16" height="16"') + (takesLeave(u) ? 'Request leave' : 'Book leave') + '</button>' +
       '<nav class="nav" aria-label="Main">' + nav + '</nav>' + (links ? '<div class="side-links">' + links + '</div>' : '') +
       '<div class="me">' + av(u) + '<div class="who"><b>' + esc(u.name) + '</b><span>' + (takesLeave(u) ? esc(catName(u)) + ' · ' + esc(u.role) : 'Administrator') + '</span></div><button data-act="logout-ask">Sign out</button></div></aside>' +
-      '<main class="main"><div class="mhead">' + brand + '<div class="controls"><button class="btn primary small" data-act="new">+ ' + (takesLeave(u) ? 'Request' : 'Book') + '</button><button class="btn small icon-btn" data-act="nav" data-view="settings" aria-label="My settings">' + icon('settings') + '</button><button class="btn small" data-act="logout-ask" aria-label="Sign out">' + esc(initials(u.name)) + ' · Out</button></div></div>' +
+      '<main class="main"><div class="mhead">' + brand + '<div class="controls"><button class="btn primary small" data-act="new">+ ' + (takesLeave(u) ? 'Request' : 'Book') + '</button><button class="btn small icon-btn" data-act="refresh" aria-label="Refresh" title="Get the latest leave">' + icon('refresh') + '</button><button class="btn small icon-btn" data-act="nav" data-view="settings" aria-label="My settings">' + icon('settings') + '</button><button class="btn small" data-act="logout-ask" aria-label="Sign out">' + esc(initials(u.name)) + ' · Out</button></div></div>' +
       (!LIVE ? '<div class="demo-note"><span><b>Demo mode.</b> You’re signed in as ' + esc(u.name) + ' (' + esc(u.role) + '). Connect your Google Sheet in config.js to go live.</span><span class="controls"><button class="btn small" data-act="logout">Switch person</button><button class="btn small ghost" data-act="demo-reset">Reset sample data</button></span></div>' : '') +
       (updateAvailable() && !S.updLater && S.view !== 'settings' ? '<div class="upd-banner" role="status"><span><b>Update available:</b> version ' + esc(S.appLatest.ver) + ' of the Leave Manager app.</span>' +
         '<span class="controls"><a class="btn small primary" href="' + esc(S.appLatest.url) + '">Update</a><button class="btn small ghost" data-act="upd-later">Later</button></span></div>' : '') +
@@ -1744,6 +1745,7 @@
       case 'pwa-install':
         if (installPrompt) { installPrompt.prompt(); installPrompt.userChoice.then(function () { installPrompt = null; render(); }); }
         break;
+      case 'refresh': refreshData(true); break;
       case 'new': requestModal(); break;
       case 'edit-req': { var er = C.findReq(S.data, el.dataset.id); if (er) requestModal({ edit: er }); break; }
       case 'book': requestModal({ date: el.dataset.date, staffId: el.dataset.staff }); break;
@@ -1869,6 +1871,51 @@
   window.addEventListener('hashchange', function () {
     var v = location.hash.replace('#', '');
     if (VIEWS.indexOf(v) >= 0 && v !== S.view && S.data) go(v);
+  });
+
+  /* ---------- Refresh: button in the phone header, and pull down from the top ---------- */
+  var refreshing = false;
+  function refreshData(show) {
+    if (!S.token || !S.data || refreshing) return;
+    refreshing = true;
+    document.documentElement.classList.add('is-refreshing');
+    api('bootstrap').then(function (d) {
+      S.hist = null; setData(d);
+      if (d && d.mustChangePin && !S.pinRequired) pinPrompt(null);
+      if (show) toast('Up to date');
+    }).catch(function (err) {
+      var m = String(err && err.message || err);
+      if (m.indexOf('AUTH') === 0) logout(m.replace(/^AUTH:?\s*/, ''));
+      else toast(m === 'Failed to fetch' ? 'Can’t reach the leave server. Check your connection.' : m, true);
+    }).then(function () { refreshing = false; document.documentElement.classList.remove('is-refreshing'); });
+  }
+  (function pullToRefresh() {
+    var startY = null, pulled = 0, ind = document.createElement('div');
+    ind.className = 'ptr'; ind.innerHTML = icon('refresh'); ind.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(ind);
+    function reset() { startY = null; pulled = 0; ind.style.transform = ''; ind.classList.remove('ready'); }
+    document.addEventListener('touchstart', function (e) {
+      if (!S.data || modalRoot.innerHTML || window.scrollY > 0 || e.touches.length !== 1) { startY = null; return; }
+      startY = e.touches[0].clientY;
+    }, { passive: true });
+    document.addEventListener('touchmove', function (e) {
+      if (startY == null) return;
+      pulled = Math.max(0, Math.min(120, e.touches[0].clientY - startY));
+      if (window.scrollY > 0) { reset(); return; }
+      ind.style.transform = 'translate(-50%, ' + (pulled * 0.8) + 'px) rotate(' + (pulled * 3) + 'deg)';
+      ind.classList.toggle('ready', pulled > 80);
+    }, { passive: true });
+    document.addEventListener('touchend', function () {
+      if (startY != null && pulled > 80) refreshData(true);
+      reset();
+    });
+  })();
+  // Coming back to the app or tab after a while: quietly fetch the latest leave.
+  var hiddenAt = 0;
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) { hiddenAt = Date.now(); return; }
+    if (hiddenAt && Date.now() - hiddenAt > 5 * 60 * 1000) refreshData(false);
+    hiddenAt = 0;
   });
 
   /* Android back button: close an open window first, then go back to Overview; otherwise let the app close. */
