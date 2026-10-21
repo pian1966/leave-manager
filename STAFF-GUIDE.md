@@ -61,7 +61,7 @@ The Overview opens first and shows your own leave at a glance.
 3. Pick the **First day** and **Last day**. The Last day fills in with the same date, so for one day you're done; for longer, change the Last day.
 4. For a single day you can choose **Morning** or **Afternoon** for a half day (not for every leave type).
 5. Add a **note** for the Administrator saying what the leave is for (e.g. *family visit*, *doctor's appointment*). The note is required; the request can't be sent without it.
-6. Check the grey box: it shows how many days this uses and what you'll have left. A red message means the request can't be sent yet and says why.
+6. Check the grey box: it shows how many days this uses and what you'll have left. If anything is wrong, a red box lists **every** problem (for example overlapping leave *and* not enough days), and the **Send request** button stays grey until they're all fixed.
 7. Click **Send request**.
 
 **Cover warnings:** if your dates leave too few people on duty (for example no pastor on a Sunday) or fall in a no-leave period such as Easter or Christmas, an orange **Cover warning** appears. You can usually still send the request; the Administrator sees the warning and decides. If the request is blocked, a red message says so; speak to the Administrator.

@@ -1740,9 +1740,10 @@
       skipHtml +
       (t && t.allowedDays ? '<span class="muted small">' + esc(t.name) + ' can only be booked on ' + esc(C.daysLabel(C.parseDays(t.allowedDays, []))) + (Number(t.perTerm) > 0 ? ', ' + (Number(t.perTerm) === 1 ? 'once' : t.perTerm + ' times') + ' per school term' : '') + '.</span>' : '') +
       (t && st && Number(t.perTerm) > 0 && C.termOf(S.data, r.start) ? '<span class="muted small">Counts as ' + esc(C.termOf(S.data, r.start).name) + '’s ' + esc(t.name) + '.</span>' : '') + line2 +
-      (t && t.needsApproval && st && st.id === me().id ? '<span class="muted small">Goes to the Administrator for approval.</span>' : '');
-    var err = st && t ? C.validate(S.data, st, r, S.editId || undefined, false, isMgr()) : null;
-    setErr(err || '');
+      (t && t.needsApproval && st && st.id === me().id ? '<span class="muted small" id="f-approve">After you send it, the Administrator will be asked to approve it. You’ll get an email with their decision.</span>' : '');
+    var errs = st && t ? C.validateAll(S.data, st, r, S.editId || undefined, false, isMgr()) : [];
+    var err = errs[0] || null;
+    setErr(errs);
     if (!err && st && t && n) {
       var cv = C.coverCheck(S.data, st, r, S.editId || undefined);
       var warns = cv.block.concat(cv.warn);
@@ -1768,7 +1769,12 @@
   }
   /** Shows a problem under the request form, and greys out the send button until it's fixed. */
   function setErr(msg) {
-    var e = document.getElementById('f-err'); if (e) e.innerHTML = msg ? '<div class="err" role="alert">' + esc(msg) + '</div>' : '';
+    var list = Array.isArray(msg) ? msg.filter(Boolean) : (msg ? [msg] : []);
+    msg = list.length ? list : '';
+    var e = document.getElementById('f-err');
+    if (e) e.innerHTML = !list.length ? '' : list.length === 1 ? '<div class="err" role="alert">' + esc(list[0]) + '</div>' :
+      '<div class="err" role="alert"><b>' + list.length + ' things to fix before you can send this:</b><ul>' + list.map(function (m) { return '<li>' + esc(m) + '</li>'; }).join('') + '</ul></div>';
+    var ap = document.getElementById('f-approve'); if (ap) ap.hidden = !!list.length;
     var go = document.getElementById('f-go');
     if (go) {
       go.disabled = !!msg;

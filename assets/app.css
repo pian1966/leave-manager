@@ -654,3 +654,5 @@ button.kpi:hover { border-color: var(--accent); }
 .pill.saving { animation: pulse 1.2s ease-in-out infinite; } @keyframes pulse { 50% { opacity: .5; } }
 /* Send / Book button while the form shows a problem */
 .btn.primary.blocked, .btn.primary.blocked:hover { background: var(--surface-2); color: var(--muted); border-color: var(--line); cursor: not-allowed; opacity: 1; filter: none; }
+.err ul { margin: 6px 0 0; padding-left: 18px; }
+.err li + li { margin-top: 4px; }

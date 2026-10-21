@@ -491,39 +491,43 @@ var LeaveCore = (function () {
   }
 
   /** Returns an error message, or null when the request is fine. */
-  function validate(data, st, r, ignoreId, approving, override) {
+  /** Every problem with a request, as a list of messages (empty = fine). */
+  function validateAll(data, st, r, ignoreId, approving, override) {
+    var out = [], one = function (m) { return [m]; };
     var t = type(data, r.type);
-    if (!t) return 'Choose a leave type.';
-    if (!st) return 'Choose who the leave is for.';
-    if (!tracksLeave(st)) return st.name + ' is in the Administrator category, so their leave isn’t tracked in the planner.';
-    if (!offered(data, st, t)) return t.name + ' isn’t available to ' + (st.level ? st.level : 'this person') + '.';
-    if (!isISO(r.start) || !isISO(r.end)) return 'Pick a first and last day.';
-    if (r.end < r.start) return 'The last day is before the first day.';
+    if (!t) return one('Choose a leave type.');
+    if (!st) return one('Choose who the leave is for.');
+    if (!tracksLeave(st)) return one(st.name + ' is in the Administrator category, so their leave isn’t tracked in the planner.');
+    if (!offered(data, st, t)) return one(t.name + ' isn’t available to ' + (st.level ? st.level : 'this person') + '.');
+    if (!isISO(r.start) || !isISO(r.end)) return one('Pick a first and last day.');
+    if (r.end < r.start) return one('The last day is before the first day.');
     if (r.half && r.half !== 'None') {
-      if (!t.halfDay) return t.name + ' can’t be taken as a half day.';
-      if (r.start !== r.end) return 'Half days can only be booked on a single date.';
+      if (!t.halfDay) out.push(t.name + ' can’t be taken as a half day.');
+      else if (r.start !== r.end) out.push('Half days can only be booked on a single date.');
     }
     var allowed = t.allowedDays ? parseDays(t.allowedDays, null) : null;
     if (allowed) {
       var d0 = parse(r.start), e0 = parse(r.end), g = 0;
       while (d0 <= e0 && g++ < 800) {
-        if (allowed.indexOf(d0.getDay()) < 0) return t.name + ' can only be booked on ' + daysLabel(allowed) + '.';
+        if (allowed.indexOf(d0.getDay()) < 0) { out.push(t.name + ' can only be booked on ' + daysLabel(allowed) + '.'); break; }
         d0 = addDays(d0, 1);
       }
     }
     if (Number(t.perTerm) > 0) {
       var term = termOf(data, r.start);
-      if (!term) return t.name + ' is limited per school term, but ' + niceDate(r.start) + ' isn’t in any term on the School Terms tab. Ask an admin to add the term dates.';
-      if (r.end > term.until) return t.name + ' can’t run from one school term into the next.';
+      if (!term) out.push(t.name + ' is limited per school term, but ' + niceDate(r.start) + ' isn’t in any term on the School Terms tab. Ask an admin to add the term dates.');
+      else {
+      if (r.end > term.until) out.push(t.name + ' can’t run from one school term into the next.');
       var used = termBookings(data, st.id, t.code, term, ignoreId);
       if (used.length >= Number(t.perTerm)) {
-        return st.name.split(' ')[0] + ' has already booked ' + (Number(t.perTerm) === 1 ? 'the ' : Number(t.perTerm) + ' of the ') + t.name + ' for ' + term.name +
-          ' (' + niceRange(used[0]) + '). Only ' + t.perTerm + ' per term is allowed.';
+        out.push(st.name.split(' ')[0] + ' has already booked ' + (Number(t.perTerm) === 1 ? 'the ' : Number(t.perTerm) + ' of the ') + t.name + ' for ' + term.name +
+          ' (' + niceRange(used[0]) + '). Only ' + t.perTerm + ' per term is allowed.');
+      }
       }
     }
     var c = ctx(data), days = dayList(r, c);
-    if (!days.length) return 'Those dates are all days ' + st.name.split(' ')[0] + ' doesn’t work, or public holidays, so no leave is needed.';
-    if (days.length > 260) return 'That request is longer than a year. Split it into smaller requests.';
+    if (!days.length) { out.push('Those dates are all days ' + st.name.split(' ')[0] + ' doesn’t work, or public holidays, so no leave is needed.'); return out; }
+    if (days.length > 260) { out.push('That request is longer than a year. Split it into smaller requests.'); return out; }
     var clash = data.requests.filter(function (o) {
       if (o.staffId !== st.id || o.id === ignoreId) return false;
       if (o.status !== 'Approved' && o.status !== 'Pending') return false;
@@ -534,7 +538,7 @@ var LeaveCore = (function () {
     });
     if (clash.length) {
       var ct = type(data, clash[0].type);
-      return st.name + ' already has ' + (ct ? ct.name : 'leave') + (clash[0].status === 'Pending' ? ' waiting for approval' : ' booked') + ' for ' + niceRange(clash[0]) + '.';
+      out.push(st.name + ' already has ' + (ct ? ct.name : 'leave') + (clash[0].status === 'Pending' ? ' waiting for approval' : ' booked') + ' for ' + niceRange(clash[0]) + '.');
     }
     if (t.deducts && !truthy(data.settings.AllowNegative)) {
       // Compare balances with and without this request in every leave year it touches.
@@ -557,15 +561,20 @@ var LeaveCore = (function () {
       });
       if (failY != null) {
         var need = amount(r, t, c);
-        return 'Not enough ' + t.name + ': this needs ' + fmtAmount(t, need) + ' but only ' + fmtAmount(t, have) +
-          (approving ? ' remain' : ' are available') + (yl.length > 1 ? '' : ' in the ' + lyLabel(failY, c.S) + ' leave year') + '.';
+        out.push('Not enough ' + t.name + ': this needs ' + fmtAmount(t, need) + ' but only ' + fmtAmount(t, have) +
+          (approving ? ' remain' : ' are available') + (yl.length > 1 ? '' : ' in the ' + lyLabel(failY, c.S) + ' leave year') + '.');
       }
     }
     if (!override) {
       var cv = coverCheck(data, st, r, ignoreId);
-      if (cv.block.length) return cv.block[0] + ' If it can’t wait, speak to the Administrator.';
+      cv.block.forEach(function (m) { out.push(m + ' If it can’t wait, speak to the Administrator.'); });
     }
-    return null;
+    return out;
+  }
+  /** The first problem with a request, or null when it's fine. */
+  function validate(data, st, r, ignoreId, approving, override) {
+    var all = validateAll(data, st, r, ignoreId, approving, override);
+    return all.length ? all[0] : null;
   }
 
   var NOTE_NEEDED = 'Please add a note for the Administrator saying what the leave is for.';
@@ -690,7 +699,7 @@ var LeaveCore = (function () {
     easter: easter, saPublicHolidays: saPublicHolidays,
     lyOf: lyOf, lyLabel: lyLabel, lyRange: lyRange, graceEnd: graceEnd, parseMonthDay: parseMonthDay, terms: terms, termOf: termOf, termBookings: termBookings,
     type: type, staffById: staffById, level: level, catKey: catKey, canManage: canManage, isAdmin: isAdmin, tracksLeave: tracksLeave, offered: offered, yearAllowance: yearAllowance,
-    balances: balances, validate: validate, fmtDays: fmtDays, findReq: findReq,
+    balances: balances, validate: validate, validateAll: validateAll, fmtDays: fmtDays, findReq: findReq,
     prepareRequest: prepareRequest, prepareDecision: prepareDecision, prepareCancel: prepareCancel, prepareEdit: prepareEdit, editBlock: editBlock,
     publicView: publicView,
     standInId: standInId, applyStandIn: applyStandIn,
