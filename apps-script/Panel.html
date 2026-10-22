@@ -198,7 +198,7 @@
       '<p class="note">Switch these emails on or off in Leave Manager: My settings → Automatic emails.</p>', open['s-mail']);
     var tools = section('s-tools', 'tools', 'Maintenance', 'Form lists, PINs, colours, repair',
       task('form', 'Refresh the Google Form lists', 'After changing staff or leave types') + task('pins', 'Secure PINs', 'Scramble any PIN typed into the sheet') +
-      task('colours', 'Colour the colour codes', 'Shade the Colour columns') + task('setup', 'Set up or repair the workbook', 'Safe to run again: adds anything missing, keeps your data', 'danger'), open['s-tools']);
+      task('colours', 'Colour the colour codes', 'Shade the Colour columns') + task('notes', 'Add help notes to headings', 'Hover over any heading to see what it means') + task('setup', 'Set up or repair the workbook', 'Safe to run again: adds anything missing, keeps your data', 'danger'), open['s-tools']);
 
     document.getElementById('app').innerHTML = tiles + facts + links + staff + rules + cal + mail + tools +
       '<div class="foot">Leave Manager · <a href="#" data-task="reload">Refresh panel</a></div>';

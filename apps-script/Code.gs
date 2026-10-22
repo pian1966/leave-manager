@@ -136,6 +136,7 @@ function setup() {
 
   dirty_();
   var problems = migrateToAdministrator_(ss);
+  try { addHeaderNotes_(ss); } catch (e) { problems.push('Heading notes: ' + (e && e.message || e)); }
   try { upgrade_(true); } catch (e) { problems.push('Upgrading: ' + (e && e.message || e)); }
   formatSheets_(ss);
   var def = ss.getSheetByName('Sheet1');
@@ -278,7 +279,7 @@ function formatRules_(sh) {
  * Brings the workbook up to date for new features, once (tracked in Script Properties).
  * Runs automatically on the first app request after an update, and from setup.
  */
-var SCHEMA_VERSION_ = '7';
+var SCHEMA_VERSION_ = '8';
 function upgrade_(force) {
   var P = PropertiesService.getScriptProperties();
   if (!force && P.getProperty('SCHEMA') === SCHEMA_VERSION_) return;
@@ -291,6 +292,7 @@ function upgrade_(force) {
     NEW_SETTINGS_.forEach(function (row) { if (have.indexOf(row[0]) < 0) set.appendRow(row); });
   }
   try { addInUseColumn_(ss); } catch (e) { console.warn('In Use column skipped: ' + e); }
+  try { addHeaderNotes_(ss); } catch (e) { console.warn('Heading notes skipped: ' + e); }
   installDailyTrigger_();
   try { if (getSetting_('FormId')) refreshForm(); } catch (e) { console.warn('Form refresh skipped: ' + e); }   // e.g. the note becomes compulsory
   P.setProperty('SCHEMA', SCHEMA_VERSION_);
@@ -1752,6 +1754,7 @@ function panelRun(task) {
     case 'form': refreshForm(); return 'The Google Form lists now match the Staff and Leave Types tabs.';
     case 'pins': var n = hashPins(); return n ? n + ' PIN' + (n > 1 ? 's' : '') + ' secured.' : 'All PINs were already secure.';
     case 'colours': paintColours(); return 'Colour codes on the Staff and Leave Types tabs are shaded.';
+    case 'notes': var nn = addHeaderNotes_(SpreadsheetApp.getActive()); return 'Help notes added to ' + nn + ' column headings. Hover over a heading to read it.';
     case 'weekly': sendWeeklyEmail_(loadData_(), todayStr_(), me); return 'A preview of this week’s “who’s away” email was sent to ' + me + '.';
     case 'reminders': var r = sendReminders_(loadData_(), todayStr_(), me);
       return (r ? r + ' reminder preview' + (r > 1 ? 's' : '') + ' and ' : '') + 'the Administrator summary were sent to ' + me + '.';
@@ -2022,4 +2025,132 @@ function renameCategoryEverywhere_(oldName, newName) {
       r2.setValues(v2.map(function (r) { return [String(r[0]).split(',').map(function (x) { return LeaveCore.catKey(x) === k ? newName : x.trim(); }).filter(String).join(', ')]; }));
     }
   }
+}
+
+
+/* ======================= HELP NOTES ON EVERY HEADING ======================= */
+
+var HELP_ = {
+  'Settings': {
+    'Key': 'The name of the setting. Don’t change these. Easier: change settings in Leave Manager → Setup → Church.',
+    'Value': 'The setting itself. TRUE/FALSE switches something on or off.',
+    'What it does': 'A short explanation of the setting.'
+  },
+  'Staff': {
+    'ID': 'A unique code for each person, e.g. S01. Never reuse or change an ID: their leave records are linked to it. Easiest: add people in Leave Manager → Setup → Staff.',
+    'Name': 'Their full name, as shown in Leave Manager and emails.',
+    'Email': 'The email they sign in with. Use their Google account (e.g. Gmail) if they’ll use “Sign in with Google”. Each person needs a different email.',
+    'Category': 'Their staff category, chosen from the Categories tab. It sets their working days and leave allowances. “Administrator” = approves leave and doesn’t take leave in Leave Manager.',
+    'Working Days': 'Leave blank to use their category’s working days. Fill in only if this person works different days, e.g. "Mon, Wed-Fri" or "Fri".',
+    'Role': 'Staff, or Administrator (approves leave and sees everything).',
+    'Manager Email': 'No longer used: every request goes to the Administrator(s).',
+    'Start Date': 'When they started at the church (yyyy-mm-dd). Used to reduce their first year’s allowance and to build up Sabbatical. Leave blank if they’ve been here for years.',
+    'PIN': 'Scrambled so nobody can read it. h:… = a temporary PIN you gave them; u:… = a PIN they chose. To reset, type a new 4-digit PIN here and tell them; they choose their own at the next sign-in.',
+    'Colour': 'Their colour in Leave Manager, as a code like #2F6FB3. Staff can choose their own under My settings.',
+    'Active': 'Ticked = on the staff. Untick when someone leaves: they can’t sign in any more, but their history is kept.'
+  },
+  'Categories': {
+    'Category': 'The name of a staff category, e.g. Pastoral Staff. Staff are linked to it by this name. Easier: edit in Leave Manager → Setup → Categories.',
+    'Working Days': 'The days people in this category usually work, e.g. "Mon, Wed-Sun". Only these days are counted as leave. One person can have different days on the Staff tab.'
+  },
+  'Leave Types': {
+    'Code': 'A short code for the leave type, e.g. PSL. It must match a column heading on the Categories tab. Don’t change it once leave has been booked. Easier: edit in Leave Manager → Setup → Leave types.',
+    'Name': 'The full name shown to staff, e.g. Pastoral Staff Leave.',
+    'Colour': 'Its colour on calendars and reports, as a code like #2F80C0.',
+    'Deducts Balance': 'Ticked = uses an allowance (set how many days per category on the Categories tab). Unticked = no allowance, e.g. Unpaid Leave.',
+    'Half Days': 'Ticked = a morning or afternoon can be booked on a single day.',
+    'Pro Rata': 'Ticked = people who start part-way through a year get a proportion of the allowance in their first year.',
+    'Needs Approval': 'Ticked = requests wait for the Administrator to approve them. Unticked = booked straight away.',
+    'Counted In': 'Days: each working day off counts. Calendar days: every date counts, incl. weekends and holidays (Sabbatical). Weekends / Bookings: each request counts as 1.',
+    'Allowed Days': 'Optional: only allow these days of the week, e.g. "Fri, Sat, Sun" for Weekend Off. Blank = any working day.',
+    'Accumulates': 'Ticked = unused days build up from year to year (e.g. Sabbatical). Unticked = they don’t carry over.',
+    'Carry Over Max': 'Not used: Leave Manager doesn’t carry leave over. Use “Use By (next year)” to give people extra time instead.',
+    'Per Term Max': 'Optional: the most bookings of this type allowed in one school term (School Terms tab). Weekend Off is always 1.',
+    'Max Balance': 'Only for types that build up (Accumulates): the most that can be saved, e.g. 87.5 calendar days for Sabbatical. Blank = no limit.',
+    'Use By (next year)': 'Optional: unused days can still be taken until this date next year, e.g. "1 Feb", then they’re lost. Blank = lost at the end of the leave year.',
+    'In Use': 'Ticked = in use. Untick to stop using a type you don’t track yet (e.g. Sick Leave): it disappears from requests, balances, calendars, reports and the Google Form. Existing records are kept.'
+  },
+  'Cover Rules': {
+    'Rule': 'A short name, shown in warnings, e.g. "Sunday cover" or "Christmas services".',
+    'Type': 'Minimum on duty: at least a number of people must be working on matching days. No leave: no leave on matching days (e.g. Easter, Christmas, a church camp).',
+    'Category': 'Who the rule is about: pick one from the dropdown, or tick several with Leave Manager → Choose categories for a cover rule…  Blank = all staff.',
+    'Days': 'Days of the week the rule applies to, e.g. "Sun". Blank = every day.',
+    'From': 'Easiest: Leave Manager → Choose dates for a cover rule… (date pickers). Or type: blank = all year; 2026-12-24 (one year); 24 Dec (every year); Easter-2 (Good Friday); Easter+1 (Family Day).',
+    'To': 'The last day the rule applies, in the same form as From.',
+    'Minimum': 'For “Minimum on duty”: how many people of the category must be working. Default 1.',
+    'Action': 'Warn: the request can still be sent, with a warning to the Administrator. Block: staff can’t send it. The Administrator can always override.',
+    'Message': 'Optional extra text added to the warning, e.g. "All hands on deck for the Christmas services."',
+    'Active': 'Untick to switch a rule off without deleting it.'
+  },
+  'Public Holidays': {
+    'Date': 'The date of the holiday (yyyy-mm-dd). These days are never counted as leave.',
+    'Name': 'The holiday’s name, shown on the calendars. South African public holidays are added automatically each year; add your own (e.g. a local holiday) in Leave Manager → Setup → Holidays & terms.'
+  },
+  'School Terms': {
+    'Term': 'The term’s name, e.g. "Term 1 2027". Used for “one Weekend Off per term”.',
+    'Start': 'The first day of the term (yyyy-mm-dd).',
+    'End': 'The last day of the term. School-holiday weekends count towards the term that has just ended (Settings: TermsIncludeHolidays).'
+  },
+  'Adjustments': {
+    'Staff ID': 'The person’s ID from the Staff tab, e.g. S05. Easier: add extra days in Leave Manager → Setup → Extra days.',
+    'Leave Year': 'The leave year the change applies to, e.g. 2026.',
+    'Type': 'The leave type code from the Leave Types tab, e.g. PSL.',
+    'Days': 'Days to add (e.g. 2 for long service) or take away (e.g. -5 already taken before Leave Manager started).',
+    'Note': 'Why, e.g. "Long service". For your records.'
+  },
+  'Requests': {
+    'ID': 'Written by Leave Manager. Don’t edit this tab by hand: use Leave Manager to change, approve or cancel leave.',
+    'Submitted': 'When the request was made.',
+    'Staff ID': 'Who the leave is for (ID from the Staff tab).',
+    'Staff Name': 'Their name when the request was made.',
+    'Type': 'The leave type code.',
+    'Start': 'First day of leave.',
+    'End': 'Last day of leave.',
+    'Half Day': 'None, AM (morning) or PM (afternoon).',
+    'Days': 'Working days away (not counting days off and public holidays).',
+    'Reason': 'The note the person wrote for the Administrator.',
+    'Status': 'Pending (waiting), Approved, Declined or Cancelled.',
+    'Decided By': 'Who approved or declined it.',
+    'Decided On': 'When it was approved or declined.',
+    'Manager Note': 'The Administrator’s note to the person.',
+    'Source': 'App or Form (Google Form).',
+    'Calendar Event': 'Used to link to the Google Calendar entry, if a calendar is set up.',
+    'Cancelled By': 'Who cancelled it.',
+    'Cancelled On': 'When it was cancelled.'
+  },
+  'History': {
+    'When': 'Written by Leave Manager: every request, decision, change and cancellation, so nothing is lost. Read it nicely in Leave Manager → History.',
+    'Action': 'What happened.',
+    'Request ID': 'The request it’s about (Requests tab).',
+    'Staff': 'Whose leave it was.',
+    'Leave Type': 'The type of leave.',
+    'Dates': 'The dates of the leave.',
+    'Days': 'Working days away.',
+    'Status': 'The request’s status after this.',
+    'By': 'Who did it.',
+    'Note': 'Any note, e.g. the previous dates when leave was changed.'
+  }
+};
+
+/** Puts a help note on every column heading of every Leave Manager tab. Returns how many headings got a note. */
+function addHeaderNotes_(ss) {
+  ss = ss || ss_();
+  var types = {};
+  try { loadData_().types.forEach(function (t) { types[t.code] = t; }); } catch (e) { /* fine */ }
+  var n = 0;
+  Object.keys(HELP_).forEach(function (tab) {
+    var sh = ss.getSheetByName(tab);
+    if (!sh || sh.getLastColumn() < 1) return;
+    heads_(sh).forEach(function (h, i) {
+      var note = HELP_[tab][h];
+      if (!note && tab === 'Categories' && h) {
+        var t = types[h];
+        note = t ? 'Days of ' + t.name + ' per leave year for this category' + (/weekend/i.test(t.unit) ? ' (counted in weekends)' : /calendar/i.test(t.unit) ? ' (calendar days)' : '') +
+          '. Leave blank if this category doesn’t get it.' + (t.active === false ? ' (This leave type is switched off.)' : '')
+          : 'Leave type code ' + h + ': days per leave year. It must match a Code on the Leave Types tab.';
+      }
+      if (note) { sh.getRange(1, i + 1).setNote(note); n++; }
+    });
+  });
+  return n;
 }
