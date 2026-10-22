@@ -3,5 +3,8 @@
     <color name="brand">#0F4F43</color>
     <color name="brand_on">#4CC3A6</color>
     <color name="page">#F4F6F5</color>
-    <color name="icon_off">#5AFFFFFF</color>
+    <!-- App icon: orange theme -->
+    <color name="icon_bg">#E8590C</color>
+    <color name="icon_on">#FFE8CC</color>
+    <color name="icon_off">#55FFFFFF</color>
 </resources>
