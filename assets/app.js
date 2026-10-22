@@ -2071,6 +2071,7 @@
     var who = pre.staffId || (takesLeave(u) ? u.id : targets[0].id);
     var html = '<header><div><p class="eyebrow">New request</p><h2>' + (takesLeave(u) ? 'Request leave' : 'Book leave') + '</h2></div><button class="x" data-act="close" aria-label="Close">×</button></header><form id="reqForm" novalidate>' +
       (targets.length > 1 || !takesLeave(u) ? '<label class="field">For<select id="f-staff">' + targets.map(function (s) { return '<option value="' + esc(s.id) + '"' + (s.id === who ? ' selected' : '') + '>' + esc(s.name) + (s.id === u.id ? ' (you)' : '') + '</option>'; }).join('') + '</select></label>' : '') +
+      '<div id="f-bal" class="fbal"></div>' +
       '<label class="field">Leave type<select id="f-type">' + typeOptions(staffById(who)) + '</select></label>' +
       '<div class="two"><label class="field">First day<input type="date" id="f-start" required value="' + esc(pre.date || '') + '"></label>' +
       '<label class="field">Last day<input type="date" id="f-end" required value="' + esc(pre.date || '') + '"' + (pre.date ? ' min="' + esc(pre.date) + '"' : '') + '></label></div>' +
@@ -2089,6 +2090,7 @@
     var willReapprove = !admin && r.status === 'Approved';
     var html = '<header><div><p class="eyebrow">Change leave' + (mine ? '' : ' · ' + esc(st.name)) + '</p><h2>Correct this request</h2></div><button class="x" data-act="close" aria-label="Close">×</button></header><form id="reqForm" novalidate>' +
       '<input type="hidden" id="f-staff" value="' + esc(r.staffId) + '">' +
+      '<div id="f-bal" class="fbal"></div>' +
       '<label class="field">Leave type<select id="f-type">' + typeOptions(st, r.type) + '</select></label>' +
       '<div class="two"><label class="field">First day<input type="date" id="f-start" required value="' + esc(r.start) + '"></label>' +
       '<label class="field">Last day<input type="date" id="f-end" required value="' + esc(r.end) + '" min="' + esc(r.start) + '"></label></div>' +
@@ -2170,11 +2172,35 @@
     }).join('');
     el.hidden = false;
   }
+  /** At the top of the request form: what this person still has of each leave type, so they know what they can ask for. */
+  function formBalances(st, r) {
+    var el = document.getElementById('f-bal');
+    if (!el) return;
+    if (!st || !C.tracksLeave(st)) { el.innerHTML = ''; return; }
+    var y = C.isISO(r.start) ? C.lyOf(r.start, CTX.S) : curLY(), today = todayISO();
+    var bal = C.balances(dataForForm(), st.id, y), mine = st.id === me().id;
+    var items = S.data.types.filter(function (t) { return t.deducts && C.offered(S.data, st, t); })
+      .map(function (t, i) { return { t: t, i: i }; })
+      .sort(function (a, b) { return (typeRank(a.t) - typeRank(b.t)) || (a.i - b.i); })
+      .map(function (x) {
+        var t = x.t, b = bal[t.code];
+        if (!b || b.entitled == null) return '';
+        var left = b.available, extra = '';
+        if (b.lastYear && b.lastYear.left > 0 && (!C.isISO(r.start) || r.start <= b.lastYear.until) && today <= b.lastYear.until) {
+          extra = '<small>+ ' + C.fmtDays(b.lastYear.left) + ' from ' + esc(lyName(y - 1)) + ' until ' + esc(fmt(b.lastYear.until)) + '</small>';
+        }
+        var pend = b.pending > 0 ? '<small>' + C.fmtDays(b.pending) + ' waiting for approval</small>' : '';
+        return '<button type="button" class="fb' + (t.code === r.type ? ' on' : '') + (left <= 0 ? ' none' : '') + '" data-act="f-pick" data-code="' + esc(t.code) + '" style="--c:' + esc(t.colour) + '" title="Choose ' + esc(t.name) + '">' +
+          '<span class="fb-n">' + esc(t.name) + '</span><b class="num">' + C.fmtDays(left) + '</b> <span class="fb-u">' + esc(C.unitName(t, left)) + ' left of ' + C.fmtDays(b.entitled) + '</span>' + extra + pend + '</button>';
+      }).filter(String);
+    el.innerHTML = items.length ? '<p class="fbal-h">' + (mine ? 'You have' : esc(firstName(st.name)) + ' has') + ' this much leave left' + (y !== curLY() ? ' in the ' + esc(lyName(y)) + ' leave year' : '') + ':</p><div class="fbal-list">' + items.join('') + '</div>' : '';
+  }
   function updateRequestSummary() {
     var sum = document.getElementById('f-sum');
     if (!sum) return;
     snapWeekend();
     var r = readReqForm(), t = C.type(S.data, r.type), st = staffById(r.staffId);
+    formBalances(st, r);
     var halfWrap = document.getElementById('f-half-wrap');
     var single = r.start && r.start === r.end && t && t.halfDay && C.isDayUnit(t);
     halfWrap.hidden = !single;
@@ -2402,6 +2428,11 @@
         if (el.dataset.confirm) { Demo.reset(); call('bootstrap', {}, 'Sample data reset'); }
         else { el.dataset.confirm = '1'; el.textContent = 'Click again to reset'; }
         break;
+      case 'f-pick': {
+        var fsel = document.getElementById('f-type');
+        if (fsel && [].some.call(fsel.options, function (o) { return o.value === el.dataset.code; })) { fsel.value = el.dataset.code; fsel.dispatchEvent(new Event('change', { bubbles: true })); }
+        break;
+      }
       case 'decide': {
         var note = document.getElementById('note-' + el.dataset.id);
         var d = el.dataset.d;

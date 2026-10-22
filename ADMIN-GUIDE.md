@@ -80,6 +80,8 @@ Once approved, their balance shows as a negative number. You can always decline 
 
 ## Booking or cancelling leave for someone
 
+When you choose the person under **For**, the top of the window shows how much of each leave type they still have, so you can see what they can take before you book.
+
 - **Book:** click **Book leave**, choose the person under **For**, then the leave type and dates. It's approved straight away and the person is emailed. Use this for leave agreed in person, or sick leave someone phones in.
 - **Cancel:** open the leave (on any calendar, or Employees) and click **Cancel this leave**. Staff can only cancel their own leave before it starts; you can cancel any leave.
 - **Correct a request** (wrong type, dates, half day or note): open it and click **Change**. Your changes keep it approved (or waiting, if it hadn't been decided yet), the person is emailed, and History records what it was before. This works even after the leave has started or ended.

@@ -57,7 +57,7 @@ The Overview opens first and shows your own leave at a glance.
 ## Requesting leave
 
 1. Click **Request leave** (top of the left panel, or **+ Request** on a phone). You can also click an empty day on your own row of the **Wallchart**.
-2. Choose the **Leave type**. You only see the types your staff category gets.
+2. Check how much you have left: the top of the window shows each of your leave types with the days still due to you (plus any days waiting for approval, and days from last year you can still use). Click one to choose it, or choose the **Leave type** from the list. You only see the types your staff category gets.
 3. Pick the **First day** and **Last day**. The Last day fills in with the same date, so for one day you're done; for longer, change the Last day.
 4. For a single day you can choose **Morning** or **Afternoon** for a half day (not for every leave type).
 5. Add a **note** for the Administrator saying what the leave is for (e.g. *family visit*, *doctor's appointment*). The note is required; the request can't be sent without it.

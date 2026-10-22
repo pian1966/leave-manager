@@ -697,3 +697,16 @@ input[readonly] { background: var(--surface-2); color: var(--muted); }
 
 .phnote{margin:-2px 0 10px;padding:8px 12px;border-radius:10px;background:color-mix(in srgb,var(--holiday-ink,#B7791F) 12%,transparent);border-left:3px solid var(--holiday-ink,#B7791F);font-size:.9rem}
 .phnote p{margin:0}.phnote p+p{margin-top:6px}
+
+.fbal{margin:0 0 12px}.fbal:empty{display:none}
+.fbal-h{margin:0 0 6px;font-size:.85rem;color:var(--muted,#5E6B68);font-weight:600}
+.fbal-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.fbal .fb{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:1px;padding:8px 10px;border-radius:10px;border:1px solid var(--line,#D9E1DE);border-left:4px solid var(--c);background:var(--surface);color:var(--ink);font-size:.82rem;line-height:1.25}
+.fbal .fb:hover{border-color:var(--c)}
+.fbal .fb:focus-visible{outline:2px solid var(--c);outline-offset:2px}
+.fbal .fb.on{background:color-mix(in srgb,var(--c) 12%,transparent);border-color:var(--c)}
+.fbal .fb.none b{color:var(--bad,#B42318)}
+.fbal .fb-n{font-weight:600}
+.fbal .fb b{font-size:1.25rem;line-height:1.1}
+.fbal .fb-u{color:var(--muted,#5E6B68)}
+.fbal .fb small{color:var(--muted,#5E6B68);font-size:.75rem}
