@@ -2071,8 +2071,8 @@
     var who = pre.staffId || (takesLeave(u) ? u.id : targets[0].id);
     var html = '<header><div><p class="eyebrow">New request</p><h2>' + (takesLeave(u) ? 'Request leave' : 'Book leave') + '</h2></div><button class="x" data-act="close" aria-label="Close">×</button></header><form id="reqForm" novalidate>' +
       (targets.length > 1 || !takesLeave(u) ? '<label class="field">For<select id="f-staff">' + targets.map(function (s) { return '<option value="' + esc(s.id) + '"' + (s.id === who ? ' selected' : '') + '>' + esc(s.name) + (s.id === u.id ? ' (you)' : '') + '</option>'; }).join('') + '</select></label>' : '') +
+      '<label class="field">Leave type<select id="f-type">' + typeOptions(staffById(who), '', true) + '</select></label>' +
       '<div id="f-bal" class="fbal"></div>' +
-      '<label class="field">Leave type<select id="f-type">' + typeOptions(staffById(who)) + '</select></label>' +
       '<div class="two"><label class="field">First day<input type="date" id="f-start" required value="' + esc(pre.date || '') + '"></label>' +
       '<label class="field">Last day<input type="date" id="f-end" required value="' + esc(pre.date || '') + '"' + (pre.date ? ' min="' + esc(pre.date) + '"' : '') + '></label></div>' +
       '<div class="field" id="f-half-wrap" hidden><span>Length</span><div class="radios">' +
@@ -2090,8 +2090,8 @@
     var willReapprove = !admin && r.status === 'Approved';
     var html = '<header><div><p class="eyebrow">Change leave' + (mine ? '' : ' · ' + esc(st.name)) + '</p><h2>Correct this request</h2></div><button class="x" data-act="close" aria-label="Close">×</button></header><form id="reqForm" novalidate>' +
       '<input type="hidden" id="f-staff" value="' + esc(r.staffId) + '">' +
-      '<div id="f-bal" class="fbal"></div>' +
       '<label class="field">Leave type<select id="f-type">' + typeOptions(st, r.type) + '</select></label>' +
+      '<div id="f-bal" class="fbal"></div>' +
       '<div class="two"><label class="field">First day<input type="date" id="f-start" required value="' + esc(r.start) + '"></label>' +
       '<label class="field">Last day<input type="date" id="f-end" required value="' + esc(r.end) + '" min="' + esc(r.start) + '"></label></div>' +
       '<div class="field" id="f-half-wrap" hidden><span>Length</span><div class="radios">' + [['None', 'Full day'], ['AM', 'Morning'], ['PM', 'Afternoon']].map(function (h) {
@@ -2119,12 +2119,13 @@
     if (t.code === 'WO' || /weekend/i.test(t.name)) return 1;
     return 2;
   }
-  function typeOptions(st, current) {
+  function typeOptions(st, current, blank) {
     var list = S.data.types.filter(function (t) { return C.offered(S.data, st, t); })
       .map(function (t, i) { return { t: t, i: i }; })
       .sort(function (a, b) { return (typeRank(a.t) - typeRank(b.t)) || (a.i - b.i); })
       .map(function (x) { return x.t; });
-    return list.map(function (t) {
+    var none = blank && !list.some(function (t) { return t.code === current; });
+    return (none ? '<option value="" selected disabled>Choose a leave type…</option>' : '') + list.map(function (t) {
       return '<option value="' + esc(t.code) + '"' + (t.code === current ? ' selected' : '') + '>' + esc(t.name) + (t.deducts ? '' : ' (doesn’t use an allowance)') + '</option>';
     }).join('');
   }
@@ -2176,24 +2177,20 @@
   function formBalances(st, r) {
     var el = document.getElementById('f-bal');
     if (!el) return;
-    if (!st || !C.tracksLeave(st)) { el.innerHTML = ''; return; }
+    var t = r.type ? C.type(S.data, r.type) : null;
+    if (!st || !t || !C.tracksLeave(st) || !C.offered(S.data, st, t)) { el.innerHTML = ''; return; }
+    var mine = st.id === me().id, who = mine ? 'You have' : esc(firstName(st.name)) + ' has';
+    if (!t.deducts) { el.innerHTML = '<div class="fb" style="--c:' + esc(t.colour) + '"><span class="fb-u">' + esc(t.name) + ' doesn’t use an allowance, so there’s no limit to show.</span></div>'; return; }
     var y = C.isISO(r.start) ? C.lyOf(r.start, CTX.S) : curLY(), today = todayISO();
-    var bal = C.balances(dataForForm(), st.id, y), mine = st.id === me().id;
-    var items = S.data.types.filter(function (t) { return t.deducts && C.offered(S.data, st, t); })
-      .map(function (t, i) { return { t: t, i: i }; })
-      .sort(function (a, b) { return (typeRank(a.t) - typeRank(b.t)) || (a.i - b.i); })
-      .map(function (x) {
-        var t = x.t, b = bal[t.code];
-        if (!b || b.entitled == null) return '';
-        var left = b.available, extra = '';
-        if (b.lastYear && b.lastYear.left > 0 && (!C.isISO(r.start) || r.start <= b.lastYear.until) && today <= b.lastYear.until) {
-          extra = '<small>+ ' + C.fmtDays(b.lastYear.left) + ' from ' + esc(lyName(y - 1)) + ' until ' + esc(fmt(b.lastYear.until)) + '</small>';
-        }
-        var pend = b.pending > 0 ? '<small>' + C.fmtDays(b.pending) + ' waiting for approval</small>' : '';
-        return '<button type="button" class="fb' + (t.code === r.type ? ' on' : '') + (left <= 0 ? ' none' : '') + '" data-act="f-pick" data-code="' + esc(t.code) + '" style="--c:' + esc(t.colour) + '" title="Choose ' + esc(t.name) + '">' +
-          '<span class="fb-n">' + esc(t.name) + '</span><b class="num">' + C.fmtDays(left) + '</b> <span class="fb-u">' + esc(C.unitName(t, left)) + ' left of ' + C.fmtDays(b.entitled) + '</span>' + extra + pend + '</button>';
-      }).filter(String);
-    el.innerHTML = items.length ? '<p class="fbal-h">' + (mine ? 'You have' : esc(firstName(st.name)) + ' has') + ' this much leave left' + (y !== curLY() ? ' in the ' + esc(lyName(y)) + ' leave year' : '') + ':</p><div class="fbal-list">' + items.join('') + '</div>' : '';
+    var b = C.balances(dataForForm(), st.id, y)[t.code];
+    if (!b || b.entitled == null) { el.innerHTML = ''; return; }
+    var left = b.available, extra = '';
+    if (b.lastYear && b.lastYear.left > 0 && (!C.isISO(r.start) || r.start <= b.lastYear.until) && today <= b.lastYear.until) {
+      extra = '<small>+ ' + C.fmtAmount(t, b.lastYear.left) + ' from ' + esc(lyName(y - 1)) + ', to use by ' + esc(fmt(b.lastYear.until)) + '</small>';
+    }
+    var pend = b.pending > 0 ? '<small>' + C.fmtAmount(t, b.pending) + ' already waiting for approval</small>' : '';
+    el.innerHTML = '<div class="fb' + (left <= 0 ? ' none' : '') + '" style="--c:' + esc(t.colour) + '"><span class="fb-n">' + who + ' <b class="num">' + C.fmtDays(left) + '</b> ' + esc(C.unitName(t, left)) + ' of ' + esc(t.name) + ' left</span>' +
+      '<span class="fb-u">out of ' + C.fmtAmount(t, b.entitled) + (y !== curLY() ? ' in the ' + esc(lyName(y)) + ' leave year' : ' this leave year') + '</span>' + extra + pend + '</div>';
   }
   function updateRequestSummary() {
     var sum = document.getElementById('f-sum');
@@ -2428,11 +2425,6 @@
         if (el.dataset.confirm) { Demo.reset(); call('bootstrap', {}, 'Sample data reset'); }
         else { el.dataset.confirm = '1'; el.textContent = 'Click again to reset'; }
         break;
-      case 'f-pick': {
-        var fsel = document.getElementById('f-type');
-        if (fsel && [].some.call(fsel.options, function (o) { return o.value === el.dataset.code; })) { fsel.value = el.dataset.code; fsel.dispatchEvent(new Event('change', { bubbles: true })); }
-        break;
-      }
       case 'decide': {
         var note = document.getElementById('note-' + el.dataset.id);
         var d = el.dataset.d;
@@ -2536,7 +2528,7 @@
     else if (ev.target.id === 'rep-person') { S.repPerson = ev.target.value; render(); }
     else if (ev.target.id === 'f-staff') {
       var sel = document.getElementById('f-type');
-      sel.innerHTML = typeOptions(staffById(ev.target.value), sel.value);
+      sel.innerHTML = typeOptions(staffById(ev.target.value), sel.value, true);
       updateRequestSummary();
     }
     else if (ev.target.closest('#reqForm')) updateRequestSummary();
