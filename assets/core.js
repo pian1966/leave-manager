@@ -78,20 +78,33 @@ var LeaveCore = (function () {
   /** Context: church open days, each person's working days, holiday lookup and leave-year start month. */
   function ctx(data) {
     var open = parseDays(data.settings.OpenDays || data.settings.WorkingDays, [1, 2, 3, 4, 5]);
-    var hol = {};
+    var hol = {}, sunWork = {};
     (data.holidays || []).forEach(function (h) { hol[h.date] = h.name; });
+    // A public holiday on a Sunday moves to the Monday (Public Holidays Act). So for staff who work Sundays,
+    // that Sunday is an ordinary working day: leave booked on it uses a day, and the Monday is their day off.
+    Object.keys(hol).forEach(function (ds) {
+      var d = parse(ds);
+      if (d.getDay() !== 0) return;
+      for (var i = 1; i <= 2; i++) if (/observed/i.test(hol[iso(addDays(d, i))] || '')) { sunWork[ds] = 1; return; }
+    });
     var S = Number(data.settings.LeaveYearStartMonth || 1) || 1;
     var swd = {};
     (data.staff || []).forEach(function (st) {
       var lv = level(data, st);
       swd[st.id] = parseDays(st.workDays, lv ? parseDays(lv.workDays, open) : open);
     });
-    return { open: open, hol: hol, S: S, swd: swd };
+    return { open: open, hol: hol, sunWork: sunWork, S: S, swd: swd };
+  }
+  /** Is this date a public holiday for this person? (A Sunday holiday isn't, for people who work Sundays.) */
+  function isHolidayFor(d, c, sid) {
+    var ds = iso(d);
+    if (!c.hol[ds]) return false;
+    return !(sid && c.sunWork && c.sunWork[ds] && staffDays(c, sid).indexOf(0) >= 0);
   }
   function staffDays(c, sid) { return (sid && c.swd[sid]) || c.open; }
   function isOpen(d, c) { return c.open.indexOf(d.getDay()) >= 0; }
   /** With a staff id: is this one of their working days? Without: is the church open (and not a holiday)? */
-  function isWorking(d, c, sid) { return staffDays(c, sid).indexOf(d.getDay()) >= 0 && !c.hol[iso(d)]; }
+  function isWorking(d, c, sid) { return staffDays(c, sid).indexOf(d.getDay()) >= 0 && !isHolidayFor(d, c, sid); }
 
   /** Every day a request takes the person away from work, with 0.5 for half days. */
   function dayList(r, c) {
@@ -705,7 +718,7 @@ var LeaveCore = (function () {
 
   return {
     DAYS: DAYS, iso: iso, niceDate: niceDate, niceRange: niceRange, parse: parse, addDays: addDays, isISO: isISO, truthy: truthy, parseDays: parseDays, daysLabel: daysLabel,
-    ctx: ctx, staffDays: staffDays, isOpen: isOpen, isWorking: isWorking,
+    ctx: ctx, staffDays: staffDays, isOpen: isOpen, isWorking: isWorking, isHolidayFor: isHolidayFor,
     dayList: dayList, countDays: countDays, isDayUnit: isDayUnit, isCalendarUnit: isCalendarUnit, unitName: unitName, fmtAmount: fmtAmount, amount: amount,
     easter: easter, saPublicHolidays: saPublicHolidays,
     lyOf: lyOf, lyLabel: lyLabel, lyRange: lyRange, graceEnd: graceEnd, parseMonthDay: parseMonthDay, terms: terms, termOf: termOf, termBookings: termBookings,

@@ -72,7 +72,7 @@ The Overview opens first and shows your own leave at a glance.
 
 <p align="center"><img src="docs/images/m-request.png" alt="Requesting leave in the Android app" width="250"></p>
 
-**What counts as a day off:** only *your own* working days. Days you don't normally work, days the church is closed (Tuesdays) and public holidays are never taken off your balance. Sabbatical is the exception: it counts every calendar day.
+**What counts as a day off:** only *your own* working days. Days you don't normally work, days the church is closed (Tuesdays) and public holidays are never taken off your balance. One exception: when a public holiday falls on a Sunday, the Monday becomes the holiday, so if you work Sundays that Sunday is a normal working day and leave on it does use a day (you get the Monday off instead). Sabbatical is the exception: it counts every calendar day.
 
 **Prefer a form?** Use **Request via Google Forms** in the left panel. Fill it in with the same email you sign in with. The note is required there too. If the request can't be booked (for example, not enough days left), you'll get an email explaining why.
 

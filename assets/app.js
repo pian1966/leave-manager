@@ -1414,7 +1414,7 @@
       return '<tr class="' + (mine ? 'mine' : '') + '"><th class="p" scope="row"><div class="row">' + av(st) + '<div class="nm"><b>' + esc(st.name) + (mine ? ' (you)' : '') + '</b><span>' + esc(catName(st)) + ' · ' + esc(C.daysLabel(wdays)) + '</span></div></div></th>' +
         dates.map(function (d) {
           var ds = C.iso(d), work = C.isWorking(d, CTX, st.id);
-          var cls = [!C.isOpen(d, CTX) ? 'closed' : (wdays.indexOf(d.getDay()) < 0 ? 'we' : ''), CTX.hol[ds] ? 'hol' : '', ds === today ? 'today' : ''];
+          var cls = [!C.isOpen(d, CTX) ? 'closed' : (wdays.indexOf(d.getDay()) < 0 ? 'we' : ''), C.isHolidayFor(d, CTX, st.id) ? 'hol' : '', ds === today ? 'today' : ''];
           var es = work ? entries(st.id, ds) : [];
           var inner = es.map(function (e) {
             var t = typeOf(e.r.type), dl = DL[e.r.id] || [];
@@ -2168,7 +2168,7 @@
       var wdays = st ? C.staffDays(CTX, st.id) : CTX.open;
       while (d <= e && guard++ < 800) {
         var ds = C.iso(d), label = DOW[d.getDay()] + ' ' + fmt(ds);
-        if (CTX.hol[ds]) { skip.hol.push(label + ': ' + CTX.hol[ds] + ' (public holiday)'); nSkip++; }
+        if (st ? C.isHolidayFor(d, CTX, st.id) : CTX.hol[ds]) { skip.hol.push(label + ': ' + CTX.hol[ds] + ' (public holiday)'); nSkip++; }
         else if (!C.isOpen(d, CTX)) { skip.closed.push(label); nSkip++; }
         else if (wdays.indexOf(d.getDay()) < 0) { skip.off.push(label); nSkip++; }
         d = C.addDays(d, 1);
