@@ -2149,16 +2149,23 @@
     eEl.readOnly = true; eEl.classList.add('locked');
     if (!note) eEl.closest('.two').insertAdjacentHTML('afterend', '<p class="muted small" id="f-wknote" style="margin:-4px 0 10px">' + esc(t.name) + ' is always Friday to Sunday. Pick any day in the weekend you want.</p>');
   }
+  /** The official South African public holiday on this date, even if its row was removed from the Public Holidays tab. */
+  var STAT = {};
+  function statHol(ds) {
+    var y = ds.slice(0, 4);
+    if (!STAT[y]) { STAT[y] = {}; C.saPublicHolidays(Number(y)).forEach(function (h) { STAT[y][h.date] = h.name; }); }
+    return STAT[y][ds] || '';
+  }
   /** Below the note: acknowledge a public holiday that is a working day for this person (a Sunday holiday moved to Monday). */
   function phNote(worked, st, mine, t) {
     var el = document.getElementById('f-ph');
     if (!el) return;
     if (!worked.length || !st) { el.hidden = true; el.innerHTML = ''; return; }
     el.innerHTML = worked.map(function (d) {
-      var ds = C.iso(d), moved = '';
-      for (var i = 1; i <= 2; i++) { var m = C.iso(C.addDays(d, i)); if (/observed/i.test(CTX.hol[m] || '')) { moved = m; break; } }
-      return '<p><b>' + esc(DOW[d.getDay()] + ' ' + fmt(ds)) + ' is ' + esc(CTX.hol[ds]) + '</b>, a public holiday, but it’s a working day for ' + (mine ? 'you' : esc(firstName(st.name))) +
-        ' because ' + (mine ? 'you work ' : esc(firstName(st.name)) + ' works ') + 'Sundays. It counts as a day of ' + esc(t ? t.name : 'leave') +
+      var ds = C.iso(d), moved = '', dayName = DOW[d.getDay()], plural = { Sun: 'Sundays', Mon: 'Mondays', Tue: 'Tuesdays', Wed: 'Wednesdays', Thu: 'Thursdays', Fri: 'Fridays', Sat: 'Saturdays' }[dayName] || 'that day';
+      for (var i = 1; i <= 2; i++) { var m = C.iso(C.addDays(d, i)); if (/observed/i.test(CTX.hol[m] || statHol(m))) { moved = m; break; } }
+      return '<p><b>' + esc(dayName + ' ' + fmt(ds)) + ' is ' + esc(CTX.hol[ds] || statHol(ds)) + '</b>, a public holiday, but it’s a working day for ' + (mine ? 'you' : esc(firstName(st.name))) +
+        ' because ' + (mine ? 'you work ' : esc(firstName(st.name)) + ' works ') + esc(plural) + '. It counts as a day of ' + esc(t ? t.name : 'leave') +
         (moved ? '; the public holiday is ' + (mine ? 'yours' : 'theirs') + ' on ' + esc(DOW[C.parse(moved).getDay()] + ' ' + fmt(moved)) + ' instead' : '') + '.</p>';
     }).join('');
     el.hidden = false;
@@ -2182,7 +2189,7 @@
       var wdays = st ? C.staffDays(CTX, st.id) : CTX.open;
       while (d <= e && guard++ < 800) {
         var ds = C.iso(d), label = DOW[d.getDay()] + ' ' + fmt(ds);
-        if (st && CTX.hol[ds] && !C.isHolidayFor(d, CTX, st.id)) worked.push(d);
+        if (st && (CTX.hol[ds] || statHol(ds)) && !C.isHolidayFor(d, CTX, st.id) && C.isWorking(d, CTX, st.id)) worked.push(d);
         if (st ? C.isHolidayFor(d, CTX, st.id) : CTX.hol[ds]) { skip.hol.push(label + ': ' + CTX.hol[ds] + ' (public holiday)'); nSkip++; }
         else if (!C.isOpen(d, CTX)) { skip.closed.push(label); nSkip++; }
         else if (wdays.indexOf(d.getDay()) < 0) { skip.off.push(label); nSkip++; }
