@@ -694,3 +694,6 @@ input.locked { background: var(--surface-2); color: var(--muted); cursor: not-al
 .pinmsg { width: 100%; font: inherit; font-size: .88rem; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--ink); resize: none; }
 .seg button.on { background: var(--accent); color: var(--accent-ink); }
 input[readonly] { background: var(--surface-2); color: var(--muted); }
+
+.phnote{margin:-2px 0 10px;padding:8px 12px;border-radius:10px;background:color-mix(in srgb,var(--holiday-ink,#B7791F) 12%,transparent);border-left:3px solid var(--holiday-ink,#B7791F);font-size:.9rem}
+.phnote p{margin:0}.phnote p+p{margin-top:6px}

@@ -2078,7 +2078,7 @@
       '<label><input type="radio" name="half" value="None" checked>Full day</label><label><input type="radio" name="half" value="AM">Morning</label><label><input type="radio" name="half" value="PM">Afternoon</label></div></div>' +
       (takesLeave(u) ? '<label class="field"><span>Note for the Administrator <span class="req" aria-hidden="true">*</span></span><textarea id="f-reason" rows="2" maxlength="500" required aria-required="true" placeholder="What is the leave for? e.g. family visit, doctor’s appointment"></textarea></label>'
         : '<label class="field">Note <span class="muted" style="font-weight:400">(optional)</span><textarea id="f-reason" rows="2" maxlength="500"></textarea></label>') +
-      '<div class="summary" id="f-sum"></div><div id="f-err"></div>' +
+      '<div id="f-ph" class="phnote" hidden></div><div class="summary" id="f-sum"></div><div id="f-err"></div>' +
       '<div class="actions"><button type="button" class="btn" data-act="close">Cancel</button><button type="submit" class="btn primary" id="f-go">' + (takesLeave(u) ? 'Send request' : 'Book leave') + '</button></div></form>';
     openModal(html, 'Request leave');
     updateRequestSummary();
@@ -2095,7 +2095,7 @@
       '<div class="field" id="f-half-wrap" hidden><span>Length</span><div class="radios">' + [['None', 'Full day'], ['AM', 'Morning'], ['PM', 'Afternoon']].map(function (h) {
         return '<label><input type="radio" name="half" value="' + h[0] + '"' + ((r.half || 'None') === h[0] ? ' checked' : '') + '>' + h[1] + '</label>'; }).join('') + '</div></div>' +
       '<label class="field"><span>Note for the Administrator' + (admin ? ' <span class="muted" style="font-weight:400">(optional)</span>' : ' <span class="req" aria-hidden="true">*</span>') + '</span><textarea id="f-reason" rows="2" maxlength="500">' + esc(r.reason || '') + '</textarea></label>' +
-      '<div class="summary" id="f-sum"></div><div id="f-err"></div>' +
+      '<div id="f-ph" class="phnote" hidden></div><div class="summary" id="f-sum"></div><div id="f-err"></div>' +
       (willReapprove ? '<p class="covwarn" style="margin-top:0"><b>Needs approval again</b><span>This leave is already approved. After you change it, it goes back to the Administrator to approve.</span></p>' :
         admin ? '<p class="muted small">' + esc(firstName(st.name)) + ' will be emailed about the change. It stays ' + esc(r.status.toLowerCase()) + '.</p>' : '') +
       '<div class="actions"><button type="button" class="btn" data-act="close">Cancel</button><button type="submit" class="btn primary" id="f-go">Save changes</button></div></form>';
@@ -2149,6 +2149,20 @@
     eEl.readOnly = true; eEl.classList.add('locked');
     if (!note) eEl.closest('.two').insertAdjacentHTML('afterend', '<p class="muted small" id="f-wknote" style="margin:-4px 0 10px">' + esc(t.name) + ' is always Friday to Sunday. Pick any day in the weekend you want.</p>');
   }
+  /** Below the note: acknowledge a public holiday that is a working day for this person (a Sunday holiday moved to Monday). */
+  function phNote(worked, st, mine, t) {
+    var el = document.getElementById('f-ph');
+    if (!el) return;
+    if (!worked.length || !st) { el.hidden = true; el.innerHTML = ''; return; }
+    el.innerHTML = worked.map(function (d) {
+      var ds = C.iso(d), moved = '';
+      for (var i = 1; i <= 2; i++) { var m = C.iso(C.addDays(d, i)); if (/observed/i.test(CTX.hol[m] || '')) { moved = m; break; } }
+      return '<p><b>' + esc(DOW[d.getDay()] + ' ' + fmt(ds)) + ' is ' + esc(CTX.hol[ds]) + '</b>, a public holiday, but it’s a working day for ' + (mine ? 'you' : esc(firstName(st.name))) +
+        ' because ' + (mine ? 'you work ' : esc(firstName(st.name)) + ' works ') + 'Sundays. It counts as a day of ' + esc(t ? t.name : 'leave') +
+        (moved ? '; the public holiday is ' + (mine ? 'yours' : 'theirs') + ' on ' + esc(DOW[C.parse(moved).getDay()] + ' ' + fmt(moved)) + ' instead' : '') + '.</p>';
+    }).join('');
+    el.hidden = false;
+  }
   function updateRequestSummary() {
     var sum = document.getElementById('f-sum');
     if (!sum) return;
@@ -2158,16 +2172,17 @@
     var single = r.start && r.start === r.end && t && t.halfDay && C.isDayUnit(t);
     halfWrap.hidden = !single;
     if (!single) r.half = 'None';
-    if (!C.isISO(r.start) || !C.isISO(r.end)) { sum.innerHTML = '<span class="muted">Pick your dates to see how many working days this uses.</span>'; setErr(''); return; }
+    if (!C.isISO(r.start) || !C.isISO(r.end)) { phNote([]); sum.innerHTML = '<span class="muted">Pick your dates to see how many working days this uses.</span>'; setErr(''); return; }
     var dl = r.end >= r.start ? C.dayList(r, CTX) : [];
     var n = dl.reduce(function (s, x) { return s + x.amt; }, 0);
     // Which dates in the range aren't counted, and why.
-    var skip = { hol: [], closed: [], off: [] }, nSkip = 0;
+    var skip = { hol: [], closed: [], off: [] }, nSkip = 0, worked = [];
     if (r.end >= r.start && !(t && C.isCalendarUnit(t))) {
       var d = C.parse(r.start), e = C.parse(r.end), guard = 0;
       var wdays = st ? C.staffDays(CTX, st.id) : CTX.open;
       while (d <= e && guard++ < 800) {
         var ds = C.iso(d), label = DOW[d.getDay()] + ' ' + fmt(ds);
+        if (st && CTX.hol[ds] && !C.isHolidayFor(d, CTX, st.id)) worked.push(d);
         if (st ? C.isHolidayFor(d, CTX, st.id) : CTX.hol[ds]) { skip.hol.push(label + ': ' + CTX.hol[ds] + ' (public holiday)'); nSkip++; }
         else if (!C.isOpen(d, CTX)) { skip.closed.push(label); nSkip++; }
         else if (wdays.indexOf(d.getDay()) < 0) { skip.off.push(label); nSkip++; }
@@ -2175,6 +2190,7 @@
       }
     }
     var mine = st && st.id === me().id, who = mine ? 'your' : (st ? firstName(st.name) + '’s' : '');
+    phNote(worked, st, mine, t);
     var skipItems = [];
     if (skip.off.length) skipItems.push(esc(skip.off.join(', ')) + ': not ' + esc(who) + ' working day' + (skip.off.length > 1 ? 's' : '') +
       ' <span class="why">(' + (mine ? 'you work ' : esc(st ? firstName(st.name) : '') + ' works ') + esc(st ? workLabel(st) : '') + ')</span>');
