@@ -51,19 +51,12 @@ var EXAMPLE_RULES_ = [
 
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('Leave Manager')
-    .addItem('1. Set up workbook and Google Form', 'setup')
-    .addItem('Refresh form lists (after editing staff or leave types)', 'refreshForm')
-    .addItem('Secure PINs now', 'hashPins')
-    .addItem('Update public holidays and school terms now', 'updateCalendarsNow')
-    .addItem('Colour the colour codes', 'paintColours')
+    .addItem('Open control panel', 'openPanel')
     .addSeparator()
     .addItem('Choose categories for a cover rule…', 'chooseRuleCategories')
     .addItem('Choose dates for a cover rule…', 'chooseRuleDates')
     .addSeparator()
-    .addItem('Preview the weekly “who’s away” email (sent to you only)', 'previewWeeklyEmail')
-    .addItem('Preview the “use it or lose it” emails (sent to you only)', 'previewReminders')
-    .addSeparator()
-    .addItem('Show my links', 'showLinks')
+    .addItem('Set up or repair the workbook', 'setup')
     .addToUi();
 }
 
@@ -893,9 +886,10 @@ function checkPin_(st, pin) {
 function hashPins() {
   var n = 0;
   loadData_().staff.forEach(function (s) {
-    if (s._pin && s._pin.indexOf('h:') !== 0) { setCells_(SHEET.STAFF, s._row, { 'PIN': hash_(s._pin) }); n++; }
+    if (s._pin && s._pin.indexOf('h:') !== 0 && s._pin.indexOf('u:') !== 0) { setCells_(SHEET.STAFF, s._row, { 'PIN': hash_(s._pin) }); n++; }
   });
-  SpreadsheetApp.getUi().alert(n + ' PIN(s) secured. Staff sign in with the same PINs as before.');
+  try { SpreadsheetApp.getUi().alert(n + ' PIN(s) secured. Staff sign in with the same PINs as before.'); } catch (e) { /* called from the panel */ }
+  return n;
 }
 
 /** My settings: a person can change their own colour (Staff tab, column J). */
@@ -1629,4 +1623,128 @@ function formTypeNames_(data) {
   return data.types.map(function (t, i) { return { t: t, i: i }; })
     .sort(function (a, b) { return (rank(a.t) - rank(b.t)) || (a.i - b.i); })
     .map(function (x) { return x.t.name; });
+}
+
+
+/* ============================ CONTROL PANEL ============================ */
+
+/** Menu: the Administrator's control panel (a side panel in the Sheet). */
+function openPanel() {
+  var html = HtmlService.createHtmlOutputFromFile('Panel').setTitle('Leave Manager');
+  SpreadsheetApp.getUi().showSidebar(html);
+}
+
+/** Everything the panel shows. */
+function panelInfo() {
+  var data = loadData_(), today = todayStr_();
+  var active = data.staff.filter(function (s) { return s.active !== false; });
+  var people = data.staff.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).map(function (s) {
+    return { id: s.id, name: s.name, email: s.email, level: s.level, active: s.active !== false, admin: LeaveCore.isAdmin(s),
+      pin: !s._pin ? 'none' : s._pin.indexOf('u:') === 0 ? 'own' : 'given' };
+  });
+  var si = LeaveCore.standInId(data, today), siSt = si ? LeaveCore.staffById(data, si) : null;
+  var url = '';
+  try { url = ScriptApp.getService().getUrl() || ''; } catch (e) { /* not deployed */ }
+  var guide = 'https://github.com/pian1966/leave-manager/blob/main/';
+  return {
+    company: String(data.settings.CompanyName || 'Leave Manager'),
+    appUrl: String(data.settings.AppURL || ''), formUrl: String(data.settings.FormURL || ''), apiUrl: url,
+    staffGuide: guide + 'STAFF-GUIDE.md', adminGuide: guide + 'ADMIN-GUIDE.md',
+    staff: people, activeCount: active.filter(function (s) { return LeaveCore.tracksLeave(s); }).length,
+    pending: data.requests.filter(function (r) { return r.status === 'Pending'; }).length,
+    awayToday: data.requests.filter(function (r) { return r.status === 'Approved' && r.start <= today && r.end >= today; }).length,
+    categories: data.levels.map(function (l) { return l.level; }).filter(function (c) { return LeaveCore.tracksLeave({ level: c }); }),
+    standIn: siSt ? { name: siSt.name, to: String(data.settings.StandInTo || '') } : null,
+    weeklyEmail: String(data.settings.WeeklyEmail || ''), reminderDates: String(data.settings.ReminderDates || ''),
+    lastCalendarUpdate: String(data.settings.LastCalendarUpdate || ''),
+    rules: (data.rules || []).filter(function (r) { return r.active !== false; }).length,
+    me: me_()
+  };
+}
+
+/** A temporary 4-digit PIN that isn't easy to guess. People choose their own at their first sign-in. */
+function tempPin_() {
+  for (var i = 0; i < 50; i++) {
+    var p = String(1000 + Math.floor(Math.random() * 9000));
+    if (!pinProblem_(p)) return p;
+  }
+  return '4821';
+}
+
+/** Adds a staff member on the Staff tab. Returns their ID and temporary PIN. */
+function panelAddStaff(f) {
+  var name = String(f && f.name || '').trim(), email = String(f && f.email || '').trim().toLowerCase();
+  var cat = String(f && f.category || '').trim(), start = String(f && f.start || '').slice(0, 10);
+  if (!name) throw new Error('Type their name.');
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('Type a valid email address.');
+  return withLock_(function () {
+    var data = loadData_();
+    if (data.staff.some(function (s) { return s.email === email; })) throw new Error('Someone on the Staff tab already has ' + email + '.');
+    if (!data.levels.some(function (l) { return LeaveCore.catKey(l.level) === LeaveCore.catKey(cat); })) throw new Error('Choose a category.');
+    var n = 0;
+    data.staff.forEach(function (s) { var m = /^S(\d+)$/i.exec(s.id); if (m) n = Math.max(n, Number(m[1])); });
+    var id = 'S' + (n + 1 < 10 ? '0' : '') + (n + 1);
+    var palette = ['#2F6FB3', '#C2410C', '#7C3AED', '#0F766E', '#B45309', '#BE185D', '#4D7C0F', '#1D4ED8', '#9333EA', '#0E7490', '#B91C1C', '#15803D'];
+    var used = data.staff.map(function (s) { return String(s.colour || '').toUpperCase(); });
+    var colour = palette.filter(function (c) { return used.indexOf(c) < 0; })[0] || palette[n % palette.length];
+    var pin = tempPin_();
+    var sh = ss_().getSheetByName(SHEET.STAFF), head = HEADERS[SHEET.STAFF], row = new Array(head.length).fill('');
+    var put = function (h, v) { var i = head.indexOf(h); if (i >= 0) row[i] = v; };
+    put('ID', id); put('Name', name); put('Email', email); put('Category', cat); put('Role', 'Staff');
+    put('Start Date', LeaveCore.isISO(start) ? start : ''); put('PIN', pin); put('Colour', colour); put('Active', true);
+    var a = sh.getLastRow() >= 2 ? sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues() : [], last = 0;
+    a.forEach(function (r, i) { if (String(r[0]).trim() !== '') last = i + 1; });
+    var at = last + 2;
+    sh.getRange(at, head.indexOf('PIN') + 1).setNumberFormat('@');
+    sh.getRange(at, 1, 1, row.length).setValues([row]);
+    try { sh.getRange(at, head.indexOf('Active') + 1).insertCheckboxes().setValue(true); } catch (e) { /* fine */ }
+    try { paintRange_(sh.getRange(at, COLOUR_COLS_['Staff'], 1, 1)); } catch (e) { /* fine */ }
+    dirty_();
+    try { refreshForm(); } catch (e) { /* form optional */ }
+    logHistory_('Staff member added', {}, name, '', me_() || 'Administrator', cat);
+    return { id: id, pin: pin, name: name };
+  });
+}
+
+/** Gives someone a new temporary PIN (they choose their own at the next sign-in). */
+function panelResetPin(id) {
+  return withLock_(function () {
+    var row = staffRow_(id), pin = tempPin_();
+    var sh = ss_().getSheetByName(SHEET.STAFF), col = HEADERS[SHEET.STAFF].indexOf('PIN') + 1;
+    sh.getRange(row, col).setNumberFormat('@').setValue(pin);
+    dirty_();
+    var name = String(sh.getRange(row, HEADERS[SHEET.STAFF].indexOf('Name') + 1).getValue());
+    logHistory_('PIN reset', {}, name, '', me_() || 'Administrator', '');
+    return { pin: pin, name: name };
+  });
+}
+
+/** Marks someone as having left (or back again). Their history is kept. */
+function panelSetActive(id, active) {
+  return withLock_(function () {
+    var row = staffRow_(id);
+    setCells_(SHEET.STAFF, row, { 'Active': !!active });
+    try { refreshForm(); } catch (e) { /* form optional */ }
+    return true;
+  });
+}
+
+/** Runs a maintenance task from the panel and returns a short message. */
+function panelRun(task) {
+  var me = me_();
+  switch (task) {
+    case 'calendars': return updateCalendars();
+    case 'form': refreshForm(); return 'The Google Form lists now match the Staff and Leave Types tabs.';
+    case 'pins': var n = hashPins(); return n ? n + ' PIN' + (n > 1 ? 's' : '') + ' secured.' : 'All PINs were already secure.';
+    case 'colours': paintColours(); return 'Colour codes on the Staff and Leave Types tabs are shaded.';
+    case 'weekly': sendWeeklyEmail_(loadData_(), todayStr_(), me); return 'A preview of this week’s “who’s away” email was sent to ' + me + '.';
+    case 'reminders': var r = sendReminders_(loadData_(), todayStr_(), me);
+      return (r ? r + ' reminder preview' + (r > 1 ? 's' : '') + ' and ' : '') + 'the Administrator summary were sent to ' + me + '.';
+    case 'rules-sheet': SpreadsheetApp.getActive().getSheetByName(SHEET.RULES).activate(); return 'Cover Rules tab opened. Click a rule’s row, then use the buttons below.';
+    case 'rule-cats': chooseRuleCategories(); return '';
+    case 'rule-dates': chooseRuleDates(); return '';
+    case 'staff-sheet': SpreadsheetApp.getActive().getSheetByName(SHEET.STAFF).activate(); return 'Staff tab opened.';
+    case 'setup': setup(); return 'Set up finished.';
+    default: throw new Error('Unknown task.');
+  }
 }

@@ -185,6 +185,22 @@ Use **‹ 2026 ›** to choose the year and **Print / Save as PDF** to print.
 
 ## Looking after the Google Sheet
 
+### The control panel
+
+In the Google Sheet, choose **Leave Manager → Open control panel**. A panel opens on the right with everything in one place:
+
+- **At a glance:** staff, requests waiting for approval, who's away today, cover rules switched on, the stand-in approver, the automatic emails, and when holidays and terms were last updated.
+- **Links:** Leave Manager, the Google Form, both guides, and the Staff tab.
+- **Staff:**
+  - **Add staff member:** type their name and email, and choose their category and start date. Leave Manager gives them the next ID, a colour and a **temporary PIN**, adds them to the Google Form, and shows a ready-made message to send them.
+  - **New PIN:** gives someone a new temporary PIN if they've forgotten theirs. They choose their own when they next sign in.
+  - **Mark as left / Back on staff:** they can no longer sign in, but their history is kept.
+  - Each person shows **Own PIN** or **Temporary PIN**, so you can see who still has to choose theirs.
+- **Cover rules & blocked days**, **Holidays & school terms** (update now), **Emails** (previews to you only) and **Maintenance** (refresh the form lists, secure PINs, colour codes, set up or repair).
+
+The Leave Manager menu itself now only has the items that need you to click a row first (choosing categories or dates for a cover rule) and **Set up or repair the workbook**. Reload the sheet once to see the new menu.
+
+
 Open it from **Open the Google Sheet** in the app's left-hand panel.
 
 | Tab | What you do there |

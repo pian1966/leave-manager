@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<style>
+  :root {
+    --ink: #14211F; --muted: #5E6B68; --line: #E1E7E5; --bg: #F4F6F5; --surface: #FFFFFF;
+    --brand: #0F4F43; --accent: #0F6E5C; --accent-soft: #DCEEE8; --on: #4CC3A6;
+    --warn: #9A5B00; --warn-soft: #FEF3C7; --bad: #B42318; --bad-soft: #FDE8E7; --ok: #1F7A45; --ok-soft: #DCFCE7;
+    --r: 10px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 13px/1.45 "Google Sans", Roboto, Arial, sans-serif; color: var(--ink); background: var(--bg); }
+  button, input, select { font: inherit; color: inherit; }
+
+  .head { background: var(--brand); color: #fff; padding: 16px 16px 14px; display: flex; gap: 12px; align-items: center; }
+  .mark { display: grid; grid-template-columns: repeat(3, 7px); gap: 3px; padding: 7px; background: #ffffff14; border-radius: 9px; }
+  .mark i { width: 7px; height: 7px; border-radius: 2px; background: #ffffff40; }
+  .mark i.on { background: var(--on); }
+  .head b { display: block; font-size: 15px; letter-spacing: .1px; }
+  .head small { color: #cfe3dd; font-size: 12px; }
+
+  .wrap { padding: 12px 12px 70px; }
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 9px 11px; }
+  .tile span { display: block; font-size: 11px; color: var(--muted); font-weight: 600; }
+  .tile b { font-size: 22px; line-height: 1.2; }
+  .tile.warn { background: var(--warn-soft); border-color: #F5D58A; }
+  .tile.warn b { color: var(--warn); }
+
+  .facts { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 4px 11px; margin-bottom: 10px; }
+  .fact { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 12px; }
+  .fact:first-child { border-top: 0; }
+  .fact span { color: var(--muted); }
+  .fact b { font-weight: 600; text-align: right; }
+
+  .links { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
+  .links a { display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px;
+    color: var(--ink); text-decoration: none; font-weight: 600; font-size: 12px; }
+  .links a:hover { border-color: var(--accent); color: var(--accent); }
+  .links a.main { grid-column: 1 / -1; background: var(--accent); color: #fff; border-color: var(--accent); justify-content: center; padding: 9px; }
+  .links a.main:hover { filter: brightness(1.08); color: #fff; }
+  .links a.off { opacity: .45; pointer-events: none; }
+
+  details { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); margin-bottom: 8px; overflow: hidden; }
+  summary { list-style: none; cursor: pointer; padding: 11px 12px; display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 13.5px; }
+  summary::-webkit-details-marker { display: none; }
+  summary .ico { width: 26px; height: 26px; border-radius: 7px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; flex: none; }
+  summary .ico svg { width: 15px; height: 15px; }
+  summary .sub { display: block; font-weight: 400; font-size: 11.5px; color: var(--muted); }
+  summary::after { content: ""; margin-left: auto; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform .15s; flex: none; }
+  details[open] summary::after { transform: rotate(-135deg); }
+  .body { padding: 2px 12px 12px; border-top: 1px solid var(--line); }
+  .body p { margin: 8px 0; color: var(--muted); font-size: 12px; }
+
+  .btn { display: flex; width: 100%; align-items: center; gap: 8px; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 10px; margin-top: 6px; cursor: pointer; font-weight: 600; font-size: 12.5px; }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn small { display: block; font-weight: 400; color: var(--muted); font-size: 11.5px; }
+  .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); justify-content: center; text-align: center; }
+  .btn.primary:hover { color: #fff; filter: brightness(1.08); }
+  .btn.danger:hover { border-color: var(--bad); color: var(--bad); }
+  .btn:disabled { opacity: .6; cursor: progress; }
+  .btn .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; }
+
+  label.f { display: block; margin-top: 8px; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+  label.f input, label.f select { display: block; width: 100%; margin-top: 3px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: var(--ink); font-size: 13px; }
+  label.f input:focus, label.f select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .people { margin-top: 10px; border-top: 1px solid var(--line); }
+  .person { padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .person .top { display: flex; align-items: center; gap: 8px; }
+  .av { width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; font-size: 10.5px; font-weight: 700; flex: none; }
+  .person .nm { flex: 1; min-width: 0; }
+  .person .nm b { display: block; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .person .nm span { color: var(--muted); font-size: 11px; }
+  .person.left { opacity: .55; }
+  .pill { display: inline-block; font-size: 10.5px; font-weight: 700; border-radius: 99px; padding: 1px 7px; }
+  .pill.own { background: var(--ok-soft); color: var(--ok); }
+  .pill.given { background: var(--warn-soft); color: var(--warn); }
+  .pill.none { background: var(--bad-soft); color: var(--bad); }
+  .pacts { display: flex; gap: 6px; margin: 6px 0 0 34px; }
+  .mini { border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 3px 8px; font-size: 11.5px; font-weight: 600; cursor: pointer; }
+  .mini:hover { border-color: var(--accent); color: var(--accent); }
+  .search { width: 100%; margin-top: 10px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 7px; font-size: 12.5px; }
+
+  .result { margin-top: 10px; background: var(--accent-soft); border-radius: 8px; padding: 10px; font-size: 12px; }
+  .result .pin { font-size: 24px; font-weight: 800; letter-spacing: 4px; color: var(--brand); display: block; margin: 2px 0 4px; }
+  .result textarea { width: 100%; margin-top: 6px; font: inherit; font-size: 11.5px; border: 1px solid var(--line); border-radius: 6px; padding: 6px; resize: none; background: #fff; }
+
+  .note { font-size: 11.5px; color: var(--muted); margin: 8px 0 0; }
+  .err { background: var(--bad-soft); color: var(--bad); border-radius: 7px; padding: 7px 9px; margin-top: 8px; font-size: 12px; }
+
+  #toast { position: fixed; left: 10px; right: 10px; bottom: 10px; background: var(--ink); color: #fff; padding: 9px 12px; border-radius: 9px; font-size: 12.5px;
+    box-shadow: 0 6px 20px #0003; transform: translateY(140%); transition: transform .2s; z-index: 9; }
+  #toast.show { transform: translateY(0); }
+  #toast.bad { background: var(--bad); }
+  .skel { height: 56px; border-radius: var(--r); background: linear-gradient(90deg, #e9eeec, #f6f8f7, #e9eeec); background-size: 200% 100%; animation: sk 1.2s infinite; margin-bottom: 8px; }
+  @keyframes sk { to { background-position: -200% 0; } }
+  .spin { width: 13px; height: 13px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; display: inline-block; animation: rot .7s linear infinite; vertical-align: -2px; }
+  @keyframes rot { to { transform: rotate(360deg); } }
+  .foot { text-align: center; color: var(--muted); font-size: 11px; margin-top: 10px; }
+</style>
+</head>
+<body>
+  <div class="head">
+    <span class="mark" aria-hidden="true"><i></i><i class="on"></i><i></i><i></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i></span>
+    <div><b>Control panel</b><small id="company">Leave Manager</small></div>
+  </div>
+
+  <div class="wrap" id="app">
+    <div class="tiles"><div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
+    <div class="skel" style="height:120px"></div>
+  </div>
+  <div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+  var INFO = null, FILTER = '';
+  var ICON = {
+    staff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3 3 0 0 1 0 6M18 14c2 .7 3 2.6 3 6"/></svg>',
+    rules: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M9 15l6 0"/></svg>',
+    cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>',
+    mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>',
+    tools: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg>'
+  };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function initials(n) { return String(n).split(/\s+/).filter(Boolean).slice(0, 2).map(function (w) { return w[0]; }).join('').toUpperCase(); }
+  var toastT;
+  function toast(m, bad) { var t = document.getElementById('toast'); t.textContent = m; t.className = 'show' + (bad ? ' bad' : ''); clearTimeout(toastT); toastT = setTimeout(function () { t.className = ''; }, bad ? 6000 : 3200); }
+  /** google.script.run as a promise. */
+  function run(fn) {
+    var args = [].slice.call(arguments, 1);
+    return new Promise(function (ok, bad) { var r = google.script.run.withSuccessHandler(ok).withFailureHandler(bad); r[fn].apply(r, args); });
+  }
+  function busy(btn, on, label) {
+    if (!btn) return;
+    if (on) { btn.dataset.html = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spin"></span> ' + (label || 'Working…'); }
+    else { btn.disabled = false; if (btn.dataset.html) btn.innerHTML = btn.dataset.html; }
+  }
+  function niceDay(v) {
+    v = String(v || '').trim(); if (!v) return '';
+    return v.split(',').map(function (x) { return x.trim(); }).join(', ');
+  }
+
+  function section(id, icon, title, sub, body, open) {
+    return '<details id="' + id + '"' + (open ? ' open' : '') + '><summary><span class="ico">' + ICON[icon] + '</span><span>' + title + '<span class="sub">' + sub + '</span></span></summary><div class="body">' + body + '</div></details>';
+  }
+  function task(t, title, help, cls) {
+    return '<button class="btn ' + (cls || '') + '" data-task="' + t + '"><span class="dot"></span><span>' + title + (help ? '<small>' + help + '</small>' : '') + '</span></button>';
+  }
+
+  function render() {
+    var I = INFO, open = {};
+    [].forEach.call(document.querySelectorAll('details'), function (d) { open[d.id] = d.open; });
+    document.getElementById('company').textContent = I.company;
+    var tiles = '<div class="tiles">' +
+      '<div class="tile"><span>Staff</span><b>' + I.activeCount + '</b></div>' +
+      '<div class="tile' + (I.pending ? ' warn' : '') + '"><span>Waiting for approval</span><b>' + I.pending + '</b></div>' +
+      '<div class="tile"><span>Away today</span><b>' + I.awayToday + '</b></div>' +
+      '<div class="tile"><span>Cover rules on</span><b>' + I.rules + '</b></div></div>';
+    var facts = '<div class="facts">' +
+      '<div class="fact"><span>Stand-in approver</span><b>' + (I.standIn ? esc(I.standIn.name) + (I.standIn.to ? ' until ' + esc(I.standIn.to) : '') : 'None') + '</b></div>' +
+      '<div class="fact"><span>Weekly “who’s away” email</span><b>' + (I.weeklyEmail ? esc(I.weeklyEmail) + 's' : 'Off') + '</b></div>' +
+      '<div class="fact"><span>“Use it or lose it” reminders</span><b>' + (I.reminderDates ? esc(niceDay(I.reminderDates)) : 'Off') + '</b></div>' +
+      '<div class="fact"><span>Holidays &amp; terms updated</span><b>' + esc(String(I.lastCalendarUpdate || 'Not yet').slice(0, 16)) + '</b></div></div>';
+    var links = '<div class="links">' +
+      '<a class="main' + (I.appUrl ? '' : ' off') + '" href="' + esc(I.appUrl) + '" target="_blank">Open Leave Manager ↗</a>' +
+      '<a class="' + (I.formUrl ? '' : 'off') + '" href="' + esc(I.formUrl) + '" target="_blank">Google Form ↗</a>' +
+      '<a href="' + esc(I.adminGuide) + '" target="_blank">Admin guide ↗</a>' +
+      '<a href="' + esc(I.staffGuide) + '" target="_blank">Staff guide ↗</a>' +
+      '<a href="#" data-task="staff-sheet">Staff tab →</a></div>';
+
+    var people = I.staff.filter(function (p) { return !FILTER || (p.name + ' ' + p.email + ' ' + p.level).toLowerCase().indexOf(FILTER) >= 0; }).map(function (p) {
+      var pin = p.pin === 'own' ? '<span class="pill own">Own PIN</span>' : p.pin === 'given' ? '<span class="pill given">Temporary PIN</span>' : '<span class="pill none">No PIN</span>';
+      return '<div class="person' + (p.active ? '' : ' left') + '"><div class="top"><span class="av">' + esc(initials(p.name)) + '</span><div class="nm"><b>' + esc(p.name) + '</b><span>' +
+        esc(p.admin ? 'Administrator' : p.level) + (p.active ? '' : ' · left') + '</span></div>' + pin + '</div>' +
+        '<div class="pacts"><button class="mini" data-pin="' + esc(p.id) + '">New PIN</button>' +
+        (p.admin ? '' : '<button class="mini" data-active="' + esc(p.id) + '" data-to="' + (p.active ? '0' : '1') + '">' + (p.active ? 'Mark as left' : 'Back on staff') + '</button>') + '</div></div>';
+    }).join('');
+    var addForm = '<form id="add" autocomplete="off"><label class="f">Name<input name="name" placeholder="e.g. Thabo Nkosi"></label>' +
+      '<label class="f">Email<input name="email" type="email" placeholder="Their Google account if they’ll sign in with Google"></label>' +
+      '<div class="two"><label class="f">Category<select name="category">' + I.categories.map(function (c) { return '<option>' + esc(c) + '</option>'; }).join('') + '</select></label>' +
+      '<label class="f">Start date<input name="start" type="date"></label></div>' +
+      '<button class="btn primary" type="submit">Add staff member</button><div id="add-out"></div></form>';
+    var staff = section('s-staff', 'staff', 'Staff', I.activeCount + ' people · add, PINs, leavers',
+      addForm + '<input class="search" id="search" placeholder="Find someone…" value="' + esc(FILTER) + '"><div class="people">' + (people || '<p>Nobody matches.</p>') + '</div><div id="pin-out"></div>', open['s-staff']);
+
+    var rules = section('s-rules', 'rules', 'Cover rules & blocked days', I.rules + ' switched on',
+      '<p>Easiest: use <b>Blocked days</b> on the Leave Manager Dashboard. On the sheet, click a rule’s row first, then:</p>' +
+      task('rules-sheet', 'Open the Cover Rules tab') + task('rule-cats', 'Choose categories…', 'Tick who the selected rule applies to') + task('rule-dates', 'Choose dates…', 'Every year, around Easter, or one year only'), open['s-rules']);
+    var cal = section('s-cal', 'cal', 'Holidays & school terms', 'Updated automatically on the 1st of each month',
+      task('calendars', 'Update now', 'Adds next year’s public holidays and school terms') + '<div id="cal-out"></div>', open['s-cal']);
+    var mail = section('s-mail', 'mail', 'Emails', 'Previews go to you only' + (I.me ? ' (' + esc(I.me) + ')' : ''),
+      task('weekly', 'Preview the weekly “who’s away” email') + task('reminders', 'Preview the “use it or lose it” emails') +
+      '<p class="note">Switch these emails on or off in Leave Manager: My settings → Automatic emails.</p>', open['s-mail']);
+    var tools = section('s-tools', 'tools', 'Maintenance', 'Form lists, PINs, colours, repair',
+      task('form', 'Refresh the Google Form lists', 'After changing staff or leave types') + task('pins', 'Secure PINs', 'Scramble any PIN typed into the sheet') +
+      task('colours', 'Colour the colour codes', 'Shade the Colour columns') + task('setup', 'Set up or repair the workbook', 'Safe to run again: adds anything missing, keeps your data', 'danger'), open['s-tools']);
+
+    document.getElementById('app').innerHTML = tiles + facts + links + staff + rules + cal + mail + tools +
+      '<div class="foot">Leave Manager · <a href="#" data-task="reload">Refresh panel</a></div>';
+  }
+
+  function load() {
+    return run('panelInfo').then(function (i) { INFO = i; render(); }).catch(function (e) {
+      document.getElementById('app').innerHTML = '<div class="err">Couldn’t load the panel: ' + esc(e.message || e) + '</div>';
+    });
+  }
+
+  document.addEventListener('click', function (ev) {
+    var el = ev.target.closest('[data-task],[data-pin],[data-active]');
+    if (!el) return;
+    ev.preventDefault();
+    if (el.dataset.task === 'reload') { load().then(function () { toast('Up to date'); }); return; }
+    if (el.dataset.task) {
+      var t = el.dataset.task;
+      if (t === 'setup' && !confirm('Set up or repair the workbook? Your data is kept; anything missing is added.')) return;
+      busy(el, true);
+      run('panelRun', t).then(function (msg) {
+        busy(el, false);
+        var after = ['calendars', 'form', 'pins', 'setup'].indexOf(t) >= 0 ? load() : Promise.resolve();
+        after.then(function () {
+          var out = document.getElementById('cal-out');
+          if (t === 'calendars' && out) { document.getElementById('s-cal').open = true; out.innerHTML = '<div class="result">' + esc(msg) + '</div>'; }
+          else if (msg) toast(msg);
+        });
+      }).catch(function (e) { busy(el, false); toast(e.message || String(e), true); });
+      return;
+    }
+    if (el.dataset.pin) {
+      var p = INFO.staff.filter(function (x) { return x.id === el.dataset.pin; })[0];
+      if (!confirm('Give ' + p.name + ' a new temporary PIN? Their current PIN will stop working.')) return;
+      busy(el, true, '');
+      run('panelResetPin', p.id).then(function (r) {
+        busy(el, false); showPin('pin-out', r.name, r.pin, 'new temporary PIN'); load().then(function () { showPin('pin-out', r.name, r.pin, 'new temporary PIN'); });
+      }).catch(function (e) { busy(el, false); toast(e.message || String(e), true); });
+      return;
+    }
+    if (el.dataset.active) {
+      var on = el.dataset.to === '1', q = INFO.staff.filter(function (x) { return x.id === el.dataset.active; })[0];
+      if (!on && !confirm('Mark ' + q.name + ' as having left? They can’t sign in any more, but their leave history is kept.')) return;
+      busy(el, true, '');
+      run('panelSetActive', q.id, on).then(function () { toast(q.name + (on ? ' is back on the staff list.' : ' is marked as having left.')); load(); })
+        .catch(function (e) { busy(el, false); toast(e.message || String(e), true); });
+    }
+  });
+  function showPin(where, name, pin, what) {
+    var box = document.getElementById(where); if (!box) return;
+    var first = String(name).split(' ')[0];
+    var msg = 'Hi ' + first + ', your Leave Manager ' + (what === 'PIN' ? 'PIN' : 'temporary PIN') + ' is ' + pin + '. Sign in at ' + (INFO.appUrl || 'Leave Manager') + ' with your email and this PIN, then choose your own PIN.';
+    box.innerHTML = '<div class="result"><b>' + esc(name) + '</b>’s ' + esc(what) + ':<span class="pin">' + esc(pin) + '</span>Give it to them in person or send this message:' +
+      '<textarea rows="4" readonly onclick="this.select()">' + esc(msg) + '</textarea></div>';
+    box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  document.addEventListener('input', function (ev) {
+    if (ev.target.id === 'search') {
+      FILTER = ev.target.value.toLowerCase().trim(); var pos = ev.target.selectionStart;
+      render(); var s = document.getElementById('search'); s.focus(); try { s.setSelectionRange(pos, pos); } catch (e) {}
+    }
+  });
+  document.addEventListener('submit', function (ev) {
+    if (ev.target.id !== 'add') return;
+    ev.preventDefault();
+    var f = ev.target, btn = f.querySelector('button[type=submit]'), out = document.getElementById('add-out');
+    var E = f.elements, data = { name: E.namedItem('name').value, email: E.namedItem('email').value, category: E.namedItem('category').value, start: E.namedItem('start').value };
+    busy(btn, true, 'Adding…'); out.innerHTML = '';
+    run('panelAddStaff', data).then(function (r) {
+      busy(btn, false);
+      return load().then(function () { showPin('add-out', r.name, r.pin, 'PIN'); toast(r.name + ' added (' + r.id + ').'); });
+    }).catch(function (e) { busy(btn, false); out.innerHTML = '<div class="err">' + esc(e.message || e) + '</div>'; });
+  });
+  load();
+</script>
+</body>
+</html>

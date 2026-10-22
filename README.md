@@ -162,6 +162,7 @@ apps-script/
   Code.gs            back end: API, setup, form, emails, calendar
   Core.gs            shared leave rules (same as web/assets/core.js)
   appsscript.json    manifest (time zone, web app settings, permissions)
+  Panel.html         the Administrator's control panel (Leave Manager → Open control panel)
 web/                 upload this folder's contents to GitHub Pages
   index.html
   assets/config.js   ← your Apps Script URL goes here
