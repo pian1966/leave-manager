@@ -20,7 +20,7 @@ var HEADERS = {
   'Staff': ['ID', 'Name', 'Email', 'Category', 'Working Days', 'Role', 'Manager Email', 'Start Date', 'PIN', 'Colour', 'Active'],
   'Categories': ['Category', 'Working Days', 'PSL', 'SSL', 'CSL', 'SL', 'WO', 'SAB', 'WA', 'TSL'],
   'Leave Types': ['Code', 'Name', 'Colour', 'Deducts Balance', 'Half Days', 'Pro Rata', 'Needs Approval',
-    'Counted In', 'Allowed Days', 'Accumulates', 'Carry Over Max', 'Per Term Max', 'Max Balance', 'Use By (next year)'],
+    'Counted In', 'Allowed Days', 'Accumulates', 'Carry Over Max', 'Per Term Max', 'Max Balance', 'Use By (next year)', 'In Use'],
   'Requests': ['ID', 'Submitted', 'Staff ID', 'Staff Name', 'Type', 'Start', 'End', 'Half Day', 'Days', 'Reason',
     'Status', 'Decided By', 'Decided On', 'Manager Note', 'Source', 'Calendar Event', 'Cancelled By', 'Cancelled On'],
   'History': ['When', 'Action', 'Request ID', 'Staff', 'Leave Type', 'Dates', 'Days', 'Status', 'By', 'Note'],
@@ -278,7 +278,7 @@ function formatRules_(sh) {
  * Brings the workbook up to date for new features, once (tracked in Script Properties).
  * Runs automatically on the first app request after an update, and from setup.
  */
-var SCHEMA_VERSION_ = '6';
+var SCHEMA_VERSION_ = '7';
 function upgrade_(force) {
   var P = PropertiesService.getScriptProperties();
   if (!force && P.getProperty('SCHEMA') === SCHEMA_VERSION_) return;
@@ -290,6 +290,7 @@ function upgrade_(force) {
     var have = readTable_(SHEET.SET).map(function (r) { return String(r.Key); });
     NEW_SETTINGS_.forEach(function (row) { if (have.indexOf(row[0]) < 0) set.appendRow(row); });
   }
+  try { addInUseColumn_(ss); } catch (e) { console.warn('In Use column skipped: ' + e); }
   installDailyTrigger_();
   try { if (getSetting_('FormId')) refreshForm(); } catch (e) { console.warn('Form refresh skipped: ' + e); }   // e.g. the note becomes compulsory
   P.setProperty('SCHEMA', SCHEMA_VERSION_);
@@ -658,7 +659,8 @@ function loadData_() {
       deducts: B(r['Deducts Balance']), halfDay: B(r['Half Days']), proRata: B(r['Pro Rata']), needsApproval: B(r['Needs Approval']),
       unit: String(r['Counted In'] || 'Days'), allowedDays: String(r['Allowed Days'] || ''), accumulates: B(r.Accumulates),
       carryMax: Number(r['Carry Over Max'] || 0), perTerm: Number(r['Per Term Max'] || 0) || (/weekend/i.test(String(r['Counted In'] || '')) ? 1 : 0), maxBalance: Number(r['Max Balance'] || 0),
-      useBy: r['Use By (next year)'] instanceof Date ? Utilities.formatDate(r['Use By (next year)'], tz_(), 'MM-dd') : String(r['Use By (next year)'] || '')
+      useBy: r['Use By (next year)'] instanceof Date ? Utilities.formatDate(r['Use By (next year)'], tz_(), 'MM-dd') : String(r['Use By (next year)'] || ''),
+      active: r['In Use'] === undefined || r['In Use'] === '' ? true : B(r['In Use'])
     };
   });
   var codes = types.map(function (t) { return t.code; });
@@ -694,7 +696,7 @@ function loadData_() {
     return { name: String(r.Term), start: String(r.Start).slice(0, 10), end: String(r.End).slice(0, 10) };
   });
   var adjustments = readTable_(SHEET.ADJ).filter(function (r) { return r['Staff ID']; }).map(function (r) {
-    return { staffId: String(r['Staff ID']), year: Number(r['Leave Year']), type: String(r.Type), days: Number(r.Days) || 0, note: String(r.Note || '') };
+    return { staffId: String(r['Staff ID']), year: Number(r['Leave Year']), type: String(r.Type), days: Number(r.Days) || 0, note: String(r.Note || ''), id: 'A' + r._row };
   });
   var rules = readTable_(SHEET.RULES).filter(function (r) { return String(r.Rule || r.Type).trim() !== ''; }).map(function (r) {
     var txt = function (v) { return v instanceof Date ? Utilities.formatDate(v, tz_(), 'yyyy-MM-dd') : String(v == null ? '' : v).trim(); };
@@ -800,6 +802,15 @@ function route_(b) {
     case 'rule-delete':
       deleteRule_(user, b);
       break;
+    case 'cfg-get':
+      if (!LeaveCore.isAdmin(user)) throw new Error('Only an Administrator can open Setup.');
+      var v0 = LeaveCore.publicView(data, user); v0.cfg = cfgPayload_(loadData_()); return v0;
+    case 'cfg-save':
+      if (!LeaveCore.isAdmin(user)) throw new Error('Only an Administrator can change Setup.');
+      var extra = cfgSave_(user, b);
+      var fresh = loadData_(); putCache_(fresh);
+      var v1 = LeaveCore.publicView(fresh, LeaveCore.staffById(fresh, user.id) || user); v1.cfg = cfgPayload_(fresh); v1.result = extra || null;
+      return v1;
     default:
       throw new Error('Unknown action: ' + b.action);
   }
@@ -1475,11 +1486,15 @@ function saveRule_(user, b) {
     }
     var name = String(b.name || '').trim(), from = String(b.from || '').trim(), to = String(b.to || from).trim();
     var action = /^warn$/i.test(String(b.ruleAction || '')) ? 'Warn' : 'Block';
-    if (!name) throw new Error('Give the blocked days a name, e.g. Christmas services.');
+    var isMin = /min/i.test(String(b.kind || ''));
+    if (!name) throw new Error(isMin ? 'Give the rule a name, e.g. Sunday cover.' : 'Give the blocked days a name, e.g. Christmas services.');
     var y = Number(todayStr_().slice(0, 4));
-    if (!LeaveCore.ruleDate(from, y) || !LeaveCore.ruleDate(to, y)) throw new Error('Choose the first and last day.');
-    if (LeaveCore.isISO(from) && LeaveCore.isISO(to) && to < from) throw new Error('The last day is before the first day.');
-    var values = [name, 'No leave', String(b.category || '').trim(), '', from, to, '', action, String(b.message || '').trim().slice(0, 300), b.active !== false];
+    if (!isMin || from || to) {
+      if (!LeaveCore.ruleDate(from, y) || !LeaveCore.ruleDate(to, y)) throw new Error('Choose the first and last day.');
+      if (LeaveCore.isISO(from) && LeaveCore.isISO(to) && to < from) throw new Error('The last day is before the first day.');
+    }
+    var minimum = isMin ? Math.max(1, Number(b.min) || 1) : '';
+    var values = [name, isMin ? 'Minimum on duty' : 'No leave', String(b.category || '').trim(), isMin ? String(b.days || '').trim() : '', from, isMin && !from ? '' : to, minimum, action, String(b.message || '').trim().slice(0, 300), b.active !== false];
     var row;
     if (b.id) row = ruleRow_(b.id);
     else {
@@ -1620,7 +1635,7 @@ function formTypeNames_(data) {
     if (t.code === 'WO' || /weekend/i.test(t.name)) return 1;
     return 2;
   };
-  return data.types.map(function (t, i) { return { t: t, i: i }; })
+  return data.types.filter(function (t) { return t.active !== false; }).map(function (t, i) { return { t: t, i: i }; })
     .sort(function (a, b) { return (rank(a.t) - rank(b.t)) || (a.i - b.i); })
     .map(function (x) { return x.t.name; });
 }
@@ -1746,5 +1761,265 @@ function panelRun(task) {
     case 'staff-sheet': SpreadsheetApp.getActive().getSheetByName(SHEET.STAFF).activate(); return 'Staff tab opened.';
     case 'setup': setup(); return 'Set up finished.';
     default: throw new Error('Unknown task.');
+  }
+}
+
+
+/** Adds the "In Use" tick-box column to Leave Types (all ticked), for sheets made before it existed. */
+function addInUseColumn_(ss) {
+  var sh = ss.getSheetByName(SHEET.TYPES);
+  if (!sh || sh.getLastColumn() < 1) return;
+  var head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+  var col = head.indexOf('In Use') + 1;
+  if (!col) {
+    col = HEADERS[SHEET.TYPES].indexOf('In Use') + 1;
+    if (col <= sh.getLastColumn() && String(sh.getRange(1, col).getValue()).trim() !== '') col = sh.getLastColumn() + 1;
+    sh.getRange(1, col).setValue('In Use').setFontWeight('bold').setBackground('#0F4F43').setFontColor('#FFFFFF')
+      .setNote('Untick to stop using a leave type (e.g. Sick Leave if you don’t track it yet). It disappears from requests, balances, calendars, reports and the Google Form. Existing records are kept.');
+    if (sh.getLastRow() >= 2) {
+      var rng = sh.getRange(2, col, sh.getLastRow() - 1, 1);
+      rng.insertCheckboxes();
+      var codes = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
+      rng.setValues(codes.map(function (r) { return [String(r[0]).trim() !== '']; }));
+    }
+  }
+  dirty_();
+}
+
+
+/* ================================ SETUP (in the app) ================================ */
+
+var CFG_SETTINGS_ = ['CompanyName', 'OpenDays', 'LeaveYearStartMonth', 'FirstLeaveYear', 'TermsIncludeHolidays', 'ProRata', 'AllowNegative',
+  'MaxOffPerDay', 'NotifyEmail', 'AppURL', 'CalendarId', 'AutoUpdateCalendars', 'WeeklyEmail', 'ReminderDates'];
+
+/** Everything the Setup pages edit, in plain values. */
+function cfgPayload_(data) {
+  var settings = {};
+  CFG_SETTINGS_.forEach(function (k) { settings[k] = data.settings[k] == null ? '' : data.settings[k]; });
+  var codes = data.types.map(function (t) { return t.code; });
+  return {
+    settings: settings,
+    staff: data.staff.map(function (s) {
+      return { id: s.id, name: s.name, email: s.email, level: s.level, workDays: s.workDays, role: LeaveCore.isAdmin(s) ? 'Administrator' : 'Staff',
+        start: s.start, colour: s.colour, active: s.active !== false, pin: !s._pin || s._pin === 'undefined' ? 'none' : s._pin.indexOf('u:') === 0 ? 'own' : 'given' };
+    }),
+    levels: data.levels.map(function (l) { var ent = {}; codes.forEach(function (c) { ent[c] = l.ent[c] == null ? '' : l.ent[c]; }); return { name: l.level, workDays: l.workDays, ent: ent }; }),
+    types: data.types.map(function (t) {
+      return { code: t.code, name: t.name, colour: t.colour, deducts: t.deducts, halfDay: t.halfDay, proRata: t.proRata, needsApproval: t.needsApproval,
+        unit: t.unit, allowedDays: t.allowedDays, accumulates: t.accumulates, perTerm: t.perTerm || '', maxBalance: t.maxBalance || '', useBy: t.useBy, active: t.active !== false };
+    }),
+    holidays: data.holidays.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }),
+    terms: (data.terms || []).slice().sort(function (a, b) { return a.start < b.start ? -1 : 1; }),
+    adjustments: (data.adjustments || []).slice(),
+    rules: (data.rules || []).slice()
+  };
+}
+
+/** Header row of a tab, as written in the sheet. */
+function heads_(sh) { return sh.getRange(1, 1, 1, Math.max(1, sh.getLastColumn())).getValues()[0].map(function (h) { return String(h).trim(); }); }
+/** Writes {Header: value} into a row, by header name (adds missing columns at the end). */
+function writeRow_(sh, row, values, textCols) {
+  var head = heads_(sh);
+  Object.keys(values).forEach(function (k) {
+    var c = head.indexOf(k) + 1;
+    if (!c) { c = head.length + 1; sh.getRange(1, c).setValue(k).setFontWeight('bold').setBackground('#0F4F43').setFontColor('#FFFFFF'); head.push(k); }
+    var cell = sh.getRange(row, c);
+    if ((textCols || []).indexOf(k) >= 0) cell.setNumberFormat('@');
+    if (typeof values[k] === 'boolean') { try { cell.insertCheckboxes(); } catch (e) { /* fine */ } }
+    cell.setValue(values[k]);
+  });
+}
+/** First empty row after the last row with something in column A. */
+function freeRow_(sh) {
+  if (sh.getLastRow() < 2) return 2;
+  var a = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues(), last = 0;
+  a.forEach(function (r, i) { if (String(r[0]).trim() !== '') last = i + 1; });
+  return last + 2;
+}
+/** Row whose value in column `col` matches (using `same`), or 0. */
+function findRow_(sh, col, same) {
+  if (sh.getLastRow() < 2) return 0;
+  var head = heads_(sh), c = head.indexOf(col) + 1;
+  if (!c) return 0;
+  var v = sh.getRange(2, c, sh.getLastRow() - 1, 1).getValues();
+  for (var i = 0; i < v.length; i++) if (same(v[i][0])) return i + 2;
+  return 0;
+}
+function dateText_(v) { return v instanceof Date ? Utilities.formatDate(v, tz_(), 'yyyy-MM-dd') : String(v == null ? '' : v).trim().slice(0, 10); }
+
+/** One Setup change. b.what says which part; b.item holds the values. Returns extra info for the screen (e.g. a new PIN). */
+function cfgSave_(user, b) {
+  var what = String(b.what || ''), it = b.item || {}, ss = ss_();
+  return withLock_(function () {
+    dirty_();
+    var data = loadData_(), out = null;
+    switch (what) {
+      case 'settings': {
+        Object.keys(it).forEach(function (k) { if (CFG_SETTINGS_.indexOf(k) >= 0) setSetting_(k, it[k]); });
+        logHistory_('Setup changed: church & settings', {}, '', '', user.name, Object.keys(it).join(', '));
+        break;
+      }
+      case 'staff': {
+        var name = String(it.name || '').trim(), email = String(it.email || '').trim().toLowerCase(), role = /admin/i.test(it.role) ? 'Administrator' : 'Staff';
+        if (!name) throw new Error('Type their name.');
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('Type a valid email address.');
+        if (data.staff.some(function (s) { return s.email === email && s.id !== it.id; })) throw new Error('Someone else already has ' + email + '.');
+        var cat = String(it.level || '').trim();
+        if (!data.levels.some(function (l) { return LeaveCore.catKey(l.level) === LeaveCore.catKey(cat); })) throw new Error('Choose a category.');
+        if (it.id) {
+          var was = LeaveCore.staffById(data, it.id);
+          var admins = data.staff.filter(function (s) { return LeaveCore.isAdmin(s) && s.active !== false; });
+          if (was && LeaveCore.isAdmin(was) && admins.length === 1 && (role !== 'Administrator' || it.active === false)) throw new Error('There must always be at least one active Administrator.');
+          var row = staffRow_(it.id), sh = ss.getSheetByName(SHEET.STAFF);
+          var vals = { 'Name': name, 'Email': email, 'Category': cat, 'Working Days': String(it.workDays || ''), 'Role': role,
+            'Start Date': LeaveCore.isISO(it.start) ? it.start : '', 'Active': it.active !== false };
+          if (it.colour) vals['Colour'] = String(it.colour);   // keep their colour unless a new one was chosen
+          writeRow_(sh, row, vals, ['Working Days', 'Start Date']);
+          try { paintRange_(sh.getRange(row, COLOUR_COLS_['Staff'], 1, 1)); } catch (e) { /* fine */ }
+          logHistory_('Setup changed: staff member', {}, name, '', user.name, '');
+        } else {
+          out = addStaffRow_({ name: name, email: email, category: cat, start: it.start, workDays: it.workDays, role: role, colour: it.colour }, user.name);
+        }
+        try { refreshForm(); } catch (e) { /* form optional */ }
+        break;
+      }
+      case 'pin': {
+        var r = staffRow_(it.id), pin = tempPin_(), shp = ss.getSheetByName(SHEET.STAFF);
+        shp.getRange(r, HEADERS[SHEET.STAFF].indexOf('PIN') + 1).setNumberFormat('@').setValue(pin);
+        out = { pin: pin, name: String(shp.getRange(r, HEADERS[SHEET.STAFF].indexOf('Name') + 1).getValue()) };
+        logHistory_('PIN reset', {}, out.name, '', user.name, '');
+        break;
+      }
+      case 'category': {
+        var nm = String(it.name || '').trim(), old = String(it.oldName || '').trim();
+        if (!nm) throw new Error('Give the category a name.');
+        if (/^administrators?$/i.test(nm) && !/^administrators?$/i.test(old)) throw new Error('“Administrator” is reserved for the people who approve leave.');
+        var shc = ss.getSheetByName(SHEET.LEVELS);
+        var clash = data.levels.some(function (l) { return LeaveCore.catKey(l.level) === LeaveCore.catKey(nm) && LeaveCore.catKey(l.level) !== LeaveCore.catKey(old); });
+        if (clash) throw new Error('There’s already a category called ' + nm + '.');
+        var rowc = old ? findRow_(shc, 'Category', function (v) { return LeaveCore.catKey(v) === LeaveCore.catKey(old); }) : 0;
+        if (old && !rowc) throw new Error('That category is no longer on the Categories tab.');
+        if (!rowc) rowc = freeRow_(shc);
+        var vals = { 'Category': nm, 'Working Days': String(it.workDays || '') };
+        Object.keys(it.ent || {}).forEach(function (code) { var v = it.ent[code]; vals[code] = v === '' || v == null ? '' : Number(v); });
+        writeRow_(shc, rowc, vals, ['Working Days']);
+        if (old && LeaveCore.catKey(old) !== LeaveCore.catKey(nm)) renameCategoryEverywhere_(old, nm);
+        logHistory_('Setup changed: category', {}, '', '', user.name, nm);
+        break;
+      }
+      case 'category-delete': {
+        var nm2 = String(it.name || '').trim();
+        var users = data.staff.filter(function (s) { return LeaveCore.catKey(s.level) === LeaveCore.catKey(nm2); });
+        if (users.length) throw new Error(users.length + ' staff member' + (users.length > 1 ? 's are' : ' is') + ' in this category (' + users.map(function (s) { return s.name; }).join(', ') + '). Move them to another category first.');
+        var shd = ss.getSheetByName(SHEET.LEVELS), rowd = findRow_(shd, 'Category', function (v) { return LeaveCore.catKey(v) === LeaveCore.catKey(nm2); });
+        if (rowd) shd.deleteRow(rowd);
+        logHistory_('Setup changed: category removed', {}, '', '', user.name, nm2);
+        break;
+      }
+      case 'type': {
+        var code = String(it.code || '').trim().toUpperCase(), sht = ss.getSheetByName(SHEET.TYPES);
+        if (!/^[A-Z][A-Z0-9]{0,5}$/.test(code)) throw new Error('The short code must be 1–6 letters, e.g. FRL.');
+        if (!String(it.name || '').trim()) throw new Error('Give the leave type a name.');
+        var rowt = findRow_(sht, 'Code', function (v) { return String(v).trim().toUpperCase() === code; });
+        if (it.isNew && rowt) throw new Error('There’s already a leave type with the code ' + code + '.');
+        if (!rowt) rowt = freeRow_(sht);
+        writeRow_(sht, rowt, { 'Code': code, 'Name': String(it.name).trim(), 'Colour': String(it.colour || '#64748B'), 'Deducts Balance': !!it.deducts, 'Half Days': !!it.halfDay,
+          'Pro Rata': !!it.proRata, 'Needs Approval': it.needsApproval !== false, 'Counted In': String(it.unit || 'Days'), 'Allowed Days': String(it.allowedDays || ''),
+          'Accumulates': !!it.accumulates, 'Per Term Max': it.perTerm === '' || it.perTerm == null ? '' : Number(it.perTerm),
+          'Max Balance': it.maxBalance === '' || it.maxBalance == null ? '' : Number(it.maxBalance), 'Use By (next year)': String(it.useBy || ''), 'In Use': it.active !== false },
+          ['Allowed Days', 'Use By (next year)']);
+        try { paintRange_(sht.getRange(rowt, COLOUR_COLS_['Leave Types'], 1, 1)); } catch (e) { /* fine */ }
+        // Make sure the Categories tab has a column for this code.
+        var shl = ss.getSheetByName(SHEET.LEVELS), hl = heads_(shl);
+        if (hl.indexOf(code) < 0) shl.getRange(1, hl.length + 1).setValue(code).setFontWeight('bold').setBackground('#0F4F43').setFontColor('#FFFFFF');
+        try { refreshForm(); } catch (e) { /* form optional */ }
+        logHistory_('Setup changed: leave type', {}, '', String(it.name), user.name, it.active === false ? 'switched off' : '');
+        break;
+      }
+      case 'holiday': {
+        var shh = ss.getSheetByName(SHEET.HOL), date = String(it.date || '').slice(0, 10), oldD = String(it.oldDate || '').slice(0, 10);
+        if (!LeaveCore.isISO(date) || !String(it.name || '').trim()) throw new Error('Choose a date and give the holiday a name.');
+        var rowh = oldD ? findRow_(shh, 'Date', function (v) { return dateText_(v) === oldD; }) : 0;
+        if (!rowh && findRow_(shh, 'Date', function (v) { return dateText_(v) === date; })) throw new Error('There’s already a holiday on that date.');
+        if (!rowh) rowh = freeRow_(shh);
+        writeRow_(shh, rowh, { 'Date': LeaveCore.parse(date), 'Name': String(it.name).trim() });
+        shh.getRange(rowh, 1).setNumberFormat('yyyy-mm-dd');
+        break;
+      }
+      case 'holiday-delete': {
+        var shh2 = ss.getSheetByName(SHEET.HOL), rowh2 = findRow_(shh2, 'Date', function (v) { return dateText_(v) === String(it.date).slice(0, 10); });
+        if (rowh2) shh2.deleteRow(rowh2);
+        break;
+      }
+      case 'term': {
+        var shs = ss.getSheetByName(SHEET.TERMS), tn = String(it.name || '').trim(), oldN = String(it.oldName || '').trim();
+        if (!tn || !LeaveCore.isISO(it.start) || !LeaveCore.isISO(it.end)) throw new Error('Give the term a name, first day and last day.');
+        if (it.end < it.start) throw new Error('The last day is before the first day.');
+        var rows = oldN ? findRow_(shs, 'Term', function (v) { return String(v).trim() === oldN; }) : 0;
+        if (!rows) rows = freeRow_(shs);
+        writeRow_(shs, rows, { 'Term': tn, 'Start': LeaveCore.parse(it.start), 'End': LeaveCore.parse(it.end) });
+        shs.getRange(rows, 2, 1, 2).setNumberFormat('yyyy-mm-dd');
+        break;
+      }
+      case 'term-delete': {
+        var shs2 = ss.getSheetByName(SHEET.TERMS), rows2 = findRow_(shs2, 'Term', function (v) { return String(v).trim() === String(it.name).trim(); });
+        if (rows2) shs2.deleteRow(rows2);
+        break;
+      }
+      case 'adjustment': {
+        var sha = ss.getSheetByName(SHEET.ADJ);
+        if (!LeaveCore.staffById(data, it.staffId)) throw new Error('Choose a staff member.');
+        if (!LeaveCore.type(data, it.type)) throw new Error('Choose a leave type.');
+        if (!(Number(it.year) > 2000)) throw new Error('Choose the leave year.');
+        if (!Number(it.days)) throw new Error('Type the number of days (use a minus sign to take days away).');
+        var rowa = it.id ? Number(String(it.id).replace(/^A/, '')) : freeRow_(sha);
+        writeRow_(sha, rowa, { 'Staff ID': it.staffId, 'Leave Year': Number(it.year), 'Type': it.type, 'Days': Number(it.days), 'Note': String(it.note || '') });
+        logHistory_('Setup changed: extra days', {}, (LeaveCore.staffById(data, it.staffId) || {}).name, '', user.name, it.days + ' ' + it.type + ' in ' + it.year);
+        break;
+      }
+      case 'adjustment-delete': {
+        var rowx = Number(String(it.id || '').replace(/^A/, ''));
+        if (rowx >= 2) ss.getSheetByName(SHEET.ADJ).deleteRow(rowx);
+        break;
+      }
+      default: throw new Error('Unknown setup change.');
+    }
+    dirty_();
+    return out;
+  });
+}
+
+/** Adds a staff row; returns { id, pin, name }. */
+function addStaffRow_(f, by) {
+  var data = loadData_(), n = 0;
+  data.staff.forEach(function (s) { var m = /^S(\d+)$/i.exec(s.id); if (m) n = Math.max(n, Number(m[1])); });
+  var id = 'S' + (n + 1 < 10 ? '0' : '') + (n + 1);
+  var palette = ['#2F6FB3', '#C2410C', '#7C3AED', '#0F766E', '#B45309', '#BE185D', '#4D7C0F', '#1D4ED8', '#9333EA', '#0E7490', '#B91C1C', '#15803D'];
+  var used = data.staff.map(function (s) { return String(s.colour || '').toUpperCase(); });
+  var colour = f.colour || palette.filter(function (c) { return used.indexOf(c) < 0; })[0] || palette[n % palette.length];
+  var pin = tempPin_(), sh = ss_().getSheetByName(SHEET.STAFF), at = freeRow_(sh);
+  writeRow_(sh, at, { 'ID': id, 'Name': f.name, 'Email': f.email, 'Category': f.category, 'Working Days': String(f.workDays || ''), 'Role': f.role || 'Staff',
+    'Start Date': LeaveCore.isISO(f.start) ? f.start : '', 'PIN': pin, 'Colour': colour, 'Active': true }, ['Working Days', 'Start Date', 'PIN']);
+  try { paintRange_(sh.getRange(at, COLOUR_COLS_['Staff'], 1, 1)); } catch (e) { /* fine */ }
+  dirty_();
+  logHistory_('Staff member added', {}, f.name, '', by || 'Administrator', f.category);
+  return { id: id, pin: pin, name: f.name };
+}
+
+/** Renaming a category: the Staff tab and Cover Rules follow. */
+function renameCategoryEverywhere_(oldName, newName) {
+  var ss = ss_(), k = LeaveCore.catKey(oldName);
+  var st = ss.getSheetByName(SHEET.STAFF), col = heads_(st).indexOf('Category') + 1;
+  if (col && st.getLastRow() >= 2) {
+    var rng = st.getRange(2, col, st.getLastRow() - 1, 1), v = rng.getValues();
+    rng.setValues(v.map(function (r) { return [LeaveCore.catKey(r[0]) === k ? newName : r[0]]; }));
+  }
+  var cr = ss.getSheetByName(SHEET.RULES);
+  if (cr && cr.getLastRow() >= 2) {
+    var cc = heads_(cr).indexOf('Category') + 1;
+    if (cc) {
+      var r2 = cr.getRange(2, cc, cr.getLastRow() - 1, 1), v2 = r2.getValues();
+      r2.setValues(v2.map(function (r) { return [String(r[0]).split(',').map(function (x) { return LeaveCore.catKey(x) === k ? newName : x.trim(); }).filter(String).join(', ')]; }));
+    }
   }
 }

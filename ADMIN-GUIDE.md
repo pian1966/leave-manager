@@ -185,6 +185,25 @@ Use **‹ 2026 ›** to choose the year and **Print / Save as PDF** to print.
 
 ## Looking after the Google Sheet
 
+### Setup: change everything without the spreadsheet
+
+In Leave Manager, click **Setup** in the left-hand panel (on a phone: **⚙ → Open Setup**). Every change is saved to the Google Sheet straight away, so you don't need to know what the columns mean.
+
+| Section | What you can do |
+| --- | --- |
+| **Church** | Church name, days the church is open, when the leave year starts, part-year allowances, school-holiday weekends, automatic holiday updates, a copy-to email, the web address and an optional Google Calendar. |
+| **Staff** | Add someone (they get a temporary PIN, shown with a message to send them), change their category, role, start date, colour or working days (tick the days), give a new PIN, or mark them as having left. |
+| **Categories** | Each category's usual working days, and how many days of each leave type it gets per year. Leave a box empty if that category doesn't get that leave. |
+| **Leave types** | Switch a type **off** if you don't use it (e.g. **Sick Leave**): it disappears from requests, balances, calendars, reports and the Google Form, and existing records are kept. Edit how each type works, or add a new one (e.g. Family Responsibility Leave). |
+| **Cover rules** | “People on duty” rules (e.g. at least one pastor every Sunday) and blocked days. |
+| **Holidays & terms** | Add a local holiday, or correct school term dates. (Both fill in automatically.) |
+| **Extra days** | Give one person extra days in one year (e.g. +2 for long service), or take days away (e.g. −5 already taken before Leave Manager). |
+
+**Safety checks:** there's always at least one Administrator, two people can't share an email address, and a category can only be deleted when nobody is in it.
+
+The control panel in the Google Sheet has an **Open Setup** button too.
+
+
 ### The control panel
 
 In the Google Sheet, choose **Leave Manager → Open control panel**. A panel opens on the right with everything in one place:

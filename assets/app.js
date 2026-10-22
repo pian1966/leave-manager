@@ -99,6 +99,7 @@
     team: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3 3 0 0 1 0 6M18 14c2 .7 3 2.6 3 6"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
     dashboard: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+    setup: '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
     refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>',
     settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'
   };
@@ -106,7 +107,7 @@
   function markHTML() { var on = [1, 4, 5]; var s = ''; for (var i = 0; i < 9; i++) s += '<i' + (on.indexOf(i) >= 0 ? ' class="on"' : '') + '></i>'; return '<span class="mark" aria-hidden="true">' + s + '</span>'; }
 
   /* ------------------------------ state ------------------------------ */
-  var VIEWS = ['dashboard', 'home', 'wall', 'month', 'year', 'approvals', 'team', 'employees', 'history', 'reports', 'settings'];
+  var VIEWS = ['setup', 'dashboard', 'home', 'wall', 'month', 'year', 'approvals', 'team', 'employees', 'history', 'reports', 'settings'];
   var hashView = (location.hash || '').replace('#', '');
   /* Per-device choices from My settings: light/dark/auto appearance and the page that opens first. */
   function applyTheme(t) {
@@ -366,13 +367,14 @@
     if (isMgr()) items.push(['team', 'Team balances']);
     if (isMgr()) items.push(['employees', 'Employees']);
     if (isMgr()) items.push(['history', 'History']);
+    if (isMgr()) items.push(['setup', 'Setup']);
     items.push(['reports', 'Reports'], ['settings', 'My settings']);
     return items;
   }
   function render() {
     if (!S.data) return renderLogin();
     if (!isApprover() && S.view === 'approvals') S.view = 'home';
-    if ((S.view === 'employees' || S.view === 'history' || S.view === 'team' || S.view === 'dashboard') && !isMgr()) S.view = 'home';
+    if ((S.view === 'employees' || S.view === 'history' || S.view === 'team' || S.view === 'dashboard' || S.view === 'setup') && !isMgr()) S.view = 'home';
     var v = VIEW_FN[S.view]();
     var u = me(), pend = isApprover() ? pendingForMe().length : 0;
     var nav = navItems().map(function (n) {
@@ -384,7 +386,7 @@
     var links = '<a href="' + esc(guideUrl) + '" target="_blank" rel="noopener">Staff guide: how to use Leave Manager ↗</a>' + (isApprover() ? '<a href="' + esc(guideUrl.replace('STAFF-GUIDE', 'ADMIN-GUIDE')) + '" target="_blank" rel="noopener">Administrator guide ↗</a>' : '') + (formUrl ? '<a href="' + esc(formUrl) + '" target="_blank" rel="noopener">Prefer a form? Request via Google Forms ↗</a>' : '') +
       (isMgr() && CFG.SHEET_URL ? '<a href="' + esc(CFG.SHEET_URL) + '" target="_blank" rel="noopener">Open the Google Sheet ↗</a>' : '');
     var brand = '<div class="brand">' + markHTML() + '<div><b>Leave Manager</b><small>' + esc(settings().CompanyName || 'My Team') + '</small></div></div>';
-    var tabs = navItems().filter(function (n) { return n[0] !== 'settings' && ((n[0] !== 'year' && n[0] !== 'home') || !isMgr()); });
+    var tabs = navItems().filter(function (n) { return n[0] !== 'settings' && n[0] !== 'setup' && ((n[0] !== 'year' && n[0] !== 'home') || !isMgr()); });
     app.innerHTML =
       '<div class="shell"><aside class="side">' + brand +
       '<button class="btn primary" data-act="new">' + icon('plus').replace('<svg', '<svg width="16" height="16"') + (takesLeave(u) ? 'Request leave' : 'Book leave') + '</button>' +
@@ -470,6 +472,10 @@
       (isApprover() ? '<a class="btn" href="' + esc(staffUrl.replace('STAFF-GUIDE', 'ADMIN-GUIDE')) + '" target="_blank" rel="noopener">Administrator guide ↗</a>' : '') + '</div></section>';
   }
   /** Administrator: switch the automatic staff emails on or off. */
+  function setupLink() {
+    return isMgr() ? '<section class="panel set-block"><h2>Setup</h2><p class="muted">Staff, categories, leave types, cover rules, holidays and settings, without opening the Google Sheet.</p>' +
+      '<div class="btns"><button class="btn primary" data-act="nav" data-view="setup">Open Setup</button></div></section>' : '';
+  }
   var WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   var DEFAULT_REMINDERS = '1 Nov, 1 Dec, 15 Jan';
   function emailSection() {
@@ -575,7 +581,7 @@
 
         '<section class="panel set-block"><h2>Start page</h2><p class="muted">The page that opens when you sign in on this device.</p>' +
         '<select id="set-start" class="btn">' + opts + '</select></section>' +
-        pinSection() + emailSection() + helpSection() +
+        setupLink() + pinSection() + emailSection() + helpSection() +
         appSection()
     };
   };
@@ -713,6 +719,436 @@
     };
   };
 
+
+
+  /* ============================== SETUP (Administrator) ==============================
+     Plain-English forms for everything on the Google Sheet. Each save writes to the sheet straight away. */
+  var SETUP_TABS = [['church', 'Church'], ['staff', 'Staff'], ['cats', 'Categories'], ['types', 'Leave types'], ['rules', 'Cover rules'], ['dates', 'Holidays & terms'], ['extra', 'Extra days']];
+  var WEEK = [[1, 'Mon'], [2, 'Tue'], [3, 'Wed'], [4, 'Thu'], [5, 'Fri'], [6, 'Sat'], [0, 'Sun']];
+  var UNITS = [['Days', 'Working days'], ['Calendar days', 'Calendar days (every day, incl. weekends)'], ['Weekends', 'Weekends (each booking counts as 1)'], ['Bookings', 'Bookings (each booking counts as 1)']];
+  var COLOURS = ['#2F80C0', '#3A86A8', '#4C9A6A', '#B0527A', '#D1495B', '#E09F3E', '#7B61C9', '#2A9D8F', '#64748B', '#2F6FB3', '#C2410C', '#7C3AED', '#0F766E', '#B45309', '#BE185D', '#4D7C0F'];
+
+  function loadCfg(force) {
+    if (S.cfg && !force) return;
+    if (S.cfgLoading) return;
+    S.cfgLoading = true;
+    api('cfg-get').then(function (d) { S.cfgLoading = false; S.cfg = d.cfg; S.cfgError = null; setData(d); })
+      .catch(function (e) { S.cfgLoading = false; S.cfgError = String(e && e.message || e); render(); });
+  }
+  /** Saves one Setup change, then shows the fresh data. Resolves with any extra result (e.g. a new PIN). */
+  function saveCfg(what, item, okMsg, btn) {
+    if (btn) busy(btn, true);
+    return api('cfg-save', { what: what, item: item }).then(function (d) {
+      S.cfg = d.cfg; closeModal(true); setData(d); if (okMsg) toast(okMsg);
+      return d.result;
+    }).catch(function (e) {
+      if (btn) busy(btn, false);
+      var m = String(e && e.message || e), box = document.getElementById('cf-err');
+      if (m.indexOf('AUTH') === 0) { logout(m.replace(/^AUTH:?\s*/, '')); throw e; }
+      if (box) box.innerHTML = '<div class="err" role="alert">' + esc(m) + '</div>'; else toast(m, true);
+      throw e;
+    });
+  }
+
+  /* ---------- form building blocks ---------- */
+  function fHelp(h) { return h ? '<small class="fhelp">' + esc(h) + '</small>' : ''; }
+  function fText(id, label, val, help, type, ph, attrs) {
+    return '<label class="field">' + esc(label) + '<input id="' + id + '" type="' + (type || 'text') + '" value="' + esc(val == null ? '' : val) + '"' + (ph ? ' placeholder="' + esc(ph) + '"' : '') + (attrs || '') + '>' + fHelp(help) + '</label>';
+  }
+  function fSelect(id, label, opts, val, help) {
+    return '<label class="field">' + esc(label) + '<select id="' + id + '">' + opts.map(function (o) {
+      var v = Array.isArray(o) ? o[0] : o, t = Array.isArray(o) ? o[1] : o;
+      return '<option value="' + esc(v) + '"' + (String(v) === String(val) ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select>' + fHelp(help) + '</label>';
+  }
+  function fToggle(id, label, on, help) {
+    return '<label class="toggle"><input type="checkbox" id="' + id + '"' + (on ? ' checked' : '') + '><span><b>' + esc(label) + '</b>' + (help ? '<small>' + esc(help) + '</small>' : '') + '</span></label>';
+  }
+  function fDays(id, label, val, help) {
+    var on = C.parseDays(val || '', []);
+    return '<div class="field"><span>' + esc(label) + '</span><div class="daybox" id="' + id + '">' + WEEK.map(function (w) {
+      return '<label><input type="checkbox" value="' + w[0] + '"' + (on.indexOf(w[0]) >= 0 ? ' checked' : '') + '><span>' + w[1] + '</span></label>'; }).join('') + '</div>' + fHelp(help) + '</div>';
+  }
+  function readDays(id) {
+    var box = document.getElementById(id); if (!box) return '';
+    var on = Array.prototype.filter.call(box.querySelectorAll('input'), function (x) { return x.checked; }).map(function (x) { return Number(x.value); });
+    return WEEK.filter(function (w) { return on.indexOf(w[0]) >= 0; }).map(function (w) { return w[1]; }).join(', ');
+  }
+  function fColour(id, label, val) {
+    val = normHex(val) || COLOURS[0];
+    return '<div class="field"><span>' + esc(label) + '</span><div class="swatches sm" id="' + id + '" data-val="' + esc(val) + '">' + COLOURS.map(function (c) {
+      return '<button type="button" class="swatch" style="--c:' + c + '" data-act="cf-colour" data-c="' + c + '" aria-label="' + c + '" aria-pressed="' + (c === val) + '"></button>'; }).join('') + '</div></div>';
+  }
+  function gv(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+  function gc(id) { var el = document.getElementById(id); return !!(el && el.checked); }
+  function cfModal(title, eyebrow, body, saveLabel, extraBtns) {
+    openModal('<header><div><p class="eyebrow">' + esc(eyebrow) + '</p><h2>' + esc(title) + '</h2></div><button class="x" data-act="close" aria-label="Close">×</button></header>' +
+      '<form id="cfForm" novalidate>' + body + '<div id="cf-err"></div><div class="actions">' + (extraBtns || '') +
+      '<button type="button" class="btn" data-act="close">Cancel</button><button type="submit" class="btn primary" id="cf-go">' + esc(saveLabel || 'Save') + '</button></div></form>', title);
+  }
+  function cfErr(m) { var b = document.getElementById('cf-err'); if (b) b.innerHTML = '<div class="err" role="alert">' + esc(m) + '</div>'; }
+  function delBtn(act, id) { return '<button type="button" class="btn bad" data-act="' + act + '" data-id="' + esc(id) + '">Delete</button>'; }
+  function onOff(on) { return on ? '' : ' <span class="pill Cancelled">Off</span>'; }
+
+  /* ---------- the page ---------- */
+  VIEW_FN.setup = function () {
+    loadCfg(false);
+    var tab = S.setupTab || 'staff';
+    var nav = '<div class="setup-tabs" role="tablist">' + SETUP_TABS.map(function (t) {
+      return '<button role="tab" data-act="setup-tab" data-tab="' + t[0] + '" aria-selected="' + (t[0] === tab) + '">' + t[1] + '</button>'; }).join('') + '</div>';
+    var body;
+    if (S.cfgError) body = '<div class="panel"><div class="err">' + esc(S.cfgError) + '</div><p><button class="btn" data-act="setup-reload">Try again</button></p></div>';
+    else if (!S.cfg) body = '<div class="panel muted">Loading from the Google Sheet…</div>';
+    else body = ({ church: setupChurch, staff: setupStaff, cats: setupCats, types: setupTypes, rules: setupRules, dates: setupDates, extra: setupExtra })[tab]();
+    return {
+      title: 'Setup',
+      sub: 'Change how Leave Manager works, in plain English. Every change is saved to the Google Sheet straight away.',
+      controls: '<button class="btn" data-act="setup-reload">Reload from sheet</button>' + (CFG.SHEET_URL ? '<a class="btn" href="' + esc(CFG.SHEET_URL) + '" target="_blank" rel="noopener">Open the sheet ↗</a>' : ''),
+      body: nav + '<div class="setup-body">' + body + '</div>'
+    };
+  };
+
+  /* ---------- Church & settings ---------- */
+  function setupChurch() {
+    var s = S.cfg.settings;
+    return '<section class="panel set-block wide"><h2>Church &amp; settings</h2>' +
+      '<form id="cfChurch" novalidate>' +
+      fText('cs-name', 'Church name', s.CompanyName, 'Shown at the top of Leave Manager and in emails.') +
+      fDays('cs-open', 'Days the church is open', s.OpenDays, 'Other days show as “Closed” on the calendars and are never counted as leave.') +
+      '<div class="two">' + fSelect('cs-month', 'Leave year starts in', MONTHS.map(function (m, i) { return [i + 1, m]; }), Number(s.LeaveYearStartMonth) || 1, 'Balances start again in this month.') +
+      fText('cs-first', 'First leave year in Leave Manager', s.FirstLeaveYear, 'Unused leave from before this year is never counted.', 'number') + '</div>' +
+      fToggle('cs-prorata', 'Reduce allowances for people who start part-way through a year', !/^false$/i.test(String(s.ProRata)), 'e.g. someone starting in July gets about half their staff leave in their first year.') +
+      fToggle('cs-neg', 'Let staff ask for more days than they have left', /^true$/i.test(String(s.AllowNegative)), 'Normally off. When on, balances can go below zero.') +
+      fToggle('cs-terms', 'Weekends in the school holidays count towards the term that has just ended', !/^false$/i.test(String(s.TermsIncludeHolidays)), 'When off, Weekend Off can only be booked during term dates.') +
+      fToggle('cs-auto', 'Update public holidays and school terms automatically', !/^false$/i.test(String(s.AutoUpdateCalendars)), 'On the 1st of each month, next year’s dates are added.') +
+      '<div class="two">' + fText('cs-max', 'Highlight days when more people than this are away', s.MaxOffPerDay, 'Shown on the Approvals page. Leave blank for no limit.', 'number') +
+      fText('cs-notify', 'Also copy every new request to (optional)', s.NotifyEmail, 'e.g. an HR or office email address.', 'email') + '</div>' +
+      fText('cs-url', 'Leave Manager web address', s.AppURL, 'Used for the “Open Leave Manager” link in emails.', 'url', 'https://pian1966.github.io/leave-manager/') +
+      fText('cs-cal', 'Google Calendar for approved leave (optional)', s.CalendarId, 'Paste a Google Calendar ID and approved leave is added to it automatically.') +
+      '<div class="btns"><button class="btn primary" type="submit" id="cs-go">Save settings</button></div><div id="cf-err"></div></form>' +
+      '<p class="muted small">Weekly and reminder emails are switched on or off under <b>My settings → Automatic emails</b>.</p></section>';
+  }
+  function saveChurch() {
+    var item = { CompanyName: gv('cs-name').trim(), OpenDays: readDays('cs-open'), LeaveYearStartMonth: Number(gv('cs-month')), FirstLeaveYear: Number(gv('cs-first')) || '',
+      ProRata: gc('cs-prorata') ? 'TRUE' : 'FALSE', AllowNegative: gc('cs-neg') ? 'TRUE' : 'FALSE', TermsIncludeHolidays: gc('cs-terms') ? 'TRUE' : 'FALSE',
+      AutoUpdateCalendars: gc('cs-auto') ? 'TRUE' : 'FALSE', MaxOffPerDay: gv('cs-max') === '' ? '' : Number(gv('cs-max')), NotifyEmail: gv('cs-notify').trim(), AppURL: gv('cs-url').trim(), CalendarId: gv('cs-cal').trim() };
+    if (!item.CompanyName) return cfErr('Type the church name.');
+    if (!item.OpenDays) return cfErr('Tick at least one day the church is open.');
+    saveCfg('settings', item, 'Settings saved', document.getElementById('cs-go'));
+  }
+
+  /* ---------- Staff ---------- */
+  function catOf(name) { return (S.cfg.levels || []).filter(function (l) { return C.catKey(l.name) === C.catKey(name); })[0]; }
+  function setupStaff() {
+    var list = S.cfg.staff.slice().sort(function (a, b) { return (b.active - a.active) || a.name.localeCompare(b.name); });
+    var shown = list.filter(function (p) { return p.active || S.showLeft; });
+    var left = list.length - list.filter(function (p) { return p.active; }).length;
+    return '<section class="panel wide"><div class="setup-head"><h2>Staff <small>' + list.filter(function (p) { return p.active; }).length + ' people</small></h2>' +
+      '<button class="btn primary" data-act="cf-staff" data-id="">+ Add staff member</button></div>' +
+      '<div class="list">' + shown.map(function (p) {
+        var lv = catOf(p.level);
+        var pin = p.pin === 'own' ? '<span class="pill Approved">Own PIN</span>' : p.pin === 'given' ? '<span class="pill Pending">Temporary PIN</span>' : '<span class="pill Declined">No PIN</span>';
+        return '<div class="li setup-row' + (p.active ? '' : ' off') + '">' + av(p) + '<div class="grow"><b>' + esc(p.name) + (p.role === 'Administrator' ? ' <span class="pill Approved">Administrator</span>' : '') + onOff(p.active) + '</b>' +
+          '<span>' + esc(p.level || 'No category') + (lv || p.workDays ? ' · works ' + esc(C.daysLabel(C.parseDays(p.workDays || (lv && lv.workDays) || '', []))) : '') + ' · ' + esc(p.email) + '</span></div>' + pin +
+          '<button class="btn small" data-act="cf-staff" data-id="' + esc(p.id) + '">Edit</button></div>';
+      }).join('') + '</div>' +
+      (left ? '<p style="margin:12px 0 0"><button class="btn small ghost" data-act="cf-showleft">' + (S.showLeft ? 'Hide' : 'Show') + ' ' + left + ' who ha' + (left > 1 ? 've' : 's') + ' left</button></p>' : '') + '</section>';
+  }
+  function staffModal(id) {
+    var p = id ? S.cfg.staff.filter(function (x) { return x.id === id; })[0] : { name: '', email: '', level: (S.cfg.levels[0] || {}).name, workDays: '', role: 'Staff', start: '', colour: '', active: true };
+    var cats = S.cfg.levels.map(function (l) { return l.name; });
+    var lv = catOf(p.level), own = !!p.workDays;
+    var body = fText('sf-name', 'Name', p.name, '', 'text', 'e.g. Thabo Nkosi') +
+      fText('sf-email', 'Email', p.email, 'Their Google account if they’ll use Sign in with Google.', 'email') +
+      '<div class="two">' + fSelect('sf-level', 'Category', cats, p.level, 'Sets their working days and allowances.') +
+      fSelect('sf-role', 'Role', [['Staff', 'Staff'], ['Administrator', 'Administrator (approves leave)']], p.role) + '</div>' +
+      '<div class="field"><span>Working days</span><div class="radios"><label><input type="radio" name="sf-wdm" value="cat"' + (own ? '' : ' checked') + '>Same as their category' +
+      ' <span id="sf-catdays">' + (lv ? '(' + esc(C.daysLabel(C.parseDays(lv.workDays, []))) + ')' : '') + '</span></label><label><input type="radio" name="sf-wdm" value="own"' + (own ? ' checked' : '') + '>Different days</label></div></div>' +
+      '<div id="sf-days-wrap"' + (own ? '' : ' hidden') + '>' + fDays('sf-days', 'Their working days', p.workDays || (lv && lv.workDays) || '', '') + '</div>' +
+      fText('sf-start', 'Start date', p.start, 'Used to reduce their first year’s allowance, and for Sabbatical.', 'date') +
+      fColour('sf-colour', 'Colour', p.colour || COLOURS[(S.cfg.staff.length) % COLOURS.length]) +
+      (id ? fToggle('sf-active', 'Still on the staff', p.active !== false, 'Untick when someone leaves. They can’t sign in any more, but their history is kept.') : '') +
+      (id ? '<div class="field"><span>PIN</span><div class="pinline">' + (p.pin === 'own' ? 'They’ve chosen their own PIN.' : p.pin === 'given' ? 'They still have a temporary PIN.' : 'No PIN yet.') +
+        ' <button type="button" class="btn small" data-act="cf-pin" data-id="' + esc(p.id) + '">Give a new temporary PIN</button></div></div>' : '<p class="muted small">A temporary PIN is created for them; you’ll see it after saving.</p>');
+    cfModal(id ? 'Edit ' + p.name : 'Add a staff member', 'Staff', body, id ? 'Save' : 'Add staff member');
+    S.cfEdit = { kind: 'staff', id: id || '' };
+  }
+  function saveStaff() {
+    var own = (modalRoot.querySelector('input[name="sf-wdm"]:checked') || {}).value === 'own';
+    var item = { id: S.cfEdit.id, name: gv('sf-name').trim(), email: gv('sf-email').trim(), level: gv('sf-level'), role: gv('sf-role'),
+      workDays: own ? readDays('sf-days') : '', start: gv('sf-start'), colour: (document.getElementById('sf-colour') || {}).dataset ? document.getElementById('sf-colour').dataset.val : '',
+      active: S.cfEdit.id ? gc('sf-active') : true };
+    if (!item.name) return cfErr('Type their name.');
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(item.email)) return cfErr('Type a valid email address.');
+    if (own && !item.workDays) return cfErr('Tick at least one working day, or choose “Same as their category”.');
+    saveCfg('staff', item, item.id ? 'Saved ' + item.name : null, document.getElementById('cf-go')).then(function (res) { if (res && res.pin) pinCard(res.name, res.pin, true); });
+  }
+  function pinCard(name, pin, isNew) {
+    var url = settings().AppURL || CFG.APP_URL || location.href.split('#')[0];
+    var msg = 'Hi ' + firstName(name) + ', ' + (isNew ? 'you’ve been added to Leave Manager. ' : '') + 'Your temporary PIN is ' + pin + '. Sign in at ' + url + ' with your email and this PIN, then choose your own PIN.';
+    openModal('<header><div><p class="eyebrow">' + (isNew ? 'Staff member added' : 'New temporary PIN') + '</p><h2>' + esc(name) + '</h2></div><button class="x" data-act="close" aria-label="Close">×</button></header>' +
+      '<p>Their temporary PIN is</p><p class="bigpin">' + esc(pin) + '</p><p class="muted small">Give it to them in person, or copy this message:</p>' +
+      '<textarea class="pinmsg" rows="4" readonly>' + esc(msg) + '</textarea>' +
+      '<div class="actions"><button class="btn" data-act="cf-copy">Copy message</button><button class="btn primary" data-act="close">Done</button></div>', 'PIN');
+  }
+
+  /* ---------- Categories ---------- */
+  function typeUnitWord(t) { return /weekend/i.test(t.unit) ? 'weekends' : /booking/i.test(t.unit) ? 'bookings' : /calendar/i.test(t.unit) ? 'calendar days' : 'days'; }
+  function setupCats() {
+    var types = S.cfg.types.filter(function (t) { return t.active && t.deducts; });
+    return '<section class="panel wide"><div class="setup-head"><h2>Categories <small>working days and allowances per year</small></h2>' +
+      '<button class="btn primary" data-act="cf-cat" data-id="">+ Add category</button></div><div class="cards">' +
+      S.cfg.levels.map(function (l) {
+        var n = S.cfg.staff.filter(function (p) { return p.active && C.catKey(p.level) === C.catKey(l.name); }).length;
+        var admin = !C.tracksLeave({ level: l.name });
+        var ents = admin ? '<span class="muted">Approves leave; doesn’t take leave in Leave Manager.</span>' : types.map(function (t) {
+          var v = l.ent[t.code];
+          return v === '' || v == null ? '' : '<span class="chip" style="--c:' + esc(t.colour) + '"><span class="dot"></span>' + esc(t.name) + ': <b>' + C.fmtDays(Number(v)) + '</b> ' + typeUnitWord(t) + '</span>';
+        }).join('') || '<span class="muted">No allowances yet.</span>';
+        return '<article class="cat-card"><header><b>' + esc(l.name) + '</b><span class="muted small">' + n + ' staff · works ' + esc(C.daysLabel(C.parseDays(l.workDays, []))) + '</span></header>' +
+          '<div class="chips">' + ents + '</div><div class="btns"><button class="btn small" data-act="cf-cat" data-id="' + esc(l.name) + '">Edit</button></div></article>';
+      }).join('') + '</div><p class="muted small" style="margin-top:12px">Leave types that don’t use an allowance (e.g. Unpaid Leave) are available to everyone.</p></section>';
+  }
+  function catModal(name) {
+    var l = name ? catOf(name) : { name: '', workDays: 'Mon, Wed, Thu, Fri', ent: {} };
+    var admin = name && !C.tracksLeave({ level: l.name });
+    var types = S.cfg.types.filter(function (t) { return t.active && t.deducts; });
+    var body = fText('cf-cname', 'Name', l.name, admin ? 'This category is for the people who approve leave.' : 'e.g. Pastoral Staff, Part-Time Support Staff', 'text', '', admin ? ' readonly' : '') +
+      fDays('cf-cdays', 'Usual working days', l.workDays, 'People in this category work these days. You can change them for one person under Staff.') +
+      (admin ? '' : '<div class="field"><span>Allowances per leave year</span><div class="ents">' + types.map(function (t) {
+        var v = l.ent[t.code];
+        return '<label class="ent"><span class="dot" style="--c:' + esc(t.colour) + '"></span><span class="grow">' + esc(t.name) + '</span>' +
+          '<input type="number" min="0" step="0.5" data-code="' + esc(t.code) + '" value="' + esc(v == null ? '' : v) + '" placeholder="–"><small>' + typeUnitWord(t) + '</small></label>';
+      }).join('') + '</div>' + fHelp('Leave a box empty if this category doesn’t get that type of leave.') + '</div>');
+    var n = name ? S.cfg.staff.filter(function (p) { return C.catKey(p.level) === C.catKey(name); }).length : 0;
+    cfModal(name ? 'Edit ' + name : 'Add a category', 'Category', body, name ? 'Save' : 'Add category', name && !admin ? (n ? '' : delBtn('cf-cat-del', name)) : '');
+    S.cfEdit = { kind: 'cat', id: name || '' };
+  }
+  function saveCat() {
+    var ent = {};
+    Array.prototype.forEach.call(modalRoot.querySelectorAll('.ents input[data-code]'), function (x) { ent[x.dataset.code] = x.value === '' ? '' : Number(x.value); });
+    var item = { oldName: S.cfEdit.id, name: gv('cf-cname').trim(), workDays: readDays('cf-cdays'), ent: ent };
+    if (!item.name) return cfErr('Give the category a name.');
+    if (!item.workDays) return cfErr('Tick at least one working day.');
+    saveCfg('category', item, 'Saved ' + item.name, document.getElementById('cf-go'));
+  }
+
+  /* ---------- Leave types ---------- */
+  function setupTypes() {
+    return '<section class="panel wide"><div class="setup-head"><h2>Leave types</h2><button class="btn primary" data-act="cf-type" data-id="">+ Add leave type</button></div>' +
+      '<p class="muted small" style="margin:0 0 10px">Switch off any type you don’t use yet (e.g. Sick Leave). It disappears from requests, balances, calendars, reports and the Google Form. Existing records are kept.</p>' +
+      '<div class="list">' + S.cfg.types.map(function (t) {
+        return '<div class="li setup-row' + (t.active ? '' : ' off') + '"><span class="dot big" style="--c:' + esc(t.colour) + '"></span><div class="grow"><b>' + esc(t.name) + ' <span class="muted small">' + esc(t.code) + '</span>' + onOff(t.active) + '</b>' +
+          '<span>' + esc(typeDesc(t).split('\n')[1] || '') + '</span></div>' +
+          '<label class="sw" title="In use"><input type="checkbox" data-type-toggle="' + esc(t.code) + '"' + (t.active ? ' checked' : '') + ' aria-label="' + esc(t.name) + ' in use"><span></span></label>' +
+          '<button class="btn small" data-act="cf-type" data-id="' + esc(t.code) + '">Edit</button></div>';
+      }).join('') + '</div></section>';
+  }
+  function typeModal(code) {
+    var t = code ? S.cfg.types.filter(function (x) { return x.code === code; })[0] :
+      { code: '', name: '', colour: COLOURS[S.cfg.types.length % COLOURS.length], deducts: true, halfDay: true, proRata: false, needsApproval: true, unit: 'Days', allowedDays: '', accumulates: false, perTerm: '', maxBalance: '', useBy: '', active: true };
+    var body = '<div class="two">' + fText('tf-name', 'Name', t.name, '', 'text', 'e.g. Family Responsibility Leave') +
+      fText('tf-code', 'Short code', t.code, code ? 'Can’t be changed.' : '1–6 letters, used on the sheet, e.g. FRL.', 'text', 'FRL', code ? ' readonly' : ' maxlength="6"') + '</div>' +
+      fColour('tf-colour', 'Colour on calendars', t.colour) +
+      fSelect('tf-unit', 'How it’s counted', UNITS, t.unit || 'Days') +
+      fToggle('tf-active', 'In use', t.active, 'Untick to hide this leave type everywhere.') +
+      fToggle('tf-deducts', 'Uses an allowance', t.deducts, 'Set how many days each category gets under Categories. Untick for e.g. Unpaid Leave.') +
+      fToggle('tf-approve', 'Needs the Administrator’s approval', t.needsApproval !== false, '') +
+      fToggle('tf-half', 'Half days allowed', t.halfDay, '') +
+      fToggle('tf-prorata', 'Reduce for people who start part-way through a year', t.proRata, '') +
+      fToggle('tf-acc', 'Unused days build up from year to year', t.accumulates, 'e.g. Sabbatical.') +
+      '<div class="two">' + fText('tf-max', 'Most that can build up', t.maxBalance, 'Only for leave that builds up. Blank = no limit.', 'number') +
+      fText('tf-term', 'Most bookings per school term', t.perTerm, 'e.g. 1 for Weekend Off. Blank = no limit.', 'number') + '</div>' +
+      fText('tf-useby', 'Unused days can still be taken until (next year)', t.useBy, 'e.g. 1 Feb. Blank = unused days are lost at the end of the leave year.', 'text', '1 Feb') +
+      fDays('tf-days', 'Only on these days (optional)', t.allowedDays, 'Leave all unticked to allow any working day. Weekend Off uses Fri, Sat, Sun.');
+    cfModal(code ? 'Edit ' + t.name : 'Add a leave type', 'Leave type', body, code ? 'Save' : 'Add leave type');
+    S.cfEdit = { kind: 'type', id: code || '' };
+  }
+  function saveType(itemOverride) {
+    var item = itemOverride || { isNew: !S.cfEdit.id, code: gv('tf-code').trim().toUpperCase(), name: gv('tf-name').trim(), colour: document.getElementById('tf-colour').dataset.val,
+      unit: gv('tf-unit'), active: gc('tf-active'), deducts: gc('tf-deducts'), needsApproval: gc('tf-approve'), halfDay: gc('tf-half'), proRata: gc('tf-prorata'),
+      accumulates: gc('tf-acc'), maxBalance: gv('tf-max'), perTerm: gv('tf-term'), useBy: gv('tf-useby').trim(), allowedDays: readDays('tf-days') };
+    if (!itemOverride) {
+      if (!item.name) return cfErr('Give the leave type a name.');
+      if (!/^[A-Z][A-Z0-9]{0,5}$/.test(item.code)) return cfErr('The short code must be 1–6 letters, e.g. FRL.');
+      if (item.useBy && !C.parseMonthDay(item.useBy)) return cfErr('Type the date like “1 Feb”, or leave it blank.');
+    }
+    return saveCfg('type', item, itemOverride ? (item.active ? item.name + ' switched on' : item.name + ' switched off') : 'Saved ' + item.name, itemOverride ? null : document.getElementById('cf-go'));
+  }
+
+  /* ---------- Cover rules ---------- */
+  function setupRules() {
+    var rules = S.data.rules || [], mins = rules.filter(function (r) { return C.isMinRule(r); });
+    return '<section class="panel wide"><div class="setup-head"><h2>People on duty</h2><button class="btn primary" data-act="cf-min" data-id="">+ Add rule</button></div>' +
+      '<p class="muted small" style="margin:0 0 10px">Make sure enough people are working, e.g. at least one pastor every Sunday.</p>' +
+      (mins.length ? '<div class="list">' + mins.map(function (r) {
+        var on = r.active !== false;
+        return '<div class="li setup-row' + (on ? '' : ' off') + '"><span class="blk-ico" aria-hidden="true">👥</span><div class="grow"><b>' + esc(r.name) + onOff(on) + '</b><span>At least ' + (Number(r.min) || 1) + ' ' +
+          esc(r.category || 'staff') + ' on ' + esc(r.days ? C.daysLabel(C.parseDays(r.days, [])) : 'every day') + (r.from ? ' · ' + esc(ruleWhen(r)) : '') + ' · ' + (/warn/i.test(r.action) ? 'warning only' : 'blocked') + '</span></div>' +
+          '<label class="sw"><input type="checkbox" data-rule-toggle="' + esc(r.id || '') + '"' + (on ? ' checked' : '') + ' aria-label="' + esc(r.name) + ' on or off"><span></span></label>' +
+          '<button class="btn small" data-act="cf-min" data-id="' + esc(r.id || '') + '">Edit</button></div>';
+      }).join('') + '</div>' : '<p class="muted">No rules yet.</p>') + '</section>' +
+      blockedPanel();
+  }
+  function minModal(id) {
+    var r = id ? (S.data.rules || []).filter(function (x) { return x.id === id; })[0] : { name: 'Sunday cover', category: '', days: 'Sun', min: 1, action: 'Warn', message: '', active: true };
+    var cats = String(r.category || '').split(',').map(function (x) { return C.catKey(x); }).filter(String);
+    var levels = S.cfg.levels.filter(function (l) { return C.tracksLeave({ level: l.name }); });
+    var body = fText('mf-name', 'Name', r.name, '', 'text', 'e.g. Sunday cover') +
+      '<div class="field"><span>Who must be on duty</span><div class="rb-cats">' + levels.map(function (l) {
+        return '<label class="chk"><input type="checkbox" name="mf-cat" value="' + esc(l.name) + '"' + (cats.indexOf(C.catKey(l.name)) >= 0 ? ' checked' : '') + '>' + esc(l.name) + '</label>'; }).join('') + '</div>' +
+      fHelp('Leave all unticked to count all staff.') + '</div>' +
+      fDays('mf-days', 'On these days', r.days, 'Leave all unticked for every day.') +
+      fText('mf-min', 'At least this many people', r.min || 1, '', 'number', '1', ' min="1"') +
+      '<div class="field"><span>If a request would break the rule</span><div class="radios"><label><input type="radio" name="mf-act" value="Warn"' + (/block/i.test(r.action) ? '' : ' checked') + '>Allow it, with a warning</label><label><input type="radio" name="mf-act" value="Block"' + (/block/i.test(r.action) ? ' checked' : '') + '>Block the request</label></div></div>' +
+      fText('mf-msg', 'Message (optional, shown to staff)', r.message, '', 'text', 'e.g. At least one pastor must be on duty every Sunday.');
+    cfModal(id ? 'Edit ' + r.name : 'Add a rule', 'People on duty', body, id ? 'Save' : 'Add rule', id ? delBtn('blk-del', id) : '');
+    S.cfEdit = { kind: 'min', id: id || '', active: r.active !== false };
+  }
+  function saveMin() {
+    var cats = Array.prototype.map.call(modalRoot.querySelectorAll('input[name="mf-cat"]:checked'), function (x) { return x.value; });
+    var item = { id: S.cfEdit.id, kind: 'Minimum on duty', name: gv('mf-name').trim(), category: cats.join(', '), days: readDays('mf-days'), min: Number(gv('mf-min')) || 1,
+      ruleAction: (modalRoot.querySelector('input[name="mf-act"]:checked') || {}).value || 'Warn', message: gv('mf-msg').trim(), active: S.cfEdit.active };
+    if (!item.name) return cfErr('Give the rule a name, e.g. Sunday cover.');
+    var btn = document.getElementById('cf-go'); busy(btn, true);
+    call('rule-save', item, 'Saved ' + item.name).then(function () { closeModal(true); }).catch(function () { busy(btn, false); });
+  }
+
+  /* ---------- Holidays & terms ---------- */
+  function setupDates() {
+    var y = new Date().getFullYear(), yr = S.holYear || y;
+    var hols = S.cfg.holidays.filter(function (h) { return h.date.slice(0, 4) === String(yr); });
+    var years = {}; S.cfg.holidays.forEach(function (h) { years[h.date.slice(0, 4)] = 1; });
+    var terms = S.cfg.terms.filter(function (t) { return Number(t.end.slice(0, 4)) >= y - 1; });
+    return '<div class="dash"><section class="panel"><div class="setup-head"><h2>Public holidays</h2><button class="btn primary" data-act="cf-hol" data-id="">+ Add</button></div>' +
+      '<div class="seg" style="margin-bottom:10px">' + Object.keys(years).sort().filter(function (k) { return Number(k) >= y - 1; }).map(function (k) {
+        return '<button data-act="cf-holyear" data-y="' + k + '"' + (String(yr) === k ? ' aria-current="true" class="on"' : '') + '>' + k + '</button>'; }).join('') + '</div>' +
+      '<div class="list">' + (hols.map(function (h) {
+        return '<div class="li setup-row"><div class="grow"><b>' + esc(h.name) + '</b><span>' + esc(fmtLong(h.date)) + '</span></div><button class="btn small" data-act="cf-hol" data-id="' + esc(h.date) + '">Edit</button></div>';
+      }).join('') || '<p class="muted">None for ' + yr + '.</p>') + '</div><p class="muted small" style="margin-top:10px">South African public holidays are added automatically each year. Add your own here, e.g. a local holiday.</p></section>' +
+      '<section class="panel"><div class="setup-head"><h2>School terms</h2><button class="btn primary" data-act="cf-term" data-id="">+ Add</button></div><div class="list">' +
+      (terms.map(function (t) {
+        return '<div class="li setup-row"><div class="grow"><b>' + esc(t.name) + '</b><span>' + esc(fmtRange({ start: t.start, end: t.end })) + '</span></div><button class="btn small" data-act="cf-term" data-id="' + esc(t.name) + '">Edit</button></div>';
+      }).join('') || '<p class="muted">No terms yet.</p>') + '</div><p class="muted small" style="margin-top:10px">Used for “one Weekend Off per term”. Filled in automatically from the official school calendar.</p></section></div>';
+  }
+  function holModal(date) {
+    var h = date ? S.cfg.holidays.filter(function (x) { return x.date === date; })[0] : { date: '', name: '' };
+    cfModal(date ? 'Edit holiday' : 'Add a holiday', 'Public holiday', fText('hf-name', 'Name', h.name, '', 'text', 'e.g. Church anniversary') + fText('hf-date', 'Date', h.date, '', 'date'), 'Save', date ? delBtn('cf-hol-del', date) : '');
+    S.cfEdit = { kind: 'hol', id: date || '' };
+  }
+  function termModal(name) {
+    var t = name ? S.cfg.terms.filter(function (x) { return x.name === name; })[0] : { name: '', start: '', end: '' };
+    cfModal(name ? 'Edit ' + t.name : 'Add a school term', 'School term', fText('tm-name', 'Name', t.name, 'e.g. Term 1 2027', 'text', 'Term 1 2027') +
+      '<div class="two">' + fText('tm-start', 'First day', t.start, '', 'date', '', ' data-follow="tm-end"') + fText('tm-end', 'Last day', t.end, '', 'date') + '</div>', 'Save', name ? delBtn('cf-term-del', name) : '');
+    S.cfEdit = { kind: 'term', id: name || '' };
+  }
+
+  /* ---------- Extra days (adjustments) ---------- */
+  function setupExtra() {
+    var list = (S.cfg.adjustments || []).slice().sort(function (a, b) { return b.year - a.year; });
+    return '<section class="panel wide"><div class="setup-head"><h2>Extra days <small>add or take away days for one person in one year</small></h2>' +
+      '<button class="btn primary" data-act="cf-adj" data-id="">+ Add</button></div>' +
+      '<p class="muted small" style="margin:0 0 10px">e.g. 2 extra days for long service, or −5 days already taken before Leave Manager started.</p>' +
+      '<div class="list">' + (list.map(function (a) {
+        var p = S.cfg.staff.filter(function (x) { return x.id === a.staffId; })[0] || { name: a.staffId }, t = S.cfg.types.filter(function (x) { return x.code === a.type; })[0] || { name: a.type };
+        return '<div class="li setup-row"><div class="grow"><b>' + esc(p.name) + ': ' + (a.days > 0 ? '+' : '') + C.fmtDays(a.days) + ' ' + esc(t.name) + '</b><span>' + esc(lyName(a.year)) + (a.note ? ' · ' + esc(a.note) : '') + '</span></div>' +
+          '<button class="btn small" data-act="cf-adj" data-id="' + esc(a.id || '') + '">Edit</button></div>';
+      }).join('') || '<p class="muted">None yet.</p>') + '</div></section>';
+  }
+  function adjModal(id) {
+    var a = id ? S.cfg.adjustments.filter(function (x) { return x.id === id; })[0] : { staffId: '', year: curLY(), type: '', days: '', note: '' };
+    var people = S.cfg.staff.filter(function (p) { return p.active && C.tracksLeave({ level: p.level }); }).sort(function (x, y) { return x.name.localeCompare(y.name); });
+    var types = S.cfg.types.filter(function (t) { return t.active && t.deducts; });
+    var body = fSelect('af-staff', 'Staff member', people.map(function (p) { return [p.id, p.name]; }), a.staffId) +
+      '<div class="two">' + fSelect('af-type', 'Leave type', types.map(function (t) { return [t.code, t.name]; }), a.type) +
+      fSelect('af-year', 'Leave year', [curLY() - 1, curLY(), curLY() + 1].map(function (y) { return [y, lyName(y)]; }), a.year) + '</div>' +
+      fText('af-days', 'Days', a.days, 'Use a minus sign to take days away, e.g. -5. Half days like 1.5 are fine.', 'number', '2', ' step="0.5"') +
+      fText('af-note', 'Note', a.note, '', 'text', 'e.g. Long service');
+    cfModal(id ? 'Edit extra days' : 'Add extra days', 'Extra days', body, 'Save', id ? delBtn('cf-adj-del', id) : '');
+    S.cfEdit = { kind: 'adj', id: id || '' };
+  }
+
+  /* ---------- events for Setup ---------- */
+  function setupClick(a, el) {
+    switch (a) {
+      case 'setup-tab': S.setupTab = el.dataset.tab; render(); return true;
+      case 'setup-reload': S.cfg = null; S.cfgError = null; loadCfg(true); render(); return true;
+      case 'cf-showleft': S.showLeft = !S.showLeft; render(); return true;
+      case 'cf-staff': staffModal(el.dataset.id); return true;
+      case 'cf-cat': catModal(el.dataset.id); return true;
+      case 'cf-type': typeModal(el.dataset.id); return true;
+      case 'cf-min': minModal(el.dataset.id); return true;
+      case 'cf-hol': holModal(el.dataset.id); return true;
+      case 'cf-term': termModal(el.dataset.id); return true;
+      case 'cf-adj': adjModal(el.dataset.id); return true;
+      case 'cf-holyear': S.holYear = Number(el.dataset.y); render(); return true;
+      case 'cf-colour': {
+        var box = el.closest('.swatches'); box.dataset.val = el.dataset.c;
+        Array.prototype.forEach.call(box.querySelectorAll('.swatch'), function (b) { b.setAttribute('aria-pressed', String(b === el)); });
+        return true;
+      }
+      case 'cf-pin': {
+        var who = S.cfg.staff.filter(function (x) { return x.id === el.dataset.id; })[0];
+        if (!el.dataset.confirm) { el.dataset.confirm = '1'; el.textContent = 'Yes – their current PIN will stop working'; el.classList.add('primary'); return true; }
+        saveCfg('pin', { id: el.dataset.id }, null, el).then(function (r) { if (r) pinCard(r.name || who.name, r.pin, false); });
+        return true;
+      }
+      case 'cf-copy': {
+        var ta = modalRoot.querySelector('.pinmsg');
+        if (ta) { ta.select(); try { navigator.clipboard.writeText(ta.value).then(function () { toast('Copied'); }, function () { document.execCommand('copy'); toast('Copied'); }); } catch (e) { document.execCommand('copy'); toast('Copied'); } }
+        return true;
+      }
+      case 'cf-cat-del': case 'cf-hol-del': case 'cf-term-del': case 'cf-adj-del': {
+        if (!el.dataset.confirm) { el.dataset.confirm = '1'; el.textContent = 'Yes, delete'; el.classList.add('primary'); return true; }
+        var what = { 'cf-cat-del': 'category-delete', 'cf-hol-del': 'holiday-delete', 'cf-term-del': 'term-delete', 'cf-adj-del': 'adjustment-delete' }[a];
+        var item = a === 'cf-cat-del' ? { name: el.dataset.id } : a === 'cf-hol-del' ? { date: el.dataset.id } : a === 'cf-term-del' ? { name: el.dataset.id } : { id: el.dataset.id };
+        saveCfg(what, item, 'Deleted', el);
+        return true;
+      }
+    }
+    return false;
+  }
+  function setupSubmit(form) {
+    if (form.id === 'cfChurch') { saveChurch(); return true; }
+    if (form.id !== 'cfForm' || !S.cfEdit) return false;
+    var k = S.cfEdit.kind;
+    if (k === 'staff') saveStaff();
+    else if (k === 'cat') saveCat();
+    else if (k === 'type') saveType();
+    else if (k === 'min') saveMin();
+    else if (k === 'hol') {
+      var hn = gv('hf-name').trim(), hd = gv('hf-date');
+      if (!hn || !hd) return cfErr('Give the holiday a name and a date.'), true;
+      saveCfg('holiday', { name: hn, date: hd, oldDate: S.cfEdit.id }, 'Saved ' + hn, document.getElementById('cf-go'));
+    } else if (k === 'term') {
+      var tn = gv('tm-name').trim(), ts = gv('tm-start'), te = gv('tm-end');
+      if (!tn || !ts || !te) return cfErr('Give the term a name, first day and last day.'), true;
+      if (te < ts) return cfErr('The last day is before the first day.'), true;
+      saveCfg('term', { name: tn, start: ts, end: te, oldName: S.cfEdit.id }, 'Saved ' + tn, document.getElementById('cf-go'));
+    } else if (k === 'adj') {
+      var days = Number(gv('af-days'));
+      if (!days) return cfErr('Type the number of days (use a minus sign to take days away).'), true;
+      saveCfg('adjustment', { id: S.cfEdit.id, staffId: gv('af-staff'), type: gv('af-type'), year: Number(gv('af-year')), days: days, note: gv('af-note').trim() }, 'Saved', document.getElementById('cf-go'));
+    }
+    return true;
+  }
+  function setupChange(t) {
+    if (t.name === 'sf-wdm') { var w = document.getElementById('sf-days-wrap'); if (w) w.hidden = t.value !== 'own'; return true; }
+    if (t.id === 'sf-level') {
+      var lv = catOf(t.value), lab = document.getElementById('sf-catdays');
+      if (lab) lab.textContent = lv ? '(' + C.daysLabel(C.parseDays(lv.workDays, [])) + ')' : '';
+      if ((modalRoot.querySelector('input[name="sf-wdm"]:checked') || {}).value !== 'own' && lv) {   // keep the day boxes in step until they choose their own
+        var box = document.getElementById('sf-days'), on = C.parseDays(lv.workDays, []);
+        if (box) Array.prototype.forEach.call(box.querySelectorAll('input'), function (x) { x.checked = on.indexOf(Number(x.value)) >= 0; });
+      }
+      return true;
+    }
+    if (t.dataset && t.dataset.typeToggle) {
+      var ty = S.cfg.types.filter(function (x) { return x.code === t.dataset.typeToggle; })[0];
+      if (ty) saveType(Object.assign({}, ty, { active: t.checked })).catch(function () { t.checked = !t.checked; });
+      return true;
+    }
+    return false;
+  }
 
   /* ---------- Blocked days ("No leave" cover rules) ---------- */
   var MONTH3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -1856,6 +2292,7 @@
     var a = el.dataset.act;
     if (a === 'overlay') { if (ev.target === el) closeModal(); return; }
     ev.stopPropagation();
+    if (/^(setup-|cf-)/.test(a) && setupClick(a, el)) return;
     switch (a) {
       case 'nav': closeModal(); go(el.dataset.view); break;
       case 'prev': S.cursor = new Date(S.cursor.getFullYear(), S.cursor.getMonth() - 1, 1, 12); render(); break;
@@ -2014,6 +2451,7 @@
     if (ev.target.id === 'set-colour') { S.pickColour = normHex(ev.target.value); applyAccent(S.pickColour); render(); return; }
     if (ev.target.name === 'theme' && ev.target.closest('#set-theme')) { store.set('theme', ev.target.value); applyTheme(ev.target.value); toast('Appearance saved on this device'); return; }
     if (ev.target.id === 'em-weekly' || ev.target.id === 'em-day' || ev.target.id === 'em-rem') { saveEmails(); return; }
+    if (setupChange(ev.target)) return;
     if (ev.target.closest && ev.target.closest('#blkForm')) { blkPreview(); return; }
     if (ev.target.dataset && ev.target.dataset.ruleToggle) {
       var on = ev.target.checked;
@@ -2040,6 +2478,7 @@
   document.addEventListener('submit', function (ev) {
     ev.preventDefault();
     if (ev.target.id === 'blkForm') { saveBlk(); return; }
+    if (setupSubmit(ev.target)) return;
     if (ev.target.id === 'pinFirst') { submitPin('pf', S.pinCurrent || (document.getElementById('pf-cur') || {}).value || ''); return; }
     if (ev.target.id === 'pinChange') { submitPin('pc', document.getElementById('pc-cur').value.trim()); return; }
     if (ev.target.id === 'loginForm') {
@@ -2270,6 +2709,60 @@
     var mem = null;
     function load() { if (!mem) mem = db(); return mem; }
     function save() { store.set(KEY, mem); }
+    var CFG_KEYS = ['CompanyName', 'OpenDays', 'LeaveYearStartMonth', 'FirstLeaveYear', 'TermsIncludeHolidays', 'ProRata', 'AllowNegative', 'MaxOffPerDay', 'NotifyEmail', 'AppURL', 'CalendarId', 'AutoUpdateCalendars', 'WeeklyEmail', 'ReminderDates'];
+    function demoCfg(d) {
+      var st = {}; CFG_KEYS.forEach(function (k) { st[k] = d.settings[k] == null ? '' : d.settings[k]; });
+      (d.adjustments || []).forEach(function (a, i) { if (!a.id) a.id = 'A' + (i + 2); });
+      var codes = d.types.map(function (t) { return t.code; });
+      return { settings: st,
+        staff: d.staff.map(function (s) { return { id: s.id, name: s.name, email: s.email, level: s.level, workDays: s.workDays || '', role: C.isAdmin(s) ? 'Administrator' : 'Staff', start: s.start || '', colour: s.colour || '', active: s.active !== false, pin: s.pin || 'own' }; }),
+        levels: d.levels.map(function (l) { var e = {}; codes.forEach(function (c) { e[c] = l.ent[c] == null ? '' : l.ent[c]; }); return { name: l.level, workDays: l.workDays, ent: e }; }),
+        types: d.types.map(function (t) { return Object.assign({ active: true, perTerm: '', maxBalance: '', useBy: '', allowedDays: '' }, t, { active: t.active !== false }); }),
+        holidays: d.holidays.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }), terms: (d.terms || []).slice(), adjustments: (d.adjustments || []).slice(), rules: d.rules || [] };
+    }
+    function demoCfgSave(d, u, what, it) {
+      var ck = C.catKey, out = null;
+      if (what === 'settings') Object.keys(it).forEach(function (k) { if (CFG_KEYS.indexOf(k) >= 0) d.settings[k] = it[k]; });
+      else if (what === 'staff') {
+        if (d.staff.some(function (s) { return s.email === String(it.email).toLowerCase() && s.id !== it.id; })) throw new Error('Someone else already has ' + it.email + '.');
+        var fields = { name: it.name, email: String(it.email).toLowerCase(), level: it.level, workDays: it.workDays || '', role: it.role, start: it.start || '', colour: it.colour || '', active: it.active !== false };
+        if (it.id) {
+          var adm = d.staff.filter(function (s) { return C.isAdmin(s) && s.active !== false; }), was = C.staffById(d, it.id);
+          if (was && C.isAdmin(was) && adm.length === 1 && (it.role !== 'Administrator' || it.active === false)) throw new Error('There must always be at least one active Administrator.');
+          Object.assign(was, fields);
+        } else {
+          var n = 0; d.staff.forEach(function (s) { var m = /^S(\d+)$/.exec(s.id); if (m) n = Math.max(n, Number(m[1])); });
+          var id = 'S' + (n + 1 < 10 ? '0' : '') + (n + 1), pin = String(4000 + Math.floor(Math.random() * 5000));
+          d.staff.push(Object.assign({ id: id, manager: '', pin: 'given' }, fields)); out = { id: id, pin: pin, name: it.name };
+        }
+      } else if (what === 'pin') { var ps = C.staffById(d, it.id); ps.pin = 'given'; out = { pin: String(4000 + Math.floor(Math.random() * 5000)), name: ps.name }; }
+      else if (what === 'category') {
+        var lv = it.oldName ? d.levels.filter(function (l) { return ck(l.level) === ck(it.oldName); })[0] : null;
+        if (d.levels.some(function (l) { return ck(l.level) === ck(it.name) && l !== lv; })) throw new Error('There’s already a category called ' + it.name + '.');
+        var ent = {}; Object.keys(it.ent || {}).forEach(function (c) { if (it.ent[c] !== '' && it.ent[c] != null) ent[c] = Number(it.ent[c]); });
+        if (lv) { if (it.oldName !== it.name) d.staff.forEach(function (s) { if (ck(s.level) === ck(it.oldName)) s.level = it.name; }); lv.level = lv.label = it.name; lv.workDays = it.workDays; if (C.tracksLeave({ level: it.name })) lv.ent = ent; }
+        else d.levels.push({ level: it.name, label: it.name, workDays: it.workDays, ent: ent });
+      } else if (what === 'category-delete') {
+        if (d.staff.some(function (s) { return ck(s.level) === ck(it.name); })) throw new Error('Move the staff in this category first.');
+        d.levels = d.levels.filter(function (l) { return ck(l.level) !== ck(it.name); });
+      } else if (what === 'type') {
+        var ex = d.types.filter(function (t) { return t.code === it.code; })[0];
+        if (it.isNew && ex) throw new Error('There’s already a leave type with the code ' + it.code + '.');
+        var nt = { code: it.code, name: it.name, colour: it.colour, deducts: !!it.deducts, halfDay: !!it.halfDay, proRata: !!it.proRata, needsApproval: it.needsApproval !== false, unit: it.unit || 'Days',
+          allowedDays: it.allowedDays || '', accumulates: !!it.accumulates, perTerm: Number(it.perTerm) || 0, maxBalance: Number(it.maxBalance) || 0, useBy: it.useBy || '', active: it.active !== false };
+        if (ex) Object.assign(ex, nt); else d.types.push(nt);
+      } else if (what === 'holiday') {
+        d.holidays = d.holidays.filter(function (h) { return h.date !== it.oldDate; }); d.holidays.push({ date: it.date, name: it.name });
+      } else if (what === 'holiday-delete') d.holidays = d.holidays.filter(function (h) { return h.date !== it.date; });
+      else if (what === 'term') { d.terms = d.terms.filter(function (t) { return t.name !== it.oldName; }); d.terms.push({ name: it.name, start: it.start, end: it.end }); }
+      else if (what === 'term-delete') d.terms = d.terms.filter(function (t) { return t.name !== it.name; });
+      else if (what === 'adjustment') {
+        var row = { staffId: it.staffId, year: Number(it.year), type: it.type, days: Number(it.days), note: it.note || '' };
+        var ea = it.id ? d.adjustments.filter(function (a) { return a.id === it.id; })[0] : null;
+        if (ea) Object.assign(ea, row); else { row.id = 'A' + Date.now().toString(36); d.adjustments.push(row); }
+      } else if (what === 'adjustment-delete') d.adjustments = d.adjustments.filter(function (a) { return a.id !== it.id; });
+      return out;
+    }
     function nowStr() { var d = new Date(); return C.iso(d) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
     function handle(action, b) {
       return new Promise(function (resolve) { setTimeout(resolve, 180); }).then(function () {
@@ -2308,6 +2801,12 @@
           er2.type = nx.type; er2.start = nx.start; er2.end = nx.end; er2.half = nx.half; er2.days = nx.days; er2.reason = nx.reason; er2.status = pe.status;
           if (pe.status === 'Pending') { er2.decidedBy = ''; er2.decidedOn = ''; } else if (C.isAdmin(u)) { er2.decidedBy = u.name; er2.decidedOn = nowStr(); }
           log('Changed' + (pe.reapprove ? ' (needs approval again)' : ''), er2, 'Was: ' + pe.changes.join('; '));
+        } else if (action === 'cfg-get' || action === 'cfg-save') {
+          if (!C.isAdmin(u)) throw new Error('Only an Administrator can open Setup.');
+          var res = action === 'cfg-save' ? demoCfgSave(d, u, b.what, b.item || {}) : null;
+          save();
+          var vv = C.publicView(d, C.staffById(d, u.id) || u); vv.cfg = demoCfg(d); vv.result = res;
+          return vv;
         } else if (action === 'rule-save') {
           if (!C.isAdmin(u)) throw new Error('Only an Administrator can change blocked days.');
           d.rules = d.rules || [];

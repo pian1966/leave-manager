@@ -166,7 +166,8 @@
       '<div class="fact"><span>“Use it or lose it” reminders</span><b>' + (I.reminderDates ? esc(niceDay(I.reminderDates)) : 'Off') + '</b></div>' +
       '<div class="fact"><span>Holidays &amp; terms updated</span><b>' + esc(String(I.lastCalendarUpdate || 'Not yet').slice(0, 16)) + '</b></div></div>';
     var links = '<div class="links">' +
-      '<a class="main' + (I.appUrl ? '' : ' off') + '" href="' + esc(I.appUrl) + '" target="_blank">Open Leave Manager ↗</a>' +
+      '<a class="main' + (I.appUrl ? '' : ' off') + '" href="' + esc(I.appUrl) + '#setup" target="_blank">Open Setup: staff, categories, leave types… ↗</a>' +
+      '<a class="' + (I.appUrl ? '' : 'off') + '" href="' + esc(I.appUrl) + '" target="_blank">Leave Manager ↗</a>' +
       '<a class="' + (I.formUrl ? '' : 'off') + '" href="' + esc(I.formUrl) + '" target="_blank">Google Form ↗</a>' +
       '<a href="' + esc(I.adminGuide) + '" target="_blank">Admin guide ↗</a>' +
       '<a href="' + esc(I.staffGuide) + '" target="_blank">Staff guide ↗</a>' +

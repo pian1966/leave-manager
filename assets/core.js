@@ -379,7 +379,7 @@ var LeaveCore = (function () {
 
   /** Is this leave type open to this person's category? Types that use an allowance need a number on the Categories tab. */
   function offered(data, st, t) {
-    if (!t || !st || !tracksLeave(st)) return false;
+    if (!t || !st || !tracksLeave(st) || t.active === false) return false;   // "In use" switched off: not offered to anyone
     if (!t.deducts) return true;
     var lv = level(data, st);
     return !!lv && lv.ent[t.code] != null && !isNaN(lv.ent[t.code]);
@@ -693,7 +693,7 @@ var LeaveCore = (function () {
       settings: data.settings,
       user: clean(user),
       staff: data.staff.filter(function (s) { return s.active !== false; }).map(clean),
-      types: data.types, levels: data.levels, holidays: data.holidays, terms: data.terms || [], rules: data.rules || [],
+      types: data.types.filter(function (t) { return t.active !== false; }), levels: data.levels, holidays: data.holidays, terms: data.terms || [], rules: data.rules || [],
       requests: data.requests.map(function (r) {
         var x = clean(r);
         if (r.staffId !== user.id && !canManage(user, byId[r.staffId])) { x.reason = ''; x.note = ''; }
