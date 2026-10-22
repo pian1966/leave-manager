@@ -37,7 +37,7 @@ The Dashboard opens with four numbers: requests **waiting for approval**, people
 
 Below them:
 
-- **Waiting for approval**: approve or decline straight from the list. Click a name for the full details first. *⚠ cover warning* means the request breaks a cover rule.
+- **Waiting for approval**: approve or decline straight from the list. Click a name for the full details first. *⚠ cover warning* means the request breaks a cover rule; *⚠ over allowance* means it's more than the person has left (see Approving leave).
 - **Cover in the next 8 weeks**: days when the cover rules aren't met, counting approved and pending leave. Click a day to see who's away.
 - **Use it or lose it**: who still has leave to take, and the date it's lost (1 February). The same people get reminder emails (see [Emails](#emails-that-go-out-automatically)).
 - **Busiest months**: approved working days off per month, coloured by leave type. Hover over a bar for the numbers.
@@ -57,7 +57,7 @@ When someone asks for leave you get an email straight away. You can decide in an
 | Where | How |
 | --- | --- |
 | **The email** | Click **Review request**, add a note if you like, then **Approve** or **Decline**. No sign-in needed. |
-| **Approvals page** | Every waiting request, with the balance after it, who else is away, and any cover warning. |
+| **Approvals page** | Every waiting request, with the balance after it, who else is away, and any cover or over-allowance warning. |
 | **Dashboard** | **Approve** / **Decline** buttons next to each waiting request. |
 | **Reports** | A person's report shows a *Waiting for approval* box with the same buttons (they don't print). |
 | **Any calendar** | Click a striped (pending) block, then Approve or Decline. |
@@ -153,7 +153,7 @@ They don't see the Dashboard, Reports for others or History. You keep full acces
 
 | Email | Who gets it | When |
 | --- | --- | --- |
-| New request (with ⚠ cover warning if any) | You, and the stand-in while active | Straight away |
+| New request (with ⚠ cover or over-allowance warning if any) | You, and the stand-in while active | Straight away |
 | Approved / declined | The person | When you decide |
 | Leave cancelled | You | When someone cancels approved leave |
 | **Who's away this week** | All staff | Every Monday about 6am |

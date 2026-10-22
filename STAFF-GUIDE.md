@@ -61,20 +61,22 @@ The Overview opens first and shows your own leave at a glance.
 3. Pick the **First day** and **Last day**. The Last day fills in with the same date, so for one day you're done; for longer, change the Last day.
 4. For a single day you can choose **Morning** or **Afternoon** for a half day (not for every leave type).
 5. Add a **note** for the Administrator saying what the leave is for (e.g. *family visit*, *doctor's appointment*). The note is required; the request can't be sent without it.
-6. Check the grey box: it shows how many days this uses and what you'll have left. If anything is wrong, a red box lists **every** problem (for example overlapping leave *and* not enough days), and the **Send request** button stays grey until they're all fixed.
+6. Check the grey box: it shows how many days this uses and what you'll have left. If anything is wrong, a red box lists **every** problem (for example overlapping leave *and* a half day on a leave type that doesn't allow it), and the **Send request** button stays grey until they're all fixed.
 7. Click **Send request**.
 
-**Cover warnings:** if your dates leave too few people on duty (for example no pastor on a Sunday) or fall in a no-leave period such as Easter or Christmas, an orange **Cover warning** appears. You can usually still send the request; the Administrator sees the warning and decides. If the request is blocked, a red message says so; speak to the Administrator.
+**Cover warnings:** if your dates leave too few people on duty (for example no pastor on a Sunday) or fall in a no-leave period such as Easter or Christmas, an orange **⚠ Please check** box appears. You can usually still send the request; the Administrator sees the warning and decides. If the request is blocked, a red message says so; speak to the Administrator.
 
-**Cover warnings:** if your dates leave too few people on duty (for example no pastor on a Sunday) or fall in a no-leave period such as Easter or Christmas, an orange **Cover warning** appears. You can usually still send the request; the Administrator sees the warning and decides. If the request is blocked, a red message says so; speak to the Administrator.
+**More than your allowance:** you can ask for more days than you have left. The orange **⚠ Please check** box tells you by how much it goes over (e.g. *needs 5 days but only 3 are available, so it goes 2 days over*). You can still send it, but it always needs the Administrator's approval, even for leave types that are normally approved straight away, and they see the same warning. If it's approved, your balance shows as a negative number.
+
+**Working on a public holiday:** if one of your dates is a public holiday that's a working day for you (a holiday on a Sunday, when you work Sundays), a yellow note below your note to the Administrator says so, and that the Monday is your holiday instead.
 
 <p><img src="docs/images/d-request.png" alt="The Request leave window, showing 3 days and the balance after this request" width="100%"></p>
 
 <p align="center"><img src="docs/images/m-request.png" alt="Requesting leave in the Android app" width="250"></p>
 
-**What counts as a day off:** only *your own* working days. Days you don't normally work, days the church is closed (Tuesdays) and public holidays are never taken off your balance. One exception: when a public holiday falls on a Sunday, the Monday becomes the holiday, so if you work Sundays that Sunday is a normal working day and leave on it does use a day (you get the Monday off instead). Sabbatical is the exception: it counts every calendar day.
+**What counts as a day off:** only *your own* working days. Days you don't normally work, days the church is closed (Tuesdays) and public holidays are never taken off your balance. One exception: when a public holiday falls on a Sunday, the Monday becomes the holiday, so if you work Sundays that Sunday is a normal working day and leave on it does use a day (you get the Monday off instead). Sabbatical works differently: it counts every calendar day.
 
-**Prefer a form?** Use **Request via Google Forms** in the left panel. Fill it in with the same email you sign in with. The note is required there too. If the request can't be booked (for example, not enough days left), you'll get an email explaining why.
+**Prefer a form?** Use **Request via Google Forms** in the left panel. Fill it in with the same email you sign in with. The note is required there too. If the request can't be booked (for example, it overlaps leave you've already booked), you'll get an email explaining why. If it's more than your allowance it's still sent, and you'll get an email warning you.
 
 ## Your leave allowances
 
@@ -162,7 +164,7 @@ You can print a professional report of your leave, or save it as a PDF.
 2. Use **‹ 2026 ›** at the top to choose the leave year.
 3. Click **Print / Save as PDF**. In the print window, choose your printer, or choose **Save as PDF** as the destination.
 
-Leave you've requested that isn't approved yet appears in a highlighted **Waiting for approval** box at the top of the report. Leave you've requested that isn't approved yet appears in a highlighted **Waiting for approval** box at the top of the report. The report shows your details, a table of each leave type (allowance, taken, pending, remaining), every request with its status and who approved it, and lines for your and the Administrator's signatures.
+Leave you've requested that isn't approved yet appears in a highlighted **Waiting for approval** box at the top of the report. The report shows your details, a table of each leave type (allowance, taken, pending, remaining), every request with its status and who approved it, and lines for your and the Administrator's signatures.
 
 <p><img src="docs/images/d-report.png" alt="A printable leave report with balances and requests" width="100%"></p>
 

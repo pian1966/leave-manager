@@ -30,7 +30,7 @@ Open `web/index.html` in a browser before you set anything up: with no API URL c
 - **Approvals** – managers see pending requests with the balance after approval and who else is away. They get an email with a **Review request** button and can approve from their phone without signing in.
 - **Managers can book leave for their team** (auto-approved), and anyone can cancel their own future leave.
 - **Unpaid Leave** shows on the calendar without using an allowance.
-- **Google Form** for people who prefer it, with an email back if a request can't be booked (e.g. not enough days).
+- **Google Form** for people who prefer it, with an email back if a request can't be booked (e.g. it overlaps other leave) or goes over the allowance.
 - **Holidays and school terms update themselves** every month. **Leave Manager → Update public holidays and school terms now** runs it on demand, and **LastCalendarUpdate** in Settings shows what it last did.
 - **Google Calendar mirror** (optional) – approved leave appears in a shared calendar.
 - Works on phones, has a dark mode, and needs no build step.
