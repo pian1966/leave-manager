@@ -945,7 +945,12 @@ function createRequest_(actor, b, source) {
     LAST_DATA_ = data;
     var byOther = p.staff.id !== actor.id;
     logHistory_(byOther ? 'Booked by Administrator' : (r.status === 'Approved' ? 'Requested (no approval needed)' : 'Requested') +
-      (source === 'Form' ? ' via Google Form' : ''), r, p.staff.name, p.type.name, actor.name, r.reason);
+      (source === 'Form' ? ' via Google Form' : ''), r, p.staff.name, p.type.name, actor.name, r.reason + (r.over ? ' [⚠ ' + r.over + ']' : ''));
+    if (r.over && source === 'Form' && p.staff.email) {
+      MailApp.sendEmail({ to: p.staff.email, subject: 'Your leave request is more than your allowance',
+        htmlBody: mailShell_(data, '<p>Your request for ' + esc_(p.type.name) + ' (' + range_(r) + ') has been sent to the Administrator, but please note:</p>' +
+          warningsHtml_([r.over]) + '<p>It needs the Administrator’s approval. You’ll get an email with their decision.</p>') });
+    }
     if (r.status === 'Approved') {
       syncCalendar_(data, r, p.staff, p.type);
       if (p.staff.id !== actor.id) mailDecision_(data, r, p.staff, p.type, actor.name);
@@ -1034,7 +1039,7 @@ function reviewLink_(r, by) {
 function warningsHtml_(list) {
   if (!list || !list.length) return '';
   return '<div style="background:#FEF3C7;border-left:4px solid #D97706;padding:10px 14px;margin:14px 0;border-radius:4px">' +
-    '<b>Cover warning</b><br>' + list.map(esc_).join('<br>') + '</div>';
+    '<b>Please check</b><br>' + list.map(esc_).join('<br>') + '</div>';
 }
 function mailShell_(data, inner) {
   var app = data.settings.AppURL ? '<p style="margin-top:24px"><a href="' + esc_(data.settings.AppURL) + '" style="color:#0F6E5C">Open Leave Manager</a></p>' : '';
@@ -1048,7 +1053,7 @@ function mailNewRequest_(data, r, st, t, kind, extraHtml) {
   var c = LeaveCore.ctx(data);
   var b = LeaveCore.balances(data, st.id, LeaveCore.lyOf(r.start, c.S))[t.code];
   var amt = LeaveCore.amount(r, t, c);
-  var warn = r.warnings || (function () { var w = LeaveCore.coverCheck(data, st, r, r.id); return w.block.concat(w.warn); })();
+  var warn = r.warnings || LeaveCore.requestWarnings(data, st, r, r.id, true);
   who.forEach(function (ap, i) {
   var review = reviewLink_(r, ap);
   var html = (kind === 'changed' ? '<p><b>' + esc_(st.name) + '</b> changed their leave, so it needs your approval again:</p>' + (extraHtml || '') + '<p>It’s now <b>' + esc_(t.name) + '</b>.</p>'
@@ -1087,7 +1092,7 @@ function reviewPage_(p) {
   if (!ok) body = '<h1>Link not valid</h1><p>Open Leave Manager to review requests.</p>';
   else if (r.status !== 'Pending') body = '<h1>Already ' + r.status.toLowerCase() + '</h1><p>' + esc_(st.name) + '’s request for ' + range_(r) + ' was ' + r.status.toLowerCase() + (r.decidedBy ? ' by ' + esc_(r.decidedBy) : '') + '.</p>';
   else body = '<h1>' + esc_(st.name) + '</h1><p class="t">' + esc_(t.name) + ' · ' + range_(r) + ' · ' + LeaveCore.fmtAmount({ unit: 'Days' }, r.days) + ' away</p>' +
-    (r.reason ? '<p>“' + esc_(r.reason) + '”</p>' : '') + warningsHtml_((function () { var w = LeaveCore.coverCheck(data, st, r, r.id); return w.block.concat(w.warn); })()) +
+    (r.reason ? '<p>“' + esc_(r.reason) + '”</p>' : '') + warningsHtml_(LeaveCore.requestWarnings(data, st, r, r.id, true)) +
     '<label>Note to ' + esc_(st.name.split(' ')[0]) + ' (optional)<textarea id="n" rows="3"></textarea></label>' +
     '<div class="b"><button class="ok" onclick="go(\'Approved\')">Approve</button><button onclick="go(\'Declined\')">Decline</button></div><p id="m"></p>' +
     '<script>function go(d){document.querySelectorAll("button").forEach(function(b){b.disabled=true});document.getElementById("m").textContent="Saving…";' +
@@ -1147,7 +1152,7 @@ function createForm_() {
   form.setDescription('Book leave here or in the Leave Manager app. Only your own working days are counted – days you don’t work and public holidays are not. Weekend Off must be Friday to Sunday, one per school term. ' +
     'You will get an email when the Administrator decides.');
   form.setCollectEmail(true);
-  form.setConfirmationMessage('Thanks – your request has been sent to the Administrator. If something is wrong (for example not enough days left) you will get an email explaining why.');
+  form.setConfirmationMessage('Thanks – your request has been sent to the Administrator. If something is wrong, or it’s more than your allowance, you will get an email explaining why.');
   form.addListItem().setTitle(FORM_Q.NAME).setRequired(true);
   form.addListItem().setTitle(FORM_Q.TYPE).setRequired(true);
   form.addDateItem().setTitle(FORM_Q.START).setRequired(true);

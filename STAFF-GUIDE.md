@@ -201,7 +201,7 @@ Then open **Leave Manager** from your apps and sign in with your email and PIN. 
 | --- | --- |
 | “That email and PIN don't match” | Check the email spelling. If it still fails, ask the Administrator to check your details or reset your PIN. |
 | “Your session has ended” | Sign in again. Sessions last about 6 hours. |
-| “Not enough … leave” | You've used or requested all your days of that type. Check your balance on the Overview, or choose another leave type. |
+| “More than …’s allowance” | The request uses more days than you have left. You can still send it, but it always needs the Administrator’s approval and they'll see the warning. Check your balance on the Overview, or choose another leave type. |
 | “Those dates are all days … doesn't work” | The dates fall on your days off or public holidays, so no leave is needed. |
 | “Already booked the Weekend Off for this term” | You get one per school term. Choose a weekend in the next term. |
 | A leave type is missing from the list | Your staff category doesn't get that type. |

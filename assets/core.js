@@ -564,6 +564,19 @@ var LeaveCore = (function () {
       var ct = type(data, clash[0].type);
       out.push(st.name + ' already has ' + (ct ? ct.name : 'leave') + (clash[0].status === 'Pending' ? ' waiting for approval' : ' booked') + ' for ' + niceRange(clash[0]) + '.');
     }
+    if (!override) {
+      var cv = coverCheck(data, st, r, ignoreId);
+      cv.block.forEach(function (m) { out.push(m + ' If it can’t wait, speak to the Administrator.'); });
+    }
+    return out;
+  }
+  /**
+   * Does this request use more than the person has left? Returns a warning ('' if not).
+   * Over-allowance requests can still be sent, but always need the Administrator's approval.
+   */
+  function allowanceWarning(data, st, r, ignoreId, approving) {
+    var t = type(data, r.type), c = ctx(data);
+    if (!t || !st || !isISO(r.start) || !isISO(r.end) || r.end < r.start || !offered(data, st, t)) return '';
     if (t.deducts && !truthy(data.settings.AllowNegative)) {
       // Compare balances with and without this request in every leave year it touches.
       var others = data.requests.filter(function (o) { return o.id !== ignoreId; });
@@ -585,16 +598,18 @@ var LeaveCore = (function () {
       });
       if (failY != null) {
         var need = amount(r, t, c);
-        out.push('Not enough ' + t.name + ': this needs ' + fmtAmount(t, need) + ' but only ' + fmtAmount(t, have) +
-          (approving ? ' remain' : ' are available') + (yl.length > 1 ? '' : ' in the ' + lyLabel(failY, c.S) + ' leave year') + '.');
+        return 'More than ' + (st.id ? st.name.split(' ')[0] + '’s' : 'the') + ' allowance: this needs ' + fmtAmount(t, need) + ' of ' + t.name + ' but only ' + fmtAmount(t, have) +
+          (approving ? ' remain' : ' are available') + (yl.length > 1 ? '' : ' in the ' + lyLabel(failY, c.S) + ' leave year') + ', so it goes ' + fmtAmount(t, need - have) + ' over.';
       }
     }
-    if (!override) {
-      var cv = coverCheck(data, st, r, ignoreId);
-      cv.block.forEach(function (m) { out.push(m + ' If it can’t wait, speak to the Administrator.'); });
-    }
-    return out;
+    return '';
   }
+  /** Everything the Administrator should know before approving: cover rules and going over the allowance. */
+  function requestWarnings(data, st, r, ignoreId, approving) {
+    var cv = coverCheck(data, st, r, ignoreId), a = allowanceWarning(data, st, r, ignoreId, approving);
+    return (a ? [a] : []).concat(cv.block, cv.warn);
+  }
+
   /** The first problem with a request, or null when it's fine. */
   function validate(data, st, r, ignoreId, approving, override) {
     var all = validateAll(data, st, r, ignoreId, approving, override);
@@ -618,11 +633,11 @@ var LeaveCore = (function () {
     var err = validate(data, target, r, undefined, false, isAdmin(actor));
     if (err) throw new Error(err);
     var t = type(data, r.type);
-    var cw = coverCheck(data, target, r);
-    r.warnings = cw.block.concat(cw.warn);
+    r.over = allowanceWarning(data, target, r);
+    r.warnings = requestWarnings(data, target, r);
     r.days = countDays(r, ctx(data));
     var bookedByManager = target.id !== actor.id;
-    var auto = !t.needsApproval || bookedByManager;
+    var auto = bookedByManager || (!t.needsApproval && !r.over);   // going over the allowance always needs approval
     r.status = auto ? 'Approved' : 'Pending';
     r.decidedBy = auto ? (bookedByManager ? actor.name : 'Auto-approved') : '';
     return { req: r, staff: target, type: t };
@@ -676,9 +691,9 @@ var LeaveCore = (function () {
     if (next.start !== r.start || next.end !== r.end || (next.half || 'None') !== (r.half || 'None')) changes.push(niceRange(r) + ' → ' + niceRange(next));
     if (next.reason !== (r.reason || '')) changes.push('note changed');
     if (!changes.length) throw new Error('Nothing has changed.');
-    var status = admin ? r.status : (t.needsApproval === false ? 'Approved' : 'Pending');
-    var cw = coverCheck(data, st, next, r.id);
-    next.warnings = cw.block.concat(cw.warn);
+    next.over = allowanceWarning(data, st, next, r.id);
+    var status = admin ? r.status : (t.needsApproval === false && !next.over ? 'Approved' : 'Pending');
+    next.warnings = requestWarnings(data, st, next, r.id);
     return { req: r, staff: st, type: t, oldType: oldT, next: next, status: status, changes: changes,
       reapprove: r.status === 'Approved' && status === 'Pending', was: { type: r.type, start: r.start, end: r.end, half: r.half, status: r.status } };
   }
@@ -718,7 +733,7 @@ var LeaveCore = (function () {
 
   return {
     DAYS: DAYS, iso: iso, niceDate: niceDate, niceRange: niceRange, parse: parse, addDays: addDays, isISO: isISO, truthy: truthy, parseDays: parseDays, daysLabel: daysLabel,
-    ctx: ctx, staffDays: staffDays, isOpen: isOpen, isWorking: isWorking, isHolidayFor: isHolidayFor,
+    ctx: ctx, staffDays: staffDays, isOpen: isOpen, isWorking: isWorking, isHolidayFor: isHolidayFor, allowanceWarning: allowanceWarning, requestWarnings: requestWarnings,
     dayList: dayList, countDays: countDays, isDayUnit: isDayUnit, isCalendarUnit: isCalendarUnit, unitName: unitName, fmtAmount: fmtAmount, amount: amount,
     easter: easter, saPublicHolidays: saPublicHolidays,
     lyOf: lyOf, lyLabel: lyLabel, lyRange: lyRange, graceEnd: graceEnd, parseMonthDay: parseMonthDay, terms: terms, termOf: termOf, termBookings: termBookings,

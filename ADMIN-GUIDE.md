@@ -70,6 +70,14 @@ Each card shows who else is away on those days and any **cover warning**:
 
 The person gets an email with your decision and note. Approving a request that breaks a cover rule is allowed: you decide.
 
+**More than their allowance.** Staff can ask for more leave than they have left. Leave Manager doesn't stop them, but:
+- they see a warning on the request form before sending it;
+- the request always waits for your approval, even for leave types that normally don't need it;
+- it's marked **⚠ over allowance** on the Dashboard, and the card and email say by how much (e.g. "needs 5 days but only 3 are available, so it goes 2 days over");
+- when you click **Approve**, the button changes to **Approve anyway** and shows the warning, so you approve it with a second click.
+
+Once approved, their balance shows as a negative number. You can always decline instead. If you'd rather never be warned, set **AllowNegative** to TRUE on the Settings tab.
+
 ## Booking or cancelling leave for someone
 
 - **Book:** click **Book leave**, choose the person under **For**, then the leave type and dates. It's approved straight away and the person is emailed. Use this for leave agreed in person, or sick leave someone phones in.

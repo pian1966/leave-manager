@@ -681,7 +681,7 @@
       (pend.length ? '<div class="list">' + pend.slice(0, 8).map(function (r) {
         var st = staffById(r.staffId), t = typeOf(r.type), w = reqWarnings(r);
         return '<div class="li qd-row"><span class="click" data-act="open-req" data-id="' + esc(r.id) + '">' + av(st) + '</span><div class="grow click" data-act="open-req" data-id="' + esc(r.id) + '"><b>' + esc(st.name) + ' · ' + esc(fmtRange(r)) + '</b><span>' +
-          esc(t.name) + ' · ' + reqAmount(r) + (w.length ? ' · <span class="warntxt">⚠ cover warning</span>' : '') + '</span></div>' + quickDecide(r) + '</div>';
+          esc(t.name) + ' · ' + reqAmount(r) + (w.length ? ' · <span class="warntxt">⚠ ' + (overWarning(r) ? 'over allowance' : 'cover warning') + '</span>' : '') + '</span></div>' + quickDecide(r) + '</div>';
       }).join('') + (pend.length > 8 ? '<p class="muted small"><a href="#approvals" data-act="nav" data-view="approvals">See all ' + pend.length + ' →</a></p>' : '') + '</div>'
         : '<p class="muted">Nothing is waiting. New requests are emailed to you and show up here.</p>') + '</section>';
     var cover = '<section class="panel"><h2>Cover in the next 8 weeks</h2>' + (!hasRules ? '<p class="muted">No cover rules yet. Add them on the <b>Cover Rules</b> tab of the Google Sheet, e.g. “at least 1 Pastoral Staff on duty every Sunday”.</p>' :
@@ -2223,9 +2223,12 @@
     var err = errs[0] || null;
     setErr(errs);
     if (!err && st && t && n) {
-      var cv = C.coverCheck(S.data, st, r, S.editId || undefined);
-      var warns = cv.block.concat(cv.warn);
-      if (warns.length) sum.insertAdjacentHTML('beforeend', coverHtml(warns, isMgr() ? 'As Administrator you can still book it.' : 'You can still send it; the Administrator will see this warning.'));
+      var warns = C.requestWarnings(S.data, st, r, S.editId || undefined, false).map(function (m) {
+        return st.id === me().id ? m.replace('More than ' + st.name.split(' ')[0] + '’s allowance', 'More than your allowance') : m;
+      });
+      var over = C.allowanceWarning(S.data, st, r, S.editId || undefined, false);
+      if (warns.length) sum.insertAdjacentHTML('beforeend', coverHtml(warns, isMgr() ? 'As Administrator you can still book it.' :
+        over ? 'You can still send it, but it will need the Administrator’s approval, and they’ll see this warning.' : 'You can still send it; the Administrator will see this warning.'));
     }
   }
   /** Approve / Decline buttons for someone who can decide this request (not shown when printing). */
@@ -2235,15 +2238,19 @@
     return '<span class="qd rp-act"><button class="btn small bad" data-act="decide" data-d="Declined" data-id="' + esc(r.id) + '">Decline</button>' +
       '<button class="btn small ok" data-act="decide" data-d="Approved" data-id="' + esc(r.id) + '">Approve</button></span>';
   }
+  /** Over-allowance warning for a request that's waiting or approved ('' if none). */
+  function overWarning(r) {
+    var st = staffById(r.staffId);
+    return st ? C.allowanceWarning(S.data, st, r, r.id, true) : '';
+  }
   function coverHtml(list, tail) {
-    return '<div class="covwarn" role="note"><b>⚠ Cover warning</b>' + list.map(function (m) { return '<span>' + esc(m) + '</span>'; }).join('') +
+    return '<div class="covwarn" role="note"><b>⚠ Please check</b>' + list.map(function (m) { return '<span>' + esc(m) + '</span>'; }).join('') +
       (tail ? '<span class="muted small">' + esc(tail) + '</span>' : '') + '</div>';
   }
   function reqWarnings(r) {
     var st = staffById(r.staffId);
     if (!st || (r.status !== 'Pending' && r.status !== 'Approved')) return [];
-    var cv = C.coverCheck(S.data, st, r, r.id);
-    return cv.block.concat(cv.warn);
+    return C.requestWarnings(S.data, st, r, r.id, true);
   }
   /** Shows a problem under the request form, and greys out the send button until it's fixed. */
   function setErr(msg) {
@@ -2398,6 +2405,11 @@
       case 'decide': {
         var note = document.getElementById('note-' + el.dataset.id);
         var d = el.dataset.d;
+        if (d === 'Approved' && !el.dataset.confirm) {
+          var ovr = (S.data.requests || []).filter(function (x) { return x.id === el.dataset.id; })[0];
+          var ow = ovr ? overWarning(ovr) : '';
+          if (ow) { el.dataset.confirm = '1'; el.textContent = 'Approve anyway'; toast('⚠ ' + ow); return; }
+        }
         var decId = el.dataset.id, noteVal = note ? note.value : '';
         var undoD = optimistic(function (dd) {
           dd.requests.forEach(function (x) { if (x.id === decId) { x.status = d; x.decidedBy = me().name; x.decidedOn = C.iso(new Date()); x.note = noteVal; x.saving = true; } });
