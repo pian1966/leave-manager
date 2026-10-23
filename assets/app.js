@@ -383,7 +383,7 @@
     }).join('');
     var formUrl = CFG.FORM_URL || settings().FormURL;
     var guideUrl = CFG.GUIDE_URL || 'https://github.com/pian1966/leave-manager/blob/main/STAFF-GUIDE.md';
-    var links = '<a href="' + esc(guideUrl) + '" target="_blank" rel="noopener">Staff guide: how to use Leave Manager ↗</a>' + (isApprover() ? '<a href="' + esc(guideUrl.replace('STAFF-GUIDE', 'ADMIN-GUIDE')) + '" target="_blank" rel="noopener">Administrator guide ↗</a>' : '') + (formUrl ? '<a href="' + esc(formUrl) + '" target="_blank" rel="noopener">Prefer a form? Request via Google Forms ↗</a>' : '') +
+    var links = '<a href="#" data-act="videos">▶ Help videos: how to request leave</a><a href="' + esc(guideUrl) + '" target="_blank" rel="noopener">Staff guide: how to use Leave Manager ↗</a>' + (isApprover() ? '<a href="' + esc(guideUrl.replace('STAFF-GUIDE', 'ADMIN-GUIDE')) + '" target="_blank" rel="noopener">Administrator guide ↗</a>' : '') + (formUrl ? '<a href="' + esc(formUrl) + '" target="_blank" rel="noopener">Prefer a form? Request via Google Forms ↗</a>' : '') +
       (isMgr() && CFG.SHEET_URL ? '<a href="' + esc(CFG.SHEET_URL) + '" target="_blank" rel="noopener">Open the Google Sheet ↗</a>' : '');
     var brand = '<div class="brand">' + markHTML() + '<div><b>Leave Manager</b><small>' + esc(settings().CompanyName || 'My Team') + '</small></div></div>';
     var tabs = navItems().filter(function (n) { return n[0] !== 'settings' && n[0] !== 'setup' && ((n[0] !== 'year' && n[0] !== 'home') || !isMgr()); });
@@ -464,11 +464,28 @@
     });
   }
 
+  /** Short how-to videos, played inside Leave Manager (works in the browser and the Android app). */
+  var VIDEOS = [
+    { id: 'phone', title: 'On a phone (Android or iPhone)', len: '43 sec', src: 'docs/videos/request-leave-phone.mp4', poster: 'docs/videos/request-leave-phone.jpg', tall: true },
+    { id: 'computer', title: 'On a computer', len: '53 sec', src: 'docs/videos/request-leave-computer.mp4', poster: 'docs/videos/request-leave-computer.jpg' }
+  ];
+  function videosModal(which) {
+    var phone = /LeaveManagerApp|Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth < 760;
+    var v = VIDEOS.filter(function (x) { return x.id === which; })[0] || (phone ? VIDEOS[0] : VIDEOS[1]);
+    var html = '<header><div><p class="eyebrow">Help videos</p><h2>How to request leave</h2></div><button class="x" data-act="close" aria-label="Close">×</button></header>' +
+      '<div class="seg vid-tabs" role="tablist">' + VIDEOS.map(function (x) {
+        return '<button type="button" role="tab" class="btn small' + (x.id === v.id ? ' primary' : '') + '" aria-selected="' + (x.id === v.id) + '" data-act="video" data-id="' + x.id + '">' + esc(x.title) + ' · ' + esc(x.len) + '</button>'; }).join('') + '</div>' +
+      '<div class="vid-wrap' + (v.tall ? ' tall' : '') + '"><video controls playsinline preload="metadata" poster="' + esc(v.poster) + '" src="' + esc(v.src) + '"></video></div>' +
+      '<p class="muted small">Turn your sound on for the voiceover. The videos use made-up sample staff. More help: the <a href="' + esc(CFG.GUIDE_URL || 'https://github.com/pian1966/leave-manager/blob/main/STAFF-GUIDE.md') + '" target="_blank" rel="noopener">Staff guide ↗</a>.</p>' +
+      '<div class="actions"><button class="btn" data-act="close">Close</button></div>';
+    openModal(html, 'Help videos');
+    var m = modalRoot.querySelector('.modal'); if (m) m.classList.add('vid-modal');
+  }
   /** Links to the user manuals (they open in the browser, also from the Android app). */
   function helpSection() {
     var staffUrl = CFG.GUIDE_URL || 'https://github.com/pian1966/leave-manager/blob/main/STAFF-GUIDE.md';
-    return '<section class="panel set-block"><h2>Help</h2><p class="muted">Step-by-step guides with pictures. They open in your browser.</p>' +
-      '<div class="btns"><a class="btn" href="' + esc(staffUrl) + '" target="_blank" rel="noopener">Staff guide ↗</a>' +
+    return '<section class="panel set-block"><h2>Help</h2><p class="muted">Short videos with a voiceover, and step-by-step guides with pictures (the guides open in your browser).</p>' +
+      '<div class="btns"><button class="btn primary" data-act="videos">▶ Help videos</button><a class="btn" href="' + esc(staffUrl) + '" target="_blank" rel="noopener">Staff guide ↗</a>' +
       (isApprover() ? '<a class="btn" href="' + esc(staffUrl.replace('STAFF-GUIDE', 'ADMIN-GUIDE')) + '" target="_blank" rel="noopener">Administrator guide ↗</a>' : '') + '</div></section>';
   }
   /** Administrator: switch the automatic staff emails on or off. */
@@ -2412,6 +2429,8 @@
       case 'open-req': requestDetail(el.dataset.id); break;
       case 'day': dayDetail(el.dataset.date); break;
       case 'close': closeModal(); break;
+      case 'videos': if (ev.preventDefault) ev.preventDefault(); videosModal(); break;
+      case 'video': videosModal(el.dataset.id); break;
       case 'logout': closeModal(); logout(); break;
       case 'logout-ask':
         openModal('<header><div><p class="eyebrow">Leave Manager</p><h2>Sign out?</h2></div><button class="x" data-act="close" aria-label="Close">×</button></header>' +

@@ -703,3 +703,9 @@ input[readonly] { background: var(--surface-2); color: var(--muted); }
 .fbal .fb-n b{font-size:1.2rem}
 .fbal .fb.none .fb-n b{color:var(--bad)}
 .fbal .fb-u,.fbal .fb small{color:var(--muted);font-size:.8rem}
+
+.vid-modal{max-width:760px}
+.vid-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.vid-wrap{background:#000;border-radius:12px;overflow:hidden;display:flex;justify-content:center}
+.vid-wrap video{display:block;width:100%;max-height:70vh;background:#000}
+.vid-wrap.tall video{width:auto;max-width:100%;height:70vh}

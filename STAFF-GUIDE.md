@@ -56,6 +56,8 @@ The Overview opens first and shows your own leave at a glance.
 
 ## Requesting leave
 
+**Prefer to watch?** In Leave Manager, click **▶ Help videos** in the left panel, or go to **My settings → Help → Help videos** (on a phone). There's a short video with a voiceover for a phone (Android or iPhone) and one for a computer. You can also open them directly: [phone video](https://pian1966.github.io/leave-manager/docs/videos/request-leave-phone.mp4) · [computer video](https://pian1966.github.io/leave-manager/docs/videos/request-leave-computer.mp4).
+
 1. Click **Request leave** (top of the left panel, or **+ Request** on a phone). You can also click an empty day on your own row of the **Wallchart**.
 2. Choose the **Leave type**. You only see the types your staff category gets. As soon as you choose one, a box below it shows how much of that leave you still have (plus any days already waiting for approval, and days from last year you can still use).
 3. Pick the **First day** and **Last day**. The Last day fills in with the same date, so for one day you're done; for longer, change the Last day.
