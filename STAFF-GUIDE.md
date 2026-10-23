@@ -195,9 +195,11 @@ Appearance and Start page are remembered on the device you set them on, so you c
 - If your phone asks, allow Chrome (or your browser) to install apps.
 - If Play Protect says it doesn't recognise the app, tap **More details → Install anyway**. It's our own church app, so it isn't in the Play Store.
 
-Then open **Leave Manager** from your apps and sign in with your email and PIN. To get the latest leave (for example after the Administrator approves something), tap **⟳** at the top, or pull the page down from the top. The app also refreshes by itself when you come back to it after a few minutes. When a newer version of the app is available, a banner at the top says **Update available**: tap **Update**, open the downloaded file and tap **Update**. You can also check yourself under **My settings → Android app → Check for updates**. The back button closes windows and takes you back to Overview. You can print reports from the app too.
+Then open **Leave Manager** from your apps (the orange icon) and sign in with Google, or with your email and PIN. To get the latest leave (for example after the Administrator approves something), tap **⟳** at the top, or pull the page down from the top. The app also refreshes by itself when you come back to it after a few minutes. When a newer version of the app is available, a banner at the top says **Update available**: tap **Update**, open the downloaded file and tap **Update**. You can also check yourself under **My settings → Android app → Check for updates**. The back button closes windows and takes you back to Overview. You can print reports from the app too.
 
-**iPhone:** open Leave Manager in Safari, tap the **Share** button, then **Add to Home Screen**.
+**iPhone:** open https://pian1966.github.io/leave-manager/ in Safari, tap the **Share** button, then **Add to Home Screen**. Leave Manager then opens from your home screen like an app.
+
+The **▶ Help videos** under **My settings → Help** include a short video showing how to request leave on a phone.
 
 ## Common questions
 

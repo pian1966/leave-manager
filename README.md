@@ -30,6 +30,11 @@ Open `web/index.html` in a browser before you set anything up: with no API URL c
 - **Approvals** – managers see pending requests with the balance after approval and who else is away. They get an email with a **Review request** button and can approve from their phone without signing in.
 - **Managers can book leave for their team** (auto-approved), and anyone can cancel their own future leave.
 - **Unpaid Leave** shows on the calendar without using an allowance.
+- **Request form shows what's left:** once a leave type is chosen, a box shows how much of it the person still has (plus pending days and last year's days still usable).
+- **Over-allowance requests** can still be sent, but are flagged **⚠ over allowance** for both the person and the Administrator, always need approval, and need a second click (**Approve anyway**) to approve.
+- **Public holidays on a Sunday:** the Monday is the holiday, so for staff who work Sundays that Sunday counts as a working day; the request form says so.
+- **Help videos:** short narrated videos (phone and computer) on how to request leave, in `docs/videos/` and linked from the app's left panel and My settings → Help.
+- **Help notes on the Google Sheet:** every column heading has a note explaining what goes in it.
 - **Google Form** for people who prefer it, with an email back if a request can't be booked (e.g. it overlaps other leave) or goes over the allowance.
 - **Holidays and school terms update themselves** every month. **Leave Manager → Update public holidays and school terms now** runs it on demand, and **LastCalendarUpdate** in Settings shows what it last did.
 - **Google Calendar mirror** (optional) – approved leave appears in a shared calendar.
@@ -135,7 +140,8 @@ Send everyone the GitHub Pages link and their PIN. Share the Google Form link (S
 ## Updating the code later
 
 - **Apps Script:** paste the new code, then **Deploy → Manage deployments → ✏️ Edit → Version: New version → Deploy**. The URL stays the same.
-- **Web app:** commit the changed files to GitHub. Keep `apps-script/Core.gs` and `web/assets/core.js` identical; they contain the shared balance rules.
+- **Web app:** commit the changed files to GitHub; GitHub Pages publishes them within a minute or two. The **Deploy Google Apps Script** workflow copies `assets/core.js` to `apps-script/Core.gs` and deploys the script automatically, so the shared balance rules stay identical.
+- **Android app:** pushing changes under `android/` builds and publishes a new release; staff see **Update available** in the app.
 
 ## Troubleshooting
 

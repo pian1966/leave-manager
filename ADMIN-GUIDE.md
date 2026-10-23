@@ -270,14 +270,20 @@ The **Employees** page also shows whether each person has chosen their own PIN y
 ## The Android app and Sign in with Google
 
 - **Android app link for staff:** <https://github.com/pian1966/leave-manager/releases/latest/download/LeaveManager.apk>. The app shows the live site, so updates appear without reinstalling. Occasionally a new app version adds phone features. The app checks for this itself and shows an **Update available** banner; installing over the old version keeps everyone signed in.
-- **iPhone:** Safari → Share → *Add to Home Screen*.
+  Easiest way to hand it out: send the link on WhatsApp or by email. When installing, staff may need to allow their browser or Files app to "install unknown apps", and tap **More details → Install anyway** if Google Play Protect warns them (the app isn't in the Play Store).
+- **iPhone:** open <https://pian1966.github.io/leave-manager/> in Safari → Share → *Add to Home Screen*.
+- **Help videos for staff:** short videos with a voiceover show how to request leave, one for a phone (Android or iPhone) and one for a computer. Staff find them under **▶ Help videos** in the left panel, or **My settings → Help** on a phone. You can also send the links: [phone](https://pian1966.github.io/leave-manager/docs/videos/request-leave-phone.mp4) · [computer](https://pian1966.github.io/leave-manager/docs/videos/request-leave-computer.mp4).
 - **Sign in with Google** works for anyone whose email on the Staff tab is a Google account. Everyone can still use email and PIN.
 
 ## Common questions
 
 | Question | Answer |
 | --- | --- |
-| Someone booked the wrong leave type | Cancel it and book the right type for them. |
+| Someone booked the wrong leave type or dates | Click the request and choose **Change**. As Administrator your change keeps its status, and the person is emailed. |
+| I want to remove a declined request completely | Leave Manager never deletes requests, so there's a record. To erase one, open the Google Sheet → **Requests** tab, find the row (check name, dates and *Declined*), right-click the row number → **Delete row**. Optionally search the **History** tab for its ID and delete those rows too. |
+| A public holiday falls on a Sunday | The Monday after is the public holiday (Public Holidays Act). For staff who work Sundays, that Sunday is a normal working day: leave on it uses a day, and the request form explains this to them. Everyone gets the Monday off. |
+| Someone wants more leave than they have | They can still send it. It's marked **⚠ over allowance** and always needs your approval (see *Approving leave*). |
+| A column on the Google Sheet is unclear | Hover over its heading: every heading has a note explaining it. If notes are missing, use **Leave Manager → Open control panel → Maintenance → Add help notes to headings**. |
 | A cover warning seems wrong | Check the rule's Category and Days on Cover Rules, and the staff member's category on Staff. |
 | The weekly email didn't arrive | Check it's switched on under **My settings → Automatic emails**, and use the Preview menu item to test. Emails go to staff with real email addresses only. |
 | A stand-in can't see Approvals | Check today is between the From and To dates on the Dashboard. |
