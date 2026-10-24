@@ -277,6 +277,31 @@ The **Employees** page also shows whether each person has chosen their own PIN y
 - **Help videos for staff:** short videos with a voiceover show how to request leave, one for a phone (Android or iPhone) and one for a computer. Staff find them under **▶ Help videos** in the left panel, or **My settings → Help** on a phone. You can also send the links: [phone](https://pian1966.github.io/leave-manager/docs/videos/request-leave-phone.mp4) · [computer](https://pian1966.github.io/leave-manager/docs/videos/request-leave-computer.mp4).
 - **Sign in with Google** works for anyone whose email on the Staff tab is a Google account. Everyone can still use email and PIN.
 
+## Elvanto: unavailability and calendar
+
+Leave Manager can keep Elvanto up to date with approved leave, so nobody is rostered while they're away:
+
+- **Unavailable Volunteers.** Elvanto doesn't let other programs add unavailability, so a **robot** does it the way a person would: every 15 minutes it logs into Elvanto and goes to **People → Volunteers → Unavailable Volunteers**. There it adds approved leave, changes the dates when leave is changed, and removes it when leave is cancelled or needs approval again. Each entry has the note *Leave Manager &lt;request ID&gt;*. Only **approved** leave goes to Elvanto.
+- **Calendar.** Approved leave also appears as a private, all-day event, *"Name – away"*, on the Elvanto calendar you choose. It's added, moved or deleted straight away.
+- **Emails.** After each robot run, the **Elvanto Administrator** gets an email listing what was added, changed or removed, asking them to check it in Elvanto. Anything the robot couldn't do is marked ⚠️ to be done by hand. If the robot hasn't managed something within 2 hours, they're told as well.
+- **The Elvanto tab** of the Google Sheet lists every entry: its dates, what's in Elvanto, the robot's status and notes. To make the robot try again, type *Waiting* in **Robot Status**. If it can't find someone, correct their **Elvanto Name**.
+
+**Setting it up (once):**
+1. **In the Google Sheet:** open **Leave Manager → Connect Elvanto…** and enter:
+   - your Elvanto address;
+   - the Elvanto Administrator's email;
+   - an Elvanto **API key**.
+
+   The key is stored privately, not on the sheet. The final message lists your Elvanto calendars: copy the ID of the one for staff leave into **ElvantoCalendarId** on the Settings tab. The message also shows the **robot secret**.
+2. **Give the robot an Elvanto login.** Ideally use a separate login just for the robot, allowed to manage volunteers. It must not need a **verification code** when signing in, or the robot can't log in.
+3. **In GitHub:** go to **leave-manager → Settings → Secrets and variables → Actions → New repository secret** and add:
+   - `ROBOT_SECRET`, the secret from step 1;
+   - `ELVANTO_USERNAME` and `ELVANTO_PASSWORD`, the robot's login.
+
+   They're stored encrypted and never appear in the robot's log. The log is public, so it never contains names or dates.
+
+To stop syncing, set **ElvantoSync** to FALSE on the Settings tab.
+
 ## Common questions
 
 | Question | Answer |

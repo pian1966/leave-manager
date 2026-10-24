@@ -34,6 +34,7 @@ Open `web/index.html` in a browser before you set anything up: with no API URL c
 - **Over-allowance requests** can still be sent, but are flagged **⚠ over allowance** for both the person and the Administrator, always need approval, and need a second click (**Approve anyway**) to approve.
 - **Public holidays on a Sunday:** the Monday is the holiday, so for staff who work Sundays that Sunday counts as a working day; the request form says so.
 - **Help videos:** short narrated videos (phone and computer) on how to request leave, in `docs/videos/` and linked from the app's left panel and My settings → Help.
+- **Elvanto:** approved leave is added to Elvanto's Unavailable Volunteers list by a robot (`robot/`, GitHub Actions every 15 minutes) and to an Elvanto calendar through the Elvanto API; changes and cancellations follow, and the Elvanto Administrator is emailed each time. Setup: Administrator guide → *Elvanto*.
 - **Help notes on the Google Sheet:** every column heading has a note explaining what goes in it.
 - **Google Form** for people who prefer it, with an email back if a request can't be booked (e.g. it overlaps other leave) or goes over the allowance.
 - **Holidays and school terms update themselves** every month. **Leave Manager → Update public holidays and school terms now** runs it on demand, and **LastCalendarUpdate** in Settings shows what it last did.

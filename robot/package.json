@@ -1,0 +1,6 @@
+{
+  "name": "leave-manager-elvanto-robot",
+  "private": true,
+  "description": "Puts approved Leave Manager leave into Elvanto's Unavailable Volunteers list.",
+  "dependencies": { "playwright": "1.48.2" }
+}

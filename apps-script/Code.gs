@@ -56,6 +56,8 @@ function onOpen() {
     .addItem('Choose categories for a cover rule…', 'chooseRuleCategories')
     .addItem('Choose dates for a cover rule…', 'chooseRuleDates')
     .addSeparator()
+    .addItem('Connect Elvanto…', 'connectElvanto')
+    .addSeparator()
     .addItem('Set up or repair the workbook', 'setup')
     .addToUi();
 }
@@ -762,6 +764,7 @@ function doGet(e) {
 
 function route_(b) {
   if (b.action === 'login') return login_(b);
+  if (b.action === 'robot-jobs' || b.action === 'robot-result') return elvRobot_(b);
   var data = cachedData_();
   var user = auth_(b.token, data);
   LAST_DATA_ = null;
@@ -953,6 +956,7 @@ function createRequest_(actor, b, source) {
     }
     if (r.status === 'Approved') {
       syncCalendar_(data, r, p.staff, p.type);
+      elvantoSync_(data, r, p.staff, true);
       if (p.staff.id !== actor.id) mailDecision_(data, r, p.staff, p.type, actor.name);
     } else {
       mailNewRequest_(data, r, p.staff, p.type);
@@ -970,7 +974,7 @@ function decide_(actor, id, decision, note) {
     r.status = decision; r.note = String(note || ''); r.decidedBy = actor.name; r.decidedOn = nowStr_();
     LAST_DATA_ = data;
     logHistory_(decision, r, p.staff.name, p.type.name, actor.name, r.note);
-    if (decision === 'Approved') syncCalendar_(data, r, p.staff, p.type);
+    if (decision === 'Approved') { syncCalendar_(data, r, p.staff, p.type); elvantoSync_(data, r, p.staff, true); }
     mailDecision_(data, r, p.staff, p.type, actor.name);
     return r;
   });
@@ -986,6 +990,7 @@ function cancel_(actor, id) {
     LAST_DATA_ = data;
     logHistory_('Cancelled (was ' + (wasApproved ? 'approved' : 'waiting for approval') + ')', r, p.staff.name, p.type.name, actor.name, '');
     removeCalendar_(data, r);
+    if (wasApproved) elvantoSync_(data, r, p.staff, false);
     if (wasApproved && actor.id === p.staff.id) {
       var to = managerEmails_(data, p.staff);
       if (to) MailApp.sendEmail({ to: to, subject: p.staff.name + ' cancelled ' + p.type.name + ' (' + range_(r) + ')',
@@ -1452,6 +1457,7 @@ function edit_(actor, b) {
     LAST_DATA_ = data;
     var updated = { id: r.id, _row: r._row, staffId: r.staffId, type: n.type, start: n.start, end: n.end, half: n.half, days: n.days, reason: n.reason, status: p.status, warnings: n.warnings };
     if (p.status === 'Approved') syncCalendar_(data, updated, p.staff, p.type);
+    if (p.status === 'Approved' || p.was.status === 'Approved') elvantoSync_(data, updated, p.staff, p.status === 'Approved');
     logHistory_('Changed' + (p.reapprove ? ' (needs approval again)' : ''), updated, p.staff.name, p.type.name, actor.name, 'Was: ' + p.changes.join('; '));
     var changeList = '<ul>' + p.changes.map(function (c) { return '<li>' + esc_(c) + '</li>'; }).join('') + '</ul>';
     if (actor.id === p.staff.id) {

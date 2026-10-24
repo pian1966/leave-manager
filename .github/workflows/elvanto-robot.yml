@@ -1,0 +1,65 @@
+# Leave Manager → Elvanto robot (see robot/robot.js).
+# Every 15 minutes it asks Leave Manager whether any approved, changed or cancelled leave needs
+# entering in Elvanto's Unavailable Volunteers list, and if so logs into Elvanto and does it.
+#
+# Repository secrets (Settings → Secrets and variables → Actions):
+#   ROBOT_SECRET      – shown by Leave Manager → Connect Elvanto… in the Google Sheet
+#   ELVANTO_USERNAME  – an Elvanto login the robot can use (without two-step verification)
+#   ELVANTO_PASSWORD
+# This repository is public, so the robot never prints names or dates in its log.
+name: Elvanto robot
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'run = do waiting work · explore = describe Elvanto’s pages, change nothing'
+        default: run
+        type: choice
+        options: [run, explore]
+
+concurrency:
+  group: elvanto-robot
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  robot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Anything to do?
+        id: check
+        env:
+          ROBOT_SECRET: ${{ secrets.ROBOT_SECRET }}
+          MODE: check
+        run: |
+          if [ -z "$ROBOT_SECRET" ]; then echo "jobs=0" >> "$GITHUB_OUTPUT"; echo "Robot not set up yet."; exit 0; fi
+          node robot/robot.js
+
+      - name: Install the browser
+        if: steps.check.outputs.jobs != '0' || github.event.inputs.mode == 'explore'
+        working-directory: robot
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Update Elvanto
+        if: steps.check.outputs.jobs != '0' || github.event.inputs.mode == 'explore'
+        env:
+          ROBOT_SECRET: ${{ secrets.ROBOT_SECRET }}
+          ELVANTO_USERNAME: ${{ secrets.ELVANTO_USERNAME }}
+          ELVANTO_PASSWORD: ${{ secrets.ELVANTO_PASSWORD }}
+          ELV_LIST_PATH: ${{ vars.ELVANTO_LIST_PATH }}
+          MODE: ${{ github.event.inputs.mode || 'run' }}
+        run: node robot/robot.js
