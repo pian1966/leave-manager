@@ -22,6 +22,8 @@ This guide is for the **Administrator**: the person who approves leave, keeps th
 11. [The Android app and Sign in with Google](#the-android-app-and-sign-in-with-google)
 12. [Common questions](#common-questions)
 
+**Prefer to watch first?** There's a 1½-minute narrated [Administrator tour](https://pian1966.github.io/leave-manager/docs/videos/administrator-tour.mp4) covering the Dashboard, approving, booking for someone, the Wallchart, balances, reports and Setup. In Leave Manager it's under **▶ Help videos** in the left panel.
+
 ## Your role
 
 - Every leave request comes to you by email and on the **Approvals** page.
